@@ -39,3 +39,10 @@ To maximize precision and eliminate hallucinations, every task must follow this 
 2. **Claude Audit:** @mentor (Claude) performs a line-by-line logic audit. 
    * *Note:* While Claude's direct API is being finalized, @mentor must still participate in the debate via simulated comments in Markdown.
 3. **The Argument:** If @mentor identifies a logic error or a "hallucinated" Python library, @engineer must provide a rebuttal or a fix. No code is committed until @mentor provides a `[PASSED BY MENTOR]` status.
+
+## VII. VERSION CONTROL, BACKUPS & DEPLOYMENT
+1. **The 5-Change Rule:** `@devops` tracks file modifications. Exactly upon reaching 5 file modifications, OR before any high-risk structural change, `@devops` MUST execute a secure local git commit.
+2. **End-of-Phase Backup Protocol:** Upon receiving the `[PASSED BY MENTOR]` stamp and the human's approval to proceed, `@devops` MUST execute the following sequence before closing the phase:
+    * **Local Backup:** Create a timestamped copy of the current `src/` and `offline_training/` directories into a local `_backups/Phase_X_YYYYMMDD/` folder (ignoring `__pycache__` and `.venv`).
+    * **Remote Push:** Execute `git add .`, `git commit -m "feat: complete Phase X [brief description]"`, and `git push origin [current-branch]`.
+3. **Sandbox Constraints:** If the IDE terminal sandbox prevents `@devops` from running these commands autonomously, `@devops` MUST generate a cross-platform Python script named `execute_backup_and_push.py` that the human can run with one click to perform the folder copy and git push simultaneously.
