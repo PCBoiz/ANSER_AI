@@ -3,10 +3,11 @@ Shared dependencies for all API routes.
 Contains RuntimeState, auth helpers, and text utilities.
 """
 
+import asyncio
 import logging
 import os
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Optional
 
 from fastapi import Header, HTTPException
@@ -30,6 +31,17 @@ class ChatRequest(BaseModel):
 
 
 # ---------------------------------------------------------------------------
+# Concurrency Guards
+# ---------------------------------------------------------------------------
+
+# Prevents TOCTOU race when multiple concurrent requests trigger
+# model loading simultaneously.  The lock is reentrant-safe: if
+# _initialize completes (or raises), the lock is always released.
+_model_load_lock = asyncio.Lock()
+_vision_load_lock = asyncio.Lock()
+
+
+# ---------------------------------------------------------------------------
 # Runtime State (lazy-loaded singletons)
 # ---------------------------------------------------------------------------
 
@@ -45,58 +57,66 @@ class RuntimeState:
     kb_error: Optional[str] = None
     vision_error: Optional[str] = None
 
-    def ensure_text_runtime(self) -> None:
+    async def ensure_text_runtime(self) -> None:
+        """Async, lock-guarded model initialization."""
+        # Fast path: already loaded — no lock needed
         if self.manager and self.coder and self.memory:
             return
-        if not self.memory:
-            from src.core.memory import MemoryManager
 
-            self.memory = MemoryManager()
+        async with _model_load_lock:
+            # Double-check after acquiring lock (another coroutine may have finished)
+            if self.manager and self.coder and self.memory:
+                return
 
-        if RUNTIME_PROFILE == "minimal":
-            self.engine_error = "Text runtime disabled by RUNTIME_PROFILE=minimal"
-            return
+            if not self.memory:
+                from src.core.memory import MemoryManager
+                self.memory = MemoryManager()
 
-        try:
-            from src.core.engine import ModelEngine
+            if RUNTIME_PROFILE == "minimal":
+                self.engine_error = "Text runtime disabled by RUNTIME_PROFILE=minimal"
+                return
 
-            self.engine = self.engine or ModelEngine()
-        except Exception as exc:
-            self.engine = None
-            self.engine_error = str(exc)
-            logger.error("Engine initialization failed: %s", exc)
+            try:
+                from src.core.engine import ModelEngine
+                self.engine = self.engine or ModelEngine()
+            except Exception as exc:
+                self.engine = None
+                self.engine_error = str(exc)
+                logger.error("Engine initialization failed: %s", exc)
 
-        try:
-            if not self.kb:
-                from src.core.knowledge import KnowledgeBase
+            try:
+                if not self.kb:
+                    from src.core.knowledge import KnowledgeBase
+                    self.kb = KnowledgeBase()
+            except Exception as exc:
+                self.kb = None
+                self.kb_error = str(exc)
+                logger.warning("Knowledge base initialization failed: %s", exc)
 
-                self.kb = KnowledgeBase()
-        except Exception as exc:
-            self.kb = None
-            self.kb_error = str(exc)
-            logger.warning("Knowledge base initialization failed: %s", exc)
+            if self.engine:
+                from src.agents.coder import CoderAgent
+                from src.agents.manager import ManagerAgent
+                self.manager = self.manager or ManagerAgent(self.engine, self.memory, kb=self.kb)
+                self.coder = self.coder or CoderAgent(self.engine, self.memory)
 
-        if self.engine:
-            from src.agents.coder import CoderAgent
-            from src.agents.manager import ManagerAgent
-
-            self.manager = self.manager or ManagerAgent(self.engine, self.memory, kb=self.kb)
-            self.coder = self.coder or CoderAgent(self.engine, self.memory)
-
-    def ensure_vision_runtime(self) -> None:
+    async def ensure_vision_runtime(self) -> None:
+        """Async, lock-guarded vision model initialization."""
         if self.vision:
             return
-        if RUNTIME_PROFILE == "text-only":
-            self.vision_error = "Vision runtime disabled by RUNTIME_PROFILE=text-only"
-            return
-        try:
-            from src.agents.vision import VisionAgent
 
-            self.vision = VisionAgent()
-        except Exception as exc:
-            self.vision = None
-            self.vision_error = str(exc)
-            logger.error("Vision initialization failed: %s", exc)
+        async with _vision_load_lock:
+            if self.vision:
+                return
+            if RUNTIME_PROFILE == "text-only":
+                self.vision_error = "Vision runtime disabled by RUNTIME_PROFILE=text-only"
+                return
+            try:
+                from src.agents.vision import VisionAgent
+                self.vision = VisionAgent()
+            except Exception as exc:
+                self.vision = None
+                self.vision_error = str(exc)
+                logger.error("Vision initialization failed: %s", exc)
 
 
 # Global singleton

@@ -94,7 +94,7 @@ def main():
     # We remove '--reload' for Colab stability (it causes multiprocessing issues in notebooks)
     cmd = [
         "uvicorn", 
-        "src.server:app", 
+        "src.api.main:app", 
         "--host", "0.0.0.0", 
         "--port", "8000"
     ]

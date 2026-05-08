@@ -44,7 +44,7 @@ async def chat_endpoint(
 ):
     require_api_token(x_api_token)
     user_id, store_id = resolve_identity(req, x_user_id, x_store_id)
-    runtime.ensure_text_runtime()
+    await runtime.ensure_text_runtime()
     if not runtime.manager or not runtime.coder:
         raise HTTPException(status_code=503, detail="Text runtime unavailable")
 
@@ -67,14 +67,15 @@ async def chat_endpoint(
             logger.info("Financial route active, utilizing MCP Server", extra={"request_id": request_id})
             from src.core.mcp_server import MCPServer
 
+            MAX_RETRIES = 3
+
             extraction_prompt = f"Extract items and total from this text into JSON. Text: {user_msg}"
             extraction = await runtime.manager.consult(extraction_prompt, context="", history="")
 
-            max_retries = 2
             parsed_payload = None
-            resp = "MCP Error: Unable to parse financial data from your request."
+            last_error = None
 
-            for attempt in range(max_retries):
+            for attempt in range(MAX_RETRIES):
                 try:
                     from json_repair import repair_json
                     parsed_dict = repair_json(extraction, return_objects=True)
@@ -83,19 +84,37 @@ async def chat_endpoint(
                     parsed_payload = InvoicePayload(**parsed_dict)
                     break
                 except Exception as e:
-                    if attempt < max_retries - 1:
-                        logger.warning(f"Validation failed on attempt {attempt+1}. Error: {e}")
-                        refinement_prompt = f"Your previous JSON failed validation. Error: {e}. Please correct it."
-                        extraction = await runtime.manager.consult(refinement_prompt, context=extraction, history="")
-                    else:
-                        resp = f"MCP Error: Schema validation failed after {max_retries} attempts. Last error: {e}"
+                    last_error = e
+                    logger.warning(
+                        "Schema validation attempt %d/%d failed: %s",
+                        attempt + 1, MAX_RETRIES, e,
+                        extra={"request_id": request_id},
+                    )
+                    if attempt < MAX_RETRIES - 1:
+                        refinement_prompt = (
+                            f"Your previous JSON failed validation. Error: {e}. "
+                            f"Please correct it to strictly match the schema."
+                        )
+                        extraction = await runtime.manager.consult(
+                            refinement_prompt, context=extraction, history=""
+                        )
 
-            if parsed_payload:
-                mcp_res = MCPServer.validate_invoice_total(
-                    [item.model_dump() for item in parsed_payload.items],
-                    parsed_payload.total
+            if not parsed_payload:
+                logger.error(
+                    "LLM failed to conform to InvoicePayload after %d attempts. Last error: %s",
+                    MAX_RETRIES, last_error,
+                    extra={"request_id": request_id},
                 )
-                resp = f"Deterministic Validation: {json.dumps(mcp_res)}"
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"LLM failed to conform to strict schema after {MAX_RETRIES} attempts.",
+                )
+
+            mcp_res = MCPServer.validate_invoice_total(
+                [item.model_dump() for item in parsed_payload.items],
+                parsed_payload.total
+            )
+            resp = f"Deterministic Validation: {json.dumps(mcp_res)}"
 
         elif cat == "TECHNICAL":
             plan = await runtime.manager.plan_or_ask(req.message)

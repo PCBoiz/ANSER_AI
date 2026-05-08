@@ -12,7 +12,7 @@ os.environ["ENV"] = "LOCAL"
 root_path = Path(__file__).parent.parent
 sys.path.insert(0, str(root_path))
 
-from src.server import app
+from src.api.main import app
 from src.core.engine import TASK_REGISTRY
 
 @pytest.mark.asyncio

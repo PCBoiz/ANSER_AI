@@ -27,7 +27,7 @@ async def upload_file(
 ):
     """Analyze an uploaded image using VisionAgent (Florence-2)."""
     require_api_token(x_api_token)
-    runtime.ensure_vision_runtime()
+    await runtime.ensure_vision_runtime()
     if not runtime.vision:
         raise HTTPException(status_code=503, detail="Vision runtime unavailable")
 
@@ -81,7 +81,7 @@ async def ocr_endpoint(
 ):
     """OCR an uploaded image via VisionAgent (Florence-2 <OCR> prompt)."""
     require_api_token(x_api_token)
-    runtime.ensure_vision_runtime()
+    await runtime.ensure_vision_runtime()
     if not runtime.vision:
         raise HTTPException(status_code=503, detail="Vision runtime unavailable")
 
