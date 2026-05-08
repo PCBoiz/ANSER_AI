@@ -58,6 +58,13 @@ def execute_backup_and_push():
         else:
             print(f"   -> Commit skipped or failed: {commit_res.stdout.strip()}")
 
+        # Check for remote origin
+        remotes_res = subprocess.run(["git", "remote"], cwd=project_root, capture_output=True, text=True)
+        if "origin" not in remotes_res.stdout.split():
+            print("   -> ⚠️ No remote 'origin' configured. Skipping remote push.")
+            print("✅ Backup and local commit completed successfully.")
+            return
+            
         # Run git push
         print("   -> Pushing to origin (current branch)...")
         push_res = subprocess.run(["git", "push", "origin", "HEAD"], cwd=project_root, capture_output=True, text=True)
@@ -65,7 +72,7 @@ def execute_backup_and_push():
         if push_res.returncode == 0:
             print("✅ Remote push completed successfully.")
         else:
-            print(f"⚠️ Remote push failed (You may need to configure a remote 'origin'):\n{push_res.stderr.strip()}")
+            print(f"⚠️ Remote push failed:\n{push_res.stderr.strip()}")
             
     except FileNotFoundError:
         print("❌ Git is not installed or not available in PATH.")
