@@ -59,8 +59,8 @@ def execute_backup_and_push():
             print(f"   -> Commit skipped or failed: {commit_res.stdout.strip()}")
 
         # Run git push
-        print("   -> Pushing to origin main...")
-        push_res = subprocess.run(["git", "push", "origin", "main"], cwd=project_root, capture_output=True, text=True)
+        print("   -> Pushing to origin (current branch)...")
+        push_res = subprocess.run(["git", "push", "origin", "HEAD"], cwd=project_root, capture_output=True, text=True)
         
         if push_res.returncode == 0:
             print("✅ Remote push completed successfully.")
