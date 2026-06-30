@@ -1,6 +1,7 @@
-
 from src.agents.base import BaseAgent
 from src.core.agent_middleware import AgentMiddleware
+from src.core.prompts import Prompts
+
 
 class CoderAgent(BaseAgent):
     def __init__(self, engine, memory):
@@ -9,24 +10,10 @@ class CoderAgent(BaseAgent):
 
     async def write_code(self, task: str, plan: str, feedback: str = ""):
         tools = self.middleware.get_workflow_tools()
-        
-        prompt = f'''<|im_start|>system
-You are the Automation Engine.
-Your job is to translate the PLAN into a JSON Action Block.
-
-AVAILABLE TOOLS:
-{tools}
-
-RULES:
-1. Output ONLY the JSON object.
-2. The JSON MUST start with {{ "action": "create_workflow", ... }}
-3. Do not write markdown or explanations.
-
-<|im_end|>
-<|im_start|>user
-TASK: {task}
-PLAN: {plan}
-<|im_end|>
-<|im_start|>assistant
-'''
-        return await self.generate(prompt, max_new_tokens=1500, temperature=0.1)
+        system = Prompts.CODER_SYSTEM.format(tools=tools)   # prompt sạch, không ChatML
+        user = f"TASK: {task}\nPLAN: {plan}"
+        if feedback:
+            user += f"\nFEEDBACK: {feedback}"
+        # generate_chat tự chèn ChatML qua apply_chat_template
+        return await self.generate_chat(user=user, system=system,
+                                        max_new_tokens=1500, temperature=0.1)

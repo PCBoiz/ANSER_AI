@@ -6,7 +6,7 @@ class InvoiceItem(BaseModel):
     name: str = Field(default="Unknown Product", description="Product name")
     price: float = Field(..., description="Unit price before tax")
     qty: int = Field(1, description="Quantity")
-    is_reduced_vat: bool = Field(True, description="Whether item qualifies for reduced VAT (e.g., 8%)")
+    is_reduced_vat: Optional[bool] = Field(None, description="None = chưa rõ diện thuế -> validator áp mặc định 10%; True nếu thuộc diện giảm 8%")
 
     @field_validator("price")
     @classmethod

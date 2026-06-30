@@ -138,6 +138,35 @@ class ModelEngine:
         # vLLM generate là blocking -> đẩy ra thread pool để không nghẽn event loop
         return await loop.run_in_executor(None, _blocking_generate)
 
+    async def generate_chat(self, system: str, user: str, max_tokens=1024, temperature=0.1):
+        """
+        Sinh text theo ĐÚNG định dạng chat của Qwen.
+        Tự dựng messages [system, user] rồi để tokenizer.apply_chat_template chèn
+        token ChatML chuẩn — KHÔNG nhúng tay <|im_start|> trong prompt nữa.
+        """
+        if self.env == "LOCAL":
+            await asyncio.sleep(0.05)
+            return '{"mock_response": "LOCAL mock chat response."}'
+
+        from vllm import SamplingParams
+
+        loop = asyncio.get_running_loop()
+        params = SamplingParams(temperature=temperature, max_tokens=max_tokens)
+        messages = [
+            {"role": "system", "content": system},
+            {"role": "user", "content": user},
+        ]
+
+        def _blocking_generate():
+            tokenizer = self.llm.get_tokenizer()
+            prompt = tokenizer.apply_chat_template(
+                messages, tokenize=False, add_generation_prompt=True
+            )
+            outputs = self.llm.generate([prompt], params)
+            return outputs[0].outputs[0].text.strip()
+
+        return await loop.run_in_executor(None, _blocking_generate)
+
     # ------------------------------------------------------------------
     # VISION  (method MỚI — để vision_model không còn là "dead load")
     # ------------------------------------------------------------------

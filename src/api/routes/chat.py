@@ -1,9 +1,11 @@
 """
 src/api/routes/chat.py — Chat endpoint and task polling.
 Fully async. Uses native await for webhook dispatch.
+
+Ghi chú: nhánh FINANCIAL ĐÃ GỠ — validate hóa đơn nay đi qua /ocr (documents.py)
+bằng ảnh, đúng use case OCR. Router không trả 'FINANCIAL' nên khối cũ là dead code.
 """
 
-import asyncio
 import json
 import logging
 import os
@@ -17,11 +19,22 @@ from src.api.dependencies import (
     clean_output, extract_user_content, web_search_fallback,
 )
 from src.core.engine import TASK_REGISTRY
-from src.core.schemas import InvoicePayload, RetailChatResponse
+from src.core.schemas import RetailChatResponse
 
 logger = logging.getLogger("projecta.api.chat")
 
 router = APIRouter()
+
+# SaasAPI singleton nhẹ (tạo engine 1 lần) — dùng cho route DATA_INTERNAL
+_saas = None
+
+
+def _get_saas():
+    global _saas
+    if _saas is None:
+        from src.core.saas_api import SaasAPI
+        _saas = SaasAPI()
+    return _saas
 
 
 @router.get("/api/v1/task/{task_id}")
@@ -63,60 +76,7 @@ async def chat_endpoint(
         logger.info("Route selected", extra={"request_id": request_id, "route": cat})
 
         resp = ""
-        if cat == "FINANCIAL":
-            logger.info("Financial route active, utilizing MCP Server", extra={"request_id": request_id})
-            from src.core.mcp_server import MCPServer
-
-            MAX_RETRIES = 3
-
-            extraction_prompt = f"Extract items and total from this text into JSON. Text: {user_msg}"
-            extraction = await runtime.manager.consult(extraction_prompt, context="", history="")
-
-            parsed_payload = None
-            last_error = None
-
-            for attempt in range(MAX_RETRIES):
-                try:
-                    from json_repair import repair_json
-                    parsed_dict = repair_json(extraction, return_objects=True)
-                    if not isinstance(parsed_dict, dict):
-                        raise ValueError("Output is not a valid JSON dictionary.")
-                    parsed_payload = InvoicePayload(**parsed_dict)
-                    break
-                except Exception as e:
-                    last_error = e
-                    logger.warning(
-                        "Schema validation attempt %d/%d failed: %s",
-                        attempt + 1, MAX_RETRIES, e,
-                        extra={"request_id": request_id},
-                    )
-                    if attempt < MAX_RETRIES - 1:
-                        refinement_prompt = (
-                            f"Your previous JSON failed validation. Error: {e}. "
-                            f"Please correct it to strictly match the schema."
-                        )
-                        extraction = await runtime.manager.consult(
-                            refinement_prompt, context=extraction, history=""
-                        )
-
-            if not parsed_payload:
-                logger.error(
-                    "LLM failed to conform to InvoicePayload after %d attempts. Last error: %s",
-                    MAX_RETRIES, last_error,
-                    extra={"request_id": request_id},
-                )
-                raise HTTPException(
-                    status_code=500,
-                    detail=f"LLM failed to conform to strict schema after {MAX_RETRIES} attempts.",
-                )
-
-            mcp_res = MCPServer.validate_invoice_total(
-                [item.model_dump() for item in parsed_payload.items],
-                parsed_payload.total
-            )
-            resp = f"Deterministic Validation: {json.dumps(mcp_res)}"
-
-        elif cat == "TECHNICAL":
+        if cat == "TECHNICAL":
             plan = await runtime.manager.plan_or_ask(req.message)
             if "[PLAN]" in plan:
                 resp = await runtime.coder.write_code(user_msg, plan)
@@ -124,7 +84,15 @@ async def chat_endpoint(
                 resp = plan
 
         elif cat == "DATA_INTERNAL":
-            resp = await runtime.manager.consult(user_msg, context="[DB Data]", history="")
+            # Tra dữ liệu THẬT từ DB thay vì context giả "[DB Data]"
+            saas = _get_saas()
+            products = saas.lookup_product(user_msg, workspace_id=store_id)
+            sales = saas.get_sales_report(workspace_id=store_id, period="today")
+            db_context = (
+                f"[PRODUCTS MATCHING QUERY]\n{products}\n\n"
+                f"[SALES TODAY]\n{json.dumps(sales, ensure_ascii=False)}"
+            )
+            resp = await runtime.manager.consult(user_msg, context=db_context, history="")
 
         elif cat == "RETRIEVAL":
             logger.info("Retrieval route active", extra={"request_id": request_id})
@@ -169,7 +137,7 @@ async def chat_endpoint(
                 headers = {
                     "Content-Type": "application/json",
                     "X-Webhook-Token": api_token,
-                    "X-Task-ID": task_id
+                    "X-Task-ID": task_id,
                 }
 
                 client = HttpClientPool.get_client()
