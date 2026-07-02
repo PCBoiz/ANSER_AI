@@ -84,6 +84,8 @@ class RuntimeState:
                 self.engine_error = str(exc)
                 logger.error("Engine initialization failed: %s", exc)
 
+            # KB phải tạo TRƯỚC manager để manager dùng chung embedder của KB
+            # (tránh nạp MiniLM 2 lần lên VRAM — xem SemanticRouter(embedder=...)).
             try:
                 if not self.kb:
                     from src.core.knowledge import KnowledgeBase
@@ -100,7 +102,13 @@ class RuntimeState:
                 self.coder = self.coder or CoderAgent(self.engine, self.memory)
 
     async def ensure_vision_runtime(self) -> None:
-        """Async, lock-guarded vision model initialization."""
+        """
+        Async, lock-guarded vision initialization.
+
+        Vision model (Qwen2-VL-2B) nay nằm TRONG ModelEngine -> VisionAgent chỉ là
+        lớp mỏng dùng chung engine đó. Vì vậy phải đảm bảo engine sẵn sàng trước,
+        rồi mới tạo VisionAgent(self.engine). (Đã bỏ Florence-2 tự-load.)
+        """
         if self.vision:
             return
 
@@ -110,9 +118,22 @@ class RuntimeState:
             if RUNTIME_PROFILE == "text-only":
                 self.vision_error = "Vision runtime disabled by RUNTIME_PROFILE=text-only"
                 return
+
+            # Engine sở hữu model vision -> tạo engine nếu chưa có (ModelEngine là singleton)
+            if not self.engine:
+                try:
+                    from src.core.engine import ModelEngine
+                    self.engine = ModelEngine()
+                except Exception as exc:
+                    self.engine = None
+                    self.engine_error = str(exc)
+                    self.vision_error = self.engine_error
+                    logger.error("Engine init (for vision) failed: %s", exc)
+                    return
+
             try:
                 from src.agents.vision import VisionAgent
-                self.vision = VisionAgent()
+                self.vision = VisionAgent(self.engine)   # <-- truyền engine vào (trước đây VisionAgent())
             except Exception as exc:
                 self.vision = None
                 self.vision_error = str(exc)

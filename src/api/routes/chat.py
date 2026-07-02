@@ -121,7 +121,8 @@ async def chat_endpoint(
         cleaned = clean_output(resp)
 
         # Schema enforcement: wrap response in RetailChatResponse
-        chat_response = RetailChatResponse(answer=cleaned, confidence=1.0, sources=None)
+        # confidence để None (chưa đo) thay vì 1.0 giả
+        chat_response = RetailChatResponse(answer=cleaned, sources=None)
 
         # Proactive Webhook Dispatcher — natively awaited, no thread hacks
         callback_url = os.getenv("BODY_CALLBACK_URL")

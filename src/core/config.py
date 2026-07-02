@@ -1,5 +1,7 @@
 import os
 
+from src.core.prompts import Prompts
+
 
 class Config:
     """
@@ -28,9 +30,8 @@ class Config:
             self.DB_URL = "sqlite:///:memory:"
 
         # ------------------------ System context -------------------------
-        # NOTE: hiện trùng với Prompts.SYSTEM_CONTEXT (prompts.py).
-        # Lâu dài nên để prompts.py làm nguồn DUY NHẤT; giữ ở đây để không vỡ import cũ.
-        self.SYSTEM_CONTEXT = "You are Project A, a Retail Automation Architect."
+        # Nguồn DUY NHẤT ở prompts.py (đã gộp — không định nghĩa lại chuỗi ở đây).
+        self.SYSTEM_CONTEXT = Prompts.SYSTEM_CONTEXT
 
         # =================================================================
         #  NGÂN SÁCH VRAM — GPU L4 22.5GB (Colab Pro)
