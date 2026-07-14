@@ -1,0 +1,400 @@
+{"domain": "FINANCIAL", "difficulty": "easy", "prompt": "Tính thuế GTGT 8% cho đơn hàng có giá trị 1,000,000 VND theo Nghị định 72/2024/NĐ-CP. Số tiền thuế và tổng thanh toán là bao nhiêu?"}
+{"domain": "FINANCIAL", "difficulty": "easy", "prompt": "Sản phẩm phần mềm bản quyền giá 2,500,000 VND. Thuế GTGT áp dụng là bao nhiêu phần trăm theo Nghị định 72/2024?"}
+{"domain": "FINANCIAL", "difficulty": "easy", "prompt": "Hàng hóa xuất khẩu có thuế GTGT 0% hay miễn thuế hoàn toàn? Giải thích sự khác nhau giữa thuế suất 0% và miễn thuế GTGT."}
+{"domain": "FINANCIAL", "difficulty": "easy", "prompt": "Cửa hàng bán 50 túi gạo, mỗi túi 120,000 VND. Tính tổng doanh thu và số thuế GTGT 8% phải nộp."}
+{"domain": "FINANCIAL", "difficulty": "easy", "prompt": "Mặt hàng thực phẩm thiết yếu có thuế suất GTGT bao nhiêu? Cho ví dụ 3 mặt hàng thuộc diện 5% và 3 mặt hàng thuộc diện 8% năm 2024."}
+{"domain": "FINANCIAL", "difficulty": "easy", "prompt": "Khách hàng mua hàng 880,000 VND (đã bao gồm VAT 10%). Tính giá chưa thuế và số tiền thuế GTGT."}
+{"domain": "FINANCIAL", "difficulty": "easy", "prompt": "Phân biệt thuế GTGT đầu vào và đầu ra. Cửa hàng bán lẻ có được khấu trừ thuế GTGT đầu vào không?"}
+{"domain": "FINANCIAL", "difficulty": "easy", "prompt": "Dịch vụ vận chuyển nội địa thuế GTGT bao nhiêu? Có khác biệt gì so với vận chuyển quốc tế không?"}
+{"domain": "FINANCIAL", "difficulty": "easy", "prompt": "Tôi bán một sản phẩm giá 500,000 VND chưa thuế, thuế suất 8%. Giá bán ghi trên hóa đơn là bao nhiêu?"}
+{"domain": "FINANCIAL", "difficulty": "easy", "prompt": "Cửa hàng tạp hóa nhỏ dưới ngưỡng doanh thu nào thì không cần đăng ký nộp thuế GTGT?"}
+{"domain": "FINANCIAL", "difficulty": "easy", "prompt": "Thuốc chữa bệnh và trang thiết bị y tế có thuế suất GTGT bao nhiêu theo quy định hiện hành?"}
+{"domain": "FINANCIAL", "difficulty": "easy", "prompt": "Phân biệt hóa đơn GTGT và hóa đơn bán hàng thông thường. Khi nào dùng loại nào?"}
+{"domain": "FINANCIAL", "difficulty": "easy", "prompt": "Tôi nhập hàng từ Trung Quốc trị giá $1,000 USD. Ngoài thuế nhập khẩu còn phải nộp thuế GTGT nhập khẩu không?"}
+{"domain": "FINANCIAL", "difficulty": "easy", "prompt": "Sản phẩm nông nghiệp chưa qua chế biến có chịu thuế GTGT không? Cho ví dụ cụ thể."}
+{"domain": "FINANCIAL", "difficulty": "easy", "prompt": "Chiết khấu thương mại 10% cho đơn hàng 5,000,000 VND. Thuế GTGT 8% tính trên giá trước hay sau chiết khấu?"}
+{"domain": "FINANCIAL", "difficulty": "easy", "prompt": "Dịch vụ giáo dục và đào tạo chịu thuế GTGT bao nhiêu phần trăm theo luật hiện hành?"}
+{"domain": "FINANCIAL", "difficulty": "easy", "prompt": "Cửa hàng bán thực phẩm chức năng (TPCN). Thuế suất GTGT áp dụng là 8% hay 10%? Giải thích."}
+{"domain": "FINANCIAL", "difficulty": "easy", "prompt": "Tôi là người bán online trên Shopee. Tôi có phải xuất hóa đơn cho mỗi đơn hàng không?"}
+{"domain": "FINANCIAL", "difficulty": "easy", "prompt": "Dịch vụ thuê nhà kho và mặt bằng bán hàng có chịu thuế GTGT không? Bên nào xuất hóa đơn?"}
+{"domain": "FINANCIAL", "difficulty": "easy", "prompt": "Thuế GTGT năm 2025 đối với phần mềm SaaS (dịch vụ trên đám mây) là bao nhiêu?"}
+{"domain": "FINANCIAL", "difficulty": "easy", "prompt": "Hàng hóa bị trả lại khách hàng sau khi đã xuất hóa đơn. Cần xử lý hóa đơn như thế nào?"}
+{"domain": "FINANCIAL", "difficulty": "easy", "prompt": "Phí vận chuyển ghi trên hóa đơn bán hàng có phải chịu thuế GTGT không?"}
+{"domain": "FINANCIAL", "difficulty": "easy", "prompt": "Tính số tiền phải trả cho nhà cung cấp: giá hàng 3,200,000 VND, chiết khấu 5%, thuế GTGT 8%."}
+{"domain": "FINANCIAL", "difficulty": "easy", "prompt": "Bảo hành sản phẩm miễn phí có phải xuất hóa đơn không? Xử lý thuế như thế nào?"}
+{"domain": "FINANCIAL", "difficulty": "easy", "prompt": "Doanh nghiệp nhỏ có doanh thu 800 triệu VND/năm áp dụng phương pháp tính thuế GTGT nào?"}
+{"domain": "FINANCIAL", "difficulty": "easy", "prompt": "Định nghĩa 'giá tính thuế GTGT' cho hàng hóa nhập khẩu theo quy định hiện hành."}
+{"domain": "FINANCIAL", "difficulty": "easy", "prompt": "Cửa hàng nhận đặt cọc 30% trước khi giao hàng. Thời điểm nào phải xuất hóa đơn VAT?"}
+{"domain": "FINANCIAL", "difficulty": "easy", "prompt": "Bán hàng qua đại lý độc quyền. Hoa hồng đại lý có chịu thuế GTGT không?"}
+{"domain": "FINANCIAL", "difficulty": "easy", "prompt": "Sản phẩm kết hợp: bán máy in (VAT 10%) kèm mực in (VAT 8%). Ghi hóa đơn như thế nào?"}
+{"domain": "FINANCIAL", "difficulty": "easy", "prompt": "Cho biết thời hạn nộp tờ khai thuế GTGT hàng tháng và hàng quý là bao nhiêu ngày?"}
+{"domain": "FINANCIAL", "difficulty": "medium", "prompt": "Hóa đơn điện tử theo Nghị định 123/2020 cần có những thông tin bắt buộc nào? Liệt kê và giải thích từng trường."}
+{"domain": "FINANCIAL", "difficulty": "medium", "prompt": "Đơn hàng gồm: TV 15,000,000 VND (VAT 10%), tủ lạnh 8,000,000 VND (VAT 10%), gạo 200,000 VND (VAT 5%). Lập bảng tính thuế từng mặt hàng và tổng hóa đơn."}
+{"domain": "FINANCIAL", "difficulty": "medium", "prompt": "Cửa hàng áp dụng chiết khấu lũy tiến: mua ≥5 triệu giảm 5%, ≥10 triệu giảm 8%. Khách mua 12 triệu (VAT 8%). Tính tổng thanh toán và thuế GTGT."}
+{"domain": "FINANCIAL", "difficulty": "medium", "prompt": "Phân tích sự thay đổi từ Nghị định 15/2022 sang Nghị định 72/2024 về giảm thuế GTGT. Nhóm hàng nào được hưởng và kéo dài đến khi nào?"}
+{"domain": "FINANCIAL", "difficulty": "medium", "prompt": "Hóa đơn xuất ngày 31/12 nhưng hàng giao ngày 2/1 năm sau. Theo NĐ 123/2020, thời điểm xuất hóa đơn bán hàng hóa là khi nào?"}
+{"domain": "FINANCIAL", "difficulty": "medium", "prompt": "Cửa hàng bán lẻ đồng thời kinh doanh dịch vụ sửa chữa (VAT 10%) và bán linh kiện (VAT 8%). Cách hạch toán và lập hóa đơn tách biệt như thế nào?"}
+{"domain": "FINANCIAL", "difficulty": "medium", "prompt": "Khách hàng là doanh nghiệp yêu cầu hóa đơn GTGT nhưng không cung cấp MST. Cửa hàng xử lý thế nào theo quy định?"}
+{"domain": "FINANCIAL", "difficulty": "medium", "prompt": "Hàng gửi bán đại lý: khi nào cần xuất hóa đơn, đại lý hay bên giao hàng xuất? Xử lý VAT thế nào cho mô hình này?"}
+{"domain": "FINANCIAL", "difficulty": "medium", "prompt": "Cửa hàng bán rượu bia (thuế tiêu thụ đặc biệt) kèm mồi nhậu. Cách tính thuế TTĐB và GTGT trên cùng hóa đơn như thế nào?"}
+{"domain": "FINANCIAL", "difficulty": "medium", "prompt": "Điều kiện để được khấu trừ thuế GTGT đầu vào theo Thông tư 78/2021. Hàng hóa mua bằng tiền mặt trên 20 triệu có được khấu trừ không?"}
+{"domain": "FINANCIAL", "difficulty": "medium", "prompt": "Cửa hàng nhập khẩu mỹ phẩm. Tính tổng chi phí: giá FOB $5,000, thuế nhập khẩu 20%, thuế GTGT nhập khẩu 10%, phí CIF 500 USD."}
+{"domain": "FINANCIAL", "difficulty": "medium", "prompt": "Hóa đơn viết sai thông tin người mua. Nghị định 123/2020 quy định cách xử lý thế nào? Có cần hủy hay điều chỉnh hóa đơn không?"}
+{"domain": "FINANCIAL", "difficulty": "medium", "prompt": "Cửa hàng bán hàng online (TMĐT). Khi khách đặt hàng qua app và thanh toán online, xuất hóa đơn điện tử lúc nào và gửi cho khách thế nào?"}
+{"domain": "FINANCIAL", "difficulty": "medium", "prompt": "Mô hình combo: bán điện thoại 12,000,000 VND (VAT 10%) kèm tai nghe 500,000 VND (VAT 10%) với giá trọn gói 12,200,000 VND. Khai thuế thế nào?"}
+{"domain": "FINANCIAL", "difficulty": "medium", "prompt": "Cửa hàng nhận gia công sản phẩm cho khách. Dịch vụ gia công và nguyên liệu tách riêng hay gộp chung trên hóa đơn? Thuế suất GTGT áp dụng?"}
+{"domain": "FINANCIAL", "difficulty": "medium", "prompt": "Kế toán cửa hàng bán lẻ: cách hạch toán bút toán xuất hóa đơn bán hàng VAT 8% và ghi nhận doanh thu theo VAS."}
+{"domain": "FINANCIAL", "difficulty": "medium", "prompt": "Cửa hàng thực hiện chương trình mua 1 tặng 1. Hàng tặng có phải kê khai thuế GTGT không? Cách xử lý hóa đơn cho hàng tặng."}
+{"domain": "FINANCIAL", "difficulty": "medium", "prompt": "Phân biệt 'hoàn thuế GTGT' và 'khấu trừ thuế GTGT'. Doanh nghiệp xuất khẩu 100% được hoàn thuế trong bao nhiêu ngày?"}
+{"domain": "FINANCIAL", "difficulty": "medium", "prompt": "Cửa hàng sửa chữa điện thoại: linh kiện thay thế (VAT 8%) và công thợ (VAT 10%). Lập hóa đơn theo từng khoản hay gộp chung?"}
+{"domain": "FINANCIAL", "difficulty": "medium", "prompt": "Khai báo tờ khai thuế GTGT mẫu 01/GTGT. Các chỉ tiêu quan trọng cần điền đúng để tránh bị phạt vi phạm hành chính."}
+{"domain": "FINANCIAL", "difficulty": "medium", "prompt": "Nghị định 82/2023/NĐ-CP về gia hạn thuế cho SME. Doanh nghiệp nhỏ bán lẻ được gia hạn những loại thuế và thời gian nào?"}
+{"domain": "FINANCIAL", "difficulty": "medium", "prompt": "Tính thuế cho doanh nghiệp theo phương pháp trực tiếp: doanh thu 500 triệu, tỉ lệ GTGT ngành bán lẻ là bao nhiêu?"}
+{"domain": "FINANCIAL", "difficulty": "medium", "prompt": "Cửa hàng nhận voucher thanh toán từ sàn TMĐT. Phần chiết khấu của sàn có phải kê khai doanh thu và thuế không?"}
+{"domain": "FINANCIAL", "difficulty": "medium", "prompt": "Kinh doanh hộ gia đình doanh thu 120 triệu/năm. Thuế khoán hay thuế GTGT tự nguyện? So sánh ưu/nhược."}
+{"domain": "FINANCIAL", "difficulty": "medium", "prompt": "Hóa đơn bằng ngoại tệ (USD) cần quy đổi VND theo tỷ giá nào? Quy định hiện hành về tỷ giá ghi hóa đơn xuất khẩu."}
+{"domain": "FINANCIAL", "difficulty": "medium", "prompt": "Cơ sở kinh doanh tạm thời đóng cửa 3 tháng có cần nộp tờ khai thuế GTGT không? Thủ tục thông báo tạm ngừng kinh doanh."}
+{"domain": "FINANCIAL", "difficulty": "medium", "prompt": "Phí vận chuyển do cửa hàng thu thay (hộ) đơn vị vận chuyển có phải cộng vào doanh thu tính thuế không?"}
+{"domain": "FINANCIAL", "difficulty": "medium", "prompt": "Cửa hàng phát hành thẻ quà tặng/gift card. Thời điểm nào phải kê khai thuế GTGT: khi bán thẻ hay khi khách dùng thẻ?"}
+{"domain": "FINANCIAL", "difficulty": "medium", "prompt": "Mã số thuế cá nhân (TIN) và mã số thuế doanh nghiệp khác nhau thế nào? Hộ kinh doanh dùng loại nào trên hóa đơn?"}
+{"domain": "FINANCIAL", "difficulty": "medium", "prompt": "Cửa hàng nhận trả góp qua công ty tài chính. Phần lãi suất trả góp có phải kê khai thuế GTGT không?"}
+{"domain": "FINANCIAL", "difficulty": "medium", "prompt": "Chứng từ thanh toán qua POS bắt buộc cho giao dịch B2B trên 20 triệu để được khấu trừ thuế đầu vào theo quy định nào?"}
+{"domain": "FINANCIAL", "difficulty": "medium", "prompt": "Cửa hàng bị kiểm tra thuế đột xuất. Những tài liệu kế toán cần chuẩn bị sẵn và lưu trữ trong bao nhiêu năm theo Luật Kế toán?"}
+{"domain": "FINANCIAL", "difficulty": "medium", "prompt": "Tài sản cố định (máy POS, kệ hàng) cửa hàng mua 50 triệu. Khấu hao TSCĐ tính như thế nào và có được khấu trừ VAT đầu vào không?"}
+{"domain": "FINANCIAL", "difficulty": "medium", "prompt": "Cửa hàng có chi nhánh ở tỉnh khác. Nộp tờ khai thuế GTGT ở đâu: trụ sở chính hay từng chi nhánh?"}
+{"domain": "FINANCIAL", "difficulty": "medium", "prompt": "Hoàn trả hàng lỗi cho nhà cung cấp sau 30 ngày. Xuất hóa đơn điều chỉnh hay hóa đơn hoàn trả? Quy định NĐ 123/2020."}
+{"domain": "FINANCIAL", "difficulty": "medium", "prompt": "Cửa hàng tham gia hội chợ thương mại và bán hàng tại đó. Phải khai báo gì với cơ quan thuế địa phương nơi tổ chức hội chợ?"}
+{"domain": "FINANCIAL", "difficulty": "medium", "prompt": "Phần mềm quản lý bán hàng (ANSER Body) mua bản quyền 5 năm. Hạch toán là chi phí trả trước hay TSCĐ vô hình? Cách phân bổ và tính thuế."}
+{"domain": "FINANCIAL", "difficulty": "medium", "prompt": "Cửa hàng nhập khẩu hàng về kho, chưa bán. Thời điểm nào phải kê khai thuế GTGT nhập khẩu và nộp thuế?"}
+{"domain": "FINANCIAL", "difficulty": "medium", "prompt": "Phiếu giảm giá (coupon) phát hành năm nay, khách dùng năm sau. Ảnh hưởng đến doanh thu và thuế GTGT thế nào?"}
+{"domain": "FINANCIAL", "difficulty": "medium", "prompt": "Nhân viên cửa hàng đi mua văn phòng phẩm bằng tiền túi rồi quyết toán. Chứng từ cần có gì để hợp lệ cho khấu trừ thuế?"}
+{"domain": "FINANCIAL", "difficulty": "hard", "prompt": "Doanh nghiệp bán hàng vừa xuất khẩu (VAT 0%) vừa bán nội địa (VAT 8-10%). Cách phân bổ thuế GTGT đầu vào được khấu trừ theo Thông tư 219/2013 và các sửa đổi."}
+{"domain": "FINANCIAL", "difficulty": "hard", "prompt": "Chuỗi bán lẻ có 10 cửa hàng. Hàng chuyển nội bộ giữa các cửa hàng có phải xuất hóa đơn không? Hạch toán thuế GTGT cho luân chuyển nội bộ."}
+{"domain": "FINANCIAL", "difficulty": "hard", "prompt": "Nghị định 72/2024 giảm VAT 2%: phân tích chi tiết phụ lục I, II, III danh mục hàng không được giảm. Sản phẩm nào trong ngành bán lẻ thuộc diện không giảm?"}
+{"domain": "FINANCIAL", "difficulty": "hard", "prompt": "Kinh doanh hỗn hợp: bán hàng hóa (VAT 8%), dịch vụ tư vấn (VAT 10%), cho thuê mặt bằng (VAT 10%), bán hàng xuất khẩu (VAT 0%). Phân bổ chi phí chung và khấu trừ thuế đầu vào."}
+{"domain": "FINANCIAL", "difficulty": "hard", "prompt": "Phân tích rủi ro thuế khi cửa hàng bán hàng theo hình thức 'mua hộ' qua mạng xã hội. Nghĩa vụ kê khai doanh thu và thuế GTGT theo Thông tư 40/2021/TT-BTC."}
+{"domain": "FINANCIAL", "difficulty": "hard", "prompt": "Tranh chấp với cơ quan thuế về phân loại hàng hóa: sản phẩm atiso sấy khô là 'thực phẩm chức năng' (VAT 8%) hay 'dược liệu thô' (VAT 5%)? Căn cứ pháp lý nào để bảo vệ lập trường?"}
+{"domain": "FINANCIAL", "difficulty": "hard", "prompt": "Cửa hàng áp dụng mô hình franchise. Phí nhượng quyền (royalty), phí thiết kế, hỗ trợ marketing từ bên nhượng quyền: phân loại thuế và khấu trừ thế nào?"}
+{"domain": "FINANCIAL", "difficulty": "hard", "prompt": "Đại lý bán hàng hưởng hoa hồng. So sánh cách tính thuế GTGT cho (1) đại lý bán đúng giá hưởng hoa hồng và (2) đại lý mua về bán lại. Điểm khác biệt quan trọng nhất."}
+{"domain": "FINANCIAL", "difficulty": "hard", "prompt": "Cửa hàng bán thiết bị y tế (kết hợp VAT 5% và 10%) và vật tư tiêu hao y tế (VAT 0%). Lập hệ thống phân loại SKU theo mã HS để tính đúng thuế."}
+{"domain": "FINANCIAL", "difficulty": "hard", "prompt": "Công ty mẹ cấp hàng cho cửa hàng con (công ty TNHH 1TV). Giao dịch nội bộ tập đoàn phải định giá chuyển nhượng như thế nào để tránh rủi ro thuế theo Nghị định 132/2020?"}
+{"domain": "FINANCIAL", "difficulty": "hard", "prompt": "Cửa hàng bán trả góp qua ứng dụng BNPL (Buy Now Pay Later). Doanh thu ghi nhận khi nào, thuế GTGT kê khai thế nào khi nhận tiền theo kỳ?"}
+{"domain": "FINANCIAL", "difficulty": "hard", "prompt": "Phân tích nghĩa vụ thuế khi cửa hàng Việt Nam bán hàng qua Amazon Global Selling và nhận tiền qua Payoneer. Thuế GTGT, thuế TNCN, khai báo ngoại hối."}
+{"domain": "FINANCIAL", "difficulty": "hard", "prompt": "Tình huống kiểm toán: cơ quan thuế yêu cầu giải trình chênh lệch giữa doanh thu khai báo thuế GTGT và doanh thu trên báo cáo tài chính. Nguyên nhân hợp lệ và cách xử lý."}
+{"domain": "FINANCIAL", "difficulty": "hard", "prompt": "Cửa hàng nhập khẩu hàng theo điều kiện DDP (Delivered Duty Paid). Ai chịu thuế nhập khẩu và VAT? Rủi ro nếu khai sai người nộp thuế."}
+{"domain": "FINANCIAL", "difficulty": "hard", "prompt": "Công ty bán lẻ niêm yết trên sàn chứng khoán phát hành cổ phiếu ưu đãi cho nhân viên (ESOP). Nghĩa vụ thuế TNCN và thuế doanh nghiệp liên quan."}
+{"domain": "FINANCIAL", "difficulty": "hard", "prompt": "So sánh chính sách giảm thuế GTGT 2%: Việt Nam (NĐ 72/2024) vs Thái Lan (7% → 5%) vs Indonesia (11%). Tác động đến giá bán lẻ và sức cạnh tranh."}
+{"domain": "FINANCIAL", "difficulty": "hard", "prompt": "Cửa hàng sử dụng phần mềm kế toán không được Bộ Tài chính chứng nhận. Rủi ro pháp lý và phạt vi phạm. Điều kiện phần mềm kế toán hợp lệ là gì?"}
+{"domain": "FINANCIAL", "difficulty": "hard", "prompt": "Hạch toán kế toán đầy đủ cho chu kỳ: nhập khẩu hàng → nhập kho → bán cho đại lý → thu tiền → nộp thuế. Bao gồm các bút toán liên quan đến VAT đầu vào và đầu ra."}
+{"domain": "FINANCIAL", "difficulty": "hard", "prompt": "Định giá chuyển nhượng trong chuỗi bán lẻ: khi nào cần báo cáo giao dịch liên kết? Mức ngưỡng doanh thu và tỉ lệ giao dịch liên kết theo NĐ 132/2020."}
+{"domain": "FINANCIAL", "difficulty": "hard", "prompt": "Cửa hàng lắp đặt hệ thống solar panel. Chi phí đầu tư: phân loại TSCĐ, tính khấu hao, và có được khấu trừ thuế GTGT đầu vào từ tiền điện bán lại cho EVN?"}
+{"domain": "FINANCIAL", "difficulty": "hard", "prompt": "Phân tích toàn bộ nghĩa vụ thuế khi cửa hàng chuyển đổi từ hộ kinh doanh sang công ty TNHH: thuế nào phát sinh, thuế nào không còn áp dụng, các ưu đãi mất đi."}
+{"domain": "FINANCIAL", "difficulty": "hard", "prompt": "Chuỗi bán lẻ mở rộng sang Campuchia. Thuế GTGT tại Campuchia (VAT 10%), cơ chế tránh đánh thuế hai lần, và nghĩa vụ khai báo tại Việt Nam."}
+{"domain": "FINANCIAL", "difficulty": "hard", "prompt": "Xử lý thuế khi cửa hàng thanh lý máy móc, thiết bị đã khấu hao hết. Có phải xuất hóa đơn VAT không? Giá tính thuế là bao nhiêu?"}
+{"domain": "FINANCIAL", "difficulty": "hard", "prompt": "Chính sách thuế đối với doanh nghiệp đổi mới sáng tạo trong lĩnh vực bán lẻ: ưu đãi thuế TNDN, R&D deduction, và điều kiện áp dụng theo Luật Công nghệ cao."}
+{"domain": "FINANCIAL", "difficulty": "hard", "prompt": "Phân tích nguyên tắc 'substance over form' trong xử lý thuế cho hợp đồng mua bán hàng hóa có điều khoản trả lại vô điều kiện (sale or return)."}
+{"domain": "FINANCIAL", "difficulty": "hard", "prompt": "Cửa hàng thực hiện M&A: mua lại cửa hàng khác. Xử lý thuế cho goodwill, tài sản được nhận, nợ thuế tồn đọng của bên bán. Trách nhiệm của bên mua."}
+{"domain": "FINANCIAL", "difficulty": "hard", "prompt": "Mô hình marketplace nội địa: platform thu phí hoa hồng từ người bán. Nghĩa vụ kê khai và khấu trừ thuế GTGT của platform theo Thông tư 40/2021."}
+{"domain": "FINANCIAL", "difficulty": "hard", "prompt": "Cửa hàng nhận tài trợ từ nhà sản xuất cho chương trình khuyến mãi (trade promotion). Khoản tài trợ này có phải kê khai doanh thu và thuế GTGT không?"}
+{"domain": "FINANCIAL", "difficulty": "hard", "prompt": "Phân tích toàn bộ chuỗi giá trị thuế: Nhà sản xuất → Nhà phân phối → Đại lý cấp 1 → Cửa hàng lẻ → Khách hàng cuối. Mỗi mắt xích VAT bao nhiêu và cơ chế khấu trừ."}
+{"domain": "FINANCIAL", "difficulty": "hard", "prompt": "Cửa hàng bị phá sản. Quy trình xử lý tài sản và thanh toán nghĩa vụ thuế GTGT còn nợ. Ưu tiên thanh toán nợ thuế so với nợ thương mại theo Luật Phá sản 2014."}
+{"domain": "RETRIEVAL", "difficulty": "easy", "prompt": "Tốc độ tăng trưởng doanh thu bán lẻ hàng hóa của Việt Nam năm 2024 là bao nhiêu phần trăm? Các yếu tố chính thúc đẩy tăng trưởng."}
+{"domain": "RETRIEVAL", "difficulty": "easy", "prompt": "Thị phần của 5 chuỗi siêu thị lớn nhất Việt Nam năm 2024 là bao nhiêu? Xu hướng cạnh tranh trong ngành."}
+{"domain": "RETRIEVAL", "difficulty": "easy", "prompt": "Tỉ lệ tăng trưởng thương mại điện tử bán lẻ Việt Nam so với cùng kỳ năm ngoái và dự báo cho năm 2025."}
+{"domain": "RETRIEVAL", "difficulty": "easy", "prompt": "Theo báo cáo ngành, chuỗi bán lẻ nào đang mở rộng nhanh nhất tại Việt Nam và chiến lược của họ là gì?"}
+{"domain": "RETRIEVAL", "difficulty": "easy", "prompt": "Số lượng cửa hàng tiện lợi (convenience store) tại Việt Nam năm 2024 và mục tiêu mở rộng trong 3 năm tới."}
+{"domain": "RETRIEVAL", "difficulty": "easy", "prompt": "Tỉ lệ người tiêu dùng Việt Nam mua sắm online ít nhất 1 lần/tháng và các mặt hàng phổ biến nhất trên TMĐT."}
+{"domain": "RETRIEVAL", "difficulty": "easy", "prompt": "GDP bình quân đầu người Việt Nam năm 2024 và tác động đến sức mua của người tiêu dùng bán lẻ."}
+{"domain": "RETRIEVAL", "difficulty": "easy", "prompt": "Tăng trưởng doanh thu ngành F&B (thực phẩm & đồ uống) bán lẻ Việt Nam và xu hướng sản phẩm healthy."}
+{"domain": "RETRIEVAL", "difficulty": "easy", "prompt": "Xu hướng người tiêu dùng Việt Nam ưa chuộng sản phẩm nội địa (made in Vietnam) thay vì hàng ngoại nhập trong 2024-2025."}
+{"domain": "RETRIEVAL", "difficulty": "easy", "prompt": "Thị trường bán lẻ dược phẩm Việt Nam: quy mô, tăng trưởng và chuỗi nhà thuốc dẫn đầu."}
+{"domain": "RETRIEVAL", "difficulty": "easy", "prompt": "Ảnh hưởng của thuế nhập khẩu Mỹ (Trump tariffs 2025) đến giá hàng hóa bán lẻ Việt Nam và chiến lược ứng phó."}
+{"domain": "RETRIEVAL", "difficulty": "easy", "prompt": "Số lượng SME bán lẻ tại Việt Nam và tỉ lệ ứng dụng chuyển đổi số trong quản lý cửa hàng."}
+{"domain": "RETRIEVAL", "difficulty": "easy", "prompt": "Xu hướng mua sắm online vào các dịp lễ lớn (Tết, 11/11, 12/12) tại Việt Nam và dữ liệu GMV của các sàn TMĐT."}
+{"domain": "RETRIEVAL", "difficulty": "easy", "prompt": "Chi phí thuê mặt bằng bán lẻ tại Hà Nội và TP.HCM trên m²/tháng và biến động trong 2024."}
+{"domain": "RETRIEVAL", "difficulty": "easy", "prompt": "Tỉ lệ cửa hàng bán lẻ truyền thống (chợ, tạp hóa) vs. bán lẻ hiện đại (siêu thị, TTTM) về doanh thu và số lượng điểm bán."}
+{"domain": "RETRIEVAL", "difficulty": "medium", "prompt": "Phân tích báo cáo SSV Retail Industry Outlook 2025: 3 xu hướng chính và cơ hội cho cửa hàng bán lẻ vừa và nhỏ."}
+{"domain": "RETRIEVAL", "difficulty": "medium", "prompt": "Dữ liệu thống kê về tỉ lệ hàng tồn kho bình quân trong ngành bán lẻ thực phẩm Việt Nam và chuẩn ngành là bao nhiêu ngày tồn kho."}
+{"domain": "RETRIEVAL", "difficulty": "medium", "prompt": "Nghiên cứu về hành vi mua sắm của người tiêu dùng thành thị Việt Nam: ngân sách chi tiêu trung bình và ưu tiên sản phẩm năm 2024."}
+{"domain": "RETRIEVAL", "difficulty": "medium", "prompt": "Tỉ lệ lạm phát Việt Nam ảnh hưởng thế nào đến chi tiêu bán lẻ theo số liệu của Tổng cục Thống kê?"}
+{"domain": "RETRIEVAL", "difficulty": "medium", "prompt": "Chỉ số PMI (Purchasing Managers Index) ngành bán lẻ Việt Nam Q1/2025 và hàm ý về triển vọng ngắn hạn."}
+{"domain": "RETRIEVAL", "difficulty": "medium", "prompt": "Theo nghiên cứu, bao nhiêu % doanh nghiệp bán lẻ Việt Nam đã triển khai phần mềm POS và tỉ lệ tích hợp với kế toán là bao nhiêu?"}
+{"domain": "RETRIEVAL", "difficulty": "medium", "prompt": "Dữ liệu về tỉ lệ churn khách hàng (customer churn rate) trung bình trong ngành bán lẻ Việt Nam và giải pháp giữ chân khách."}
+{"domain": "RETRIEVAL", "difficulty": "medium", "prompt": "Theo báo cáo nào đó về ESG, xu hướng tiêu dùng xanh tại Việt Nam: người tiêu dùng sẵn sàng trả thêm bao nhiêu % cho sản phẩm thân thiện môi trường?"}
+{"domain": "RETRIEVAL", "difficulty": "medium", "prompt": "Phân tích dữ liệu về thời gian khách hàng lưu lại tại cửa hàng offline và mối liên hệ với doanh thu/m² ở Việt Nam."}
+{"domain": "RETRIEVAL", "difficulty": "medium", "prompt": "Số liệu về tỉ lệ trả hàng (return rate) trong TMĐT Việt Nam và chi phí xử lý hoàn hàng trung bình."}
+{"domain": "RETRIEVAL", "difficulty": "medium", "prompt": "Luật Bảo vệ quyền lợi người tiêu dùng sửa đổi 2023 có những thay đổi gì quan trọng so với luật 2010 ảnh hưởng đến cửa hàng bán lẻ?"}
+{"domain": "RETRIEVAL", "difficulty": "medium", "prompt": "Nghị định 85/2021/NĐ-CP về thương mại điện tử: các quy định về đăng ký kinh doanh TMĐT và nghĩa vụ của người bán trên sàn."}
+{"domain": "RETRIEVAL", "difficulty": "medium", "prompt": "Quy chuẩn kỹ thuật quốc gia về an toàn thực phẩm (QCVN) áp dụng cho cửa hàng bán thực phẩm: những yêu cầu bắt buộc về bảo quản và tem nhãn."}
+{"domain": "RETRIEVAL", "difficulty": "medium", "prompt": "Nghị định 98/2020/NĐ-CP về xử phạt hành chính trong thương mại: mức phạt cho các vi phạm phổ biến nhất của cửa hàng bán lẻ là bao nhiêu?"}
+{"domain": "RETRIEVAL", "difficulty": "medium", "prompt": "Luật Cạnh tranh 2018: các hành vi bán phá giá và liên kết giá cả bị cấm trong bán lẻ. Chuỗi cửa hàng cần tuân thủ những gì?"}
+{"domain": "RETRIEVAL", "difficulty": "medium", "prompt": "Quy định về nhãn hàng hóa Nghị định 111/2021/NĐ-CP: những thông tin bắt buộc trên nhãn sản phẩm tiêu dùng bán tại Việt Nam."}
+{"domain": "RETRIEVAL", "difficulty": "medium", "prompt": "Tiêu chuẩn HACCP và ISO 22000 cho cơ sở kinh doanh thực phẩm: ai bắt buộc phải có, chi phí và quy trình chứng nhận."}
+{"domain": "RETRIEVAL", "difficulty": "medium", "prompt": "Quy định về phòng cháy chữa cháy (PCCC) cho cửa hàng bán lẻ theo Nghị định 136/2020/NĐ-CP: diện tích nào bắt buộc lắp sprinkler?"}
+{"domain": "RETRIEVAL", "difficulty": "medium", "prompt": "Luật Lao động 2019: các quy định về giờ làm thêm, nghỉ phép và lương tối thiểu vùng ảnh hưởng thế nào đến chi phí nhân sự cửa hàng bán lẻ?"}
+{"domain": "RETRIEVAL", "difficulty": "medium", "prompt": "Nghị định 13/2023/NĐ-CP về bảo vệ dữ liệu cá nhân: cửa hàng thu thập thông tin khách hàng (tên, SĐT, địa chỉ) cần tuân thủ những gì?"}
+{"domain": "RETRIEVAL", "difficulty": "medium", "prompt": "Chính sách hỗ trợ SME của Chính phủ Việt Nam 2024-2025: gói vay ưu đãi, bảo lãnh tín dụng và điều kiện tiếp cận cho doanh nghiệp bán lẻ nhỏ."}
+{"domain": "RETRIEVAL", "difficulty": "medium", "prompt": "Quy định của Bộ Công Thương về nhượng quyền thương mại (franchise): hồ sơ đăng ký, nghĩa vụ công bố thông tin và hợp đồng nhượng quyền."}
+{"domain": "RETRIEVAL", "difficulty": "medium", "prompt": "Tiêu chuẩn VietGAP cho rau củ quả: điều kiện chứng nhận, quy trình kiểm tra và ý nghĩa với cửa hàng bán thực phẩm sạch."}
+{"domain": "RETRIEVAL", "difficulty": "medium", "prompt": "Nghị quyết 01/NQ-CP năm 2025: mục tiêu tăng trưởng GDP và các chính sách kích cầu tiêu dùng nội địa ảnh hưởng đến ngành bán lẻ."}
+{"domain": "RETRIEVAL", "difficulty": "medium", "prompt": "Quy định về bán hàng đa cấp và phân biệt với mô hình đại lý bán lẻ truyền thống theo Nghị định 40/2018/NĐ-CP."}
+{"domain": "RETRIEVAL", "difficulty": "medium", "prompt": "Phương pháp phân tích ABC trong quản lý hàng tồn kho: áp dụng thế nào cho cửa hàng bán lẻ 500 SKU với ngân sách hạn chế?"}
+{"domain": "RETRIEVAL", "difficulty": "medium", "prompt": "Chỉ số KPI nào quan trọng nhất cho cửa hàng bán lẻ vừa và nhỏ? Cách tính và mục tiêu chuẩn ngành cho từng chỉ số."}
+{"domain": "RETRIEVAL", "difficulty": "medium", "prompt": "Tỉ lệ lợi nhuận gộp (gross margin) trung bình theo từng ngành hàng bán lẻ tại Việt Nam: thực phẩm, điện tử, thời trang, dược phẩm."}
+{"domain": "RETRIEVAL", "difficulty": "medium", "prompt": "Benchmark chi phí vận hành cửa hàng bán lẻ (rent, labor, utilities, marketing) tính theo % doanh thu cho thị trường Việt Nam."}
+{"domain": "RETRIEVAL", "difficulty": "medium", "prompt": "Mô hình định giá Value-Based Pricing cho cửa hàng bán lẻ tại Việt Nam: nghiên cứu trường hợp thành công và thất bại."}
+{"domain": "RETRIEVAL", "difficulty": "medium", "prompt": "Số liệu về tỉ lệ chuyển đổi (conversion rate) khách vào cửa hàng offline tại Việt Nam và yếu tố ảnh hưởng lớn nhất."}
+{"domain": "RETRIEVAL", "difficulty": "medium", "prompt": "Nghiên cứu về hiệu quả của loyalty program trong giữ chân khách hàng ở thị trường bán lẻ Việt Nam: ROI trung bình là bao nhiêu?"}
+{"domain": "RETRIEVAL", "difficulty": "medium", "prompt": "Theo khảo sát người tiêu dùng, yếu tố nào quan trọng nhất khi chọn cửa hàng bán lẻ: giá cả, vị trí, chất lượng, hay dịch vụ?"}
+{"domain": "RETRIEVAL", "difficulty": "hard", "prompt": "Tổng hợp thông tin từ báo cáo BCG, McKinsey về tương lai bán lẻ Việt Nam 2025-2030 và những cơ hội cho doanh nghiệp vừa và nhỏ."}
+{"domain": "RETRIEVAL", "difficulty": "hard", "prompt": "Theo dữ liệu công bố của Bộ Công Thương, top 5 mặt hàng có tốc độ tăng doanh thu cao nhất tại kênh bán lẻ truyền thống 6 tháng đầu 2025."}
+{"domain": "RETRIEVAL", "difficulty": "hard", "prompt": "Nghiên cứu về tác động của chuyển đổi số lên năng suất lao động (doanh thu/nhân viên) trong ngành bán lẻ SME Việt Nam."}
+{"domain": "RETRIEVAL", "difficulty": "hard", "prompt": "Phân tích dữ liệu từ các báo cáo ngành: tỉ lệ cửa hàng bán lẻ SME phá sản trong 3 năm đầu hoạt động tại Việt Nam và nguyên nhân chính."}
+{"domain": "RETRIEVAL", "difficulty": "hard", "prompt": "Dữ liệu về Net Promoter Score (NPS) trung bình của các kênh bán lẻ tại Việt Nam: siêu thị vs. tạp hóa vs. TMĐT vs. cửa hàng tiện lợi."}
+{"domain": "RETRIEVAL", "difficulty": "hard", "prompt": "Theo báo cáo công nghệ bán lẻ, tỉ lệ ROI trung bình khi cửa hàng triển khai hệ thống POS tích hợp AI tại Việt Nam và thời gian hoàn vốn."}
+{"domain": "RETRIEVAL", "difficulty": "hard", "prompt": "Phân tích tổng hợp về tác động của biến đổi khí hậu đến chuỗi cung ứng nông sản và giá bán lẻ rau củ quả ở Việt Nam năm 2024-2025."}
+{"domain": "RETRIEVAL", "difficulty": "hard", "prompt": "Theo nghiên cứu về hành vi tiêu dùng, tỉ lệ khách hàng chuyển từ offline sang online sau COVID-19 và xu hướng ngược lại (online to offline) hiện nay."}
+{"domain": "RETRIEVAL", "difficulty": "hard", "prompt": "Dữ liệu về inventory shrinkage (thất thoát hàng tồn kho do mất cắp, hư hỏng) trung bình trong ngành bán lẻ Việt Nam và giải pháp giảm thiểu."}
+{"domain": "RETRIEVAL", "difficulty": "hard", "prompt": "Nghiên cứu về premium pricing psychology tại thị trường Việt Nam: sản phẩm giá cao có thực sự tăng tính thuyết phục về chất lượng không?"}
+{"domain": "RETRIEVAL", "difficulty": "hard", "prompt": "Phân tích từ báo cáo IFC/WB về khó khăn tiếp cận vốn của SME bán lẻ Việt Nam và các sản phẩm tài chính phù hợp nhất."}
+{"domain": "RETRIEVAL", "difficulty": "hard", "prompt": "Tổng hợp từ các nghiên cứu về tác động của mạng xã hội (TikTok Shop, Facebook) đến doanh thu cửa hàng offline truyền thống tại Việt Nam."}
+{"domain": "TECHNICAL", "difficulty": "easy", "prompt": "Tạo workflow n8n đơn giản: mỗi ngày 8 giờ sáng, gửi báo cáo doanh thu hôm qua qua Telegram cho chủ cửa hàng. Liệt kê các node cần dùng."}
+{"domain": "TECHNICAL", "difficulty": "easy", "prompt": "Thiết kế workflow n8n: khi tồn kho sản phẩm xuống dưới 10 đơn vị, tự động gửi email cảnh báo cho nhà cung cấp để đặt hàng. Cần những trigger và action gì?"}
+{"domain": "TECHNICAL", "difficulty": "easy", "prompt": "Tạo automation đơn giản: khách hàng mua hàng xong, hệ thống tự gửi SMS xác nhận đơn hàng và hóa đơn điện tử qua email. Mô tả flow và API cần kết nối."}
+{"domain": "TECHNICAL", "difficulty": "easy", "prompt": "Workflow n8n cho nhập liệu: nhân viên nhập dữ liệu tồn kho vào Google Sheets, n8n tự đồng bộ sang database PostgreSQL của ANSER Body. Cách thiết lập trigger sheet?"}
+{"domain": "TECHNICAL", "difficulty": "easy", "prompt": "Thiết kế webhook đơn giản: khi khách đặt hàng trên website WooCommerce, tự động tạo đơn hàng tương ứng trong ANSER Body. Payload webhook trông như thế nào?"}
+{"domain": "TECHNICAL", "difficulty": "easy", "prompt": "Automation báo cáo cuối tuần: mỗi thứ 6 lúc 17h, tổng hợp doanh thu 7 ngày, top 5 sản phẩm bán chạy và gửi PDF qua Zalo OA. Workflow n8n cần bao nhiêu node?"}
+{"domain": "TECHNICAL", "difficulty": "easy", "prompt": "Tạo chatbot FAQ đơn giản trên Facebook Messenger cho cửa hàng: trả lời tự động câu hỏi về giờ mở cửa, địa chỉ, bảng giá. n8n kết nối Facebook API thế nào?"}
+{"domain": "TECHNICAL", "difficulty": "easy", "prompt": "Workflow tự động backup dữ liệu: mỗi ngày nửa đêm, xuất toàn bộ đơn hàng ngày đó từ ANSER Body thành file CSV và upload lên Google Drive. Thiết kế flow."}
+{"domain": "TECHNICAL", "difficulty": "easy", "prompt": "Automation tạo đơn đặt hàng tự động: khi hàng dưới ngưỡng, tạo file Excel đơn đặt hàng theo mẫu chuẩn và gửi email cho nhà cung cấp. Mô tả n8n nodes."}
+{"domain": "TECHNICAL", "difficulty": "easy", "prompt": "Cách kết nối n8n với API ANSER Brain để khi nhân viên gõ lệnh '/report' trong Slack, tự động trả về báo cáo doanh thu tuần. Thiết kế flow end-to-end."}
+{"domain": "TECHNICAL", "difficulty": "easy", "prompt": "Workflow n8n để đồng bộ giá sản phẩm: khi admin cập nhật giá trên Google Sheets, tự động cập nhật giá trong hệ thống POS và website. Cần xử lý conflict thế nào?"}
+{"domain": "TECHNICAL", "difficulty": "easy", "prompt": "Tạo workflow xử lý đơn hoàn trả: khi khách gửi email yêu cầu trả hàng, n8n tự phân loại, tạo phiếu trả hàng, thông báo kho và gửi xác nhận cho khách."}
+{"domain": "TECHNICAL", "difficulty": "easy", "prompt": "Automation chấm công nhân viên: nhân viên chụp ảnh QR code khi check-in/out, n8n ghi nhận thời gian và tính lương tự động cuối tháng. Thiết kế flow."}
+{"domain": "TECHNICAL", "difficulty": "easy", "prompt": "Workflow đăng sản phẩm mới đa kênh: khi thêm sản phẩm vào ANSER Body, tự động đăng lên Shopee, Lazada và Facebook Shop với thông tin đồng bộ."}
+{"domain": "TECHNICAL", "difficulty": "easy", "prompt": "Cách dùng n8n để tự động trả lời review trên Google Maps: review 5 sao → cảm ơn template, review 1-2 sao → thông báo manager để xử lý ngay."}
+{"domain": "TECHNICAL", "difficulty": "easy", "prompt": "Webhook cho nhận thanh toán: khi MoMo/VNPay xác nhận thanh toán, n8n tự cập nhật trạng thái đơn hàng và giảm tồn kho. Xử lý trường hợp timeout thế nào?"}
+{"domain": "TECHNICAL", "difficulty": "easy", "prompt": "Automation sinh nhật khách hàng: n8n đọc database, 3 ngày trước sinh nhật gửi voucher giảm giá 15% cho khách. Cách lặp qua toàn bộ khách hàng mỗi ngày?"}
+{"domain": "TECHNICAL", "difficulty": "easy", "prompt": "Tạo workflow đơn giản: khi nhiệt độ tủ đông vượt -12°C (cảm biến IoT), gửi cảnh báo ngay cho nhân viên qua Zalo và SMS. n8n xử lý MQTT input thế nào?"}
+{"domain": "TECHNICAL", "difficulty": "easy", "prompt": "Workflow quản lý hàng hết hạn: n8n quét database hàng ngày, cảnh báo sản phẩm còn 7 ngày hết hạn và tự đặt giảm giá 30% cho sản phẩm còn 3 ngày."}
+{"domain": "TECHNICAL", "difficulty": "easy", "prompt": "Automation cập nhật bảng giá từ nhà cung cấp: nhà cung cấp gửi file Excel giá mới qua email, n8n đọc attachment, so sánh với giá cũ và highlight những thứ thay đổi."}
+{"domain": "TECHNICAL", "difficulty": "easy", "prompt": "Workflow onboarding nhân viên mới: khi HR tạo tài khoản nhân viên, n8n tự tạo email công ty, cấp quyền phần mềm, gửi tài liệu đào tạo và thêm vào group chat."}
+{"domain": "TECHNICAL", "difficulty": "easy", "prompt": "Cách thiết lập n8n để monitor uptime server ANSER Brain: ping mỗi 5 phút, nếu down quá 3 lần liên tiếp → gửi cảnh báo Telegram ngay."}
+{"domain": "TECHNICAL", "difficulty": "easy", "prompt": "Workflow tự động in nhãn giá: khi sản phẩm mới nhập kho, n8n gửi lệnh in nhãn đến máy in nhãn Zebra với mã barcode, tên và giá bán."}
+{"domain": "TECHNICAL", "difficulty": "easy", "prompt": "Automation xử lý form liên hệ website: khách điền form, n8n tự phân loại (khiếu nại/tư vấn/đặt hàng), route đến đúng bộ phận và tạo ticket trong hệ thống."}
+{"domain": "TECHNICAL", "difficulty": "easy", "prompt": "Workflow daily standup tự động: 8h sáng, n8n tổng hợp tasks từ Trello/Jira đang trong progress, gửi tóm tắt vào Slack channel team."}
+{"domain": "TECHNICAL", "difficulty": "medium", "prompt": "Thiết kế workflow n8n đa bước cho quy trình nhập hàng: tạo PO → nhà cung cấp xác nhận → nhận hàng → kiểm tra số lượng/chất lượng → cập nhật kho → tạo hóa đơn thanh toán. Xử lý exception ở bước kiểm tra thế nào?"}
+{"domain": "TECHNICAL", "difficulty": "medium", "prompt": "Tạo Make.com (Integromat) scenario cho chuỗi marketing automation: khách đăng ký email → welcome email ngay → 3 ngày sau email chăm sóc → 7 ngày sau offer → nếu chưa mua → re-engagement. Thiết kế với conditional routing."}
+{"domain": "TECHNICAL", "difficulty": "medium", "prompt": "Workflow n8n cho inventory forecasting đơn giản: lấy dữ liệu bán hàng 30 ngày từ PostgreSQL, tính average daily sales, dự báo ngày hết hàng và tự tạo đơn đặt hàng với lead time nhà cung cấp."}
+{"domain": "TECHNICAL", "difficulty": "medium", "prompt": "Thiết kế workflow xử lý khiếu nại khách hàng end-to-end: khách gửi form → phân loại AI (lỗi sản phẩm/giao hàng/dịch vụ) → assign cho đúng team → set SLA timer → escalate nếu quá hạn → gửi kết quả cho khách."}
+{"domain": "TECHNICAL", "difficulty": "medium", "prompt": "Tạo n8n workflow tích hợp POS với kế toán: mỗi giao dịch bán hàng → cập nhật doanh thu realtime → cuối ngày reconcile với số liệu kế toán → báo cáo chênh lệch nếu có."}
+{"domain": "TECHNICAL", "difficulty": "medium", "prompt": "Workflow n8n cho quản lý nhà cung cấp: monitor giá nguyên liệu từ 5 nhà cung cấp, so sánh tự động, alert khi có nhà cung cấp cạnh tranh giá tốt hơn 5%, tạo bản phân tích so sánh."}
+{"domain": "TECHNICAL", "difficulty": "medium", "prompt": "Thiết kế micro-services architecture cho ANSER: service nào chạy trong n8n, service nào thuộc FastAPI ANSER Brain, service nào trong Flask ANSER Body? Vẽ ranh giới và giao tiếp qua REST/webhook."}
+{"domain": "TECHNICAL", "difficulty": "medium", "prompt": "Workflow n8n tích hợp với Zalo OA để chăm sóc khách hàng: nhận tin nhắn → intent classification bằng ANSER Brain API → trả lời tự động nếu FAQ → escalate human nếu phức tạp."}
+{"domain": "TECHNICAL", "difficulty": "medium", "prompt": "Tạo pipeline dữ liệu với n8n: thu thập giá cạnh tranh từ Shopee/Lazada bằng scraping, so sánh với giá của mình, alert nếu mình đang bị undercut và đề xuất điều chỉnh giá."}
+{"domain": "TECHNICAL", "difficulty": "medium", "prompt": "Workflow n8n cho flash sale management: set up schedule → cập nhật giá trên tất cả kênh cùng lúc → monitor inventory realtime → khi hết hàng → đóng sale tất cả kênh ngay. Xử lý race condition thế nào?"}
+{"domain": "TECHNICAL", "difficulty": "medium", "prompt": "Thiết kế workflow cho B2B order processing: khách B2B gửi PO qua email/portal → parse thông tin → kiểm tra credit limit → reserve inventory → tạo SO trong hệ thống → confirm với khách."}
+{"domain": "TECHNICAL", "difficulty": "medium", "prompt": "n8n workflow cho audit trail: mọi thay đổi trong database ANSER Body (giá, kho, đơn hàng) đều được log vào immutable audit table với timestamp, user, old value, new value. Thiết kế schema và trigger."}
+{"domain": "TECHNICAL", "difficulty": "medium", "prompt": "Workflow xử lý hóa đơn điện tử: sau khi POS xuất hóa đơn, n8n tự gửi hóa đơn lên cơ quan thuế (API VNPT/MISA), nhận mã CQT, cập nhật vào hệ thống và email/SMS cho khách."}
+{"domain": "TECHNICAL", "difficulty": "medium", "prompt": "Tạo workflow n8n cho merchandise planning: phân tích dữ liệu bán hàng theo mùa từ 2 năm trước, tự tính suggested order quantity cho từng SKU theo mùa tiếp theo."}
+{"domain": "TECHNICAL", "difficulty": "medium", "prompt": "Thiết kế data pipeline ETL với n8n: extract từ POS → transform (chuẩn hóa, validate, enrich) → load vào data warehouse NeonDB → trigger dashboard refresh."}
+{"domain": "TECHNICAL", "difficulty": "medium", "prompt": "Workflow n8n tự động generate content marketing: mỗi tuần, lấy sản phẩm bán chạy nhất → gửi đến ANSER Brain để viết caption mạng xã hội → post lên Facebook/Instagram theo lịch."}
+{"domain": "TECHNICAL", "difficulty": "medium", "prompt": "Thiết kế workflow approval cho chi tiêu lớn: khi đơn hàng mua > 50 triệu, tự động tạo yêu cầu phê duyệt, gửi cho manager, set deadline, escalate nếu không approve trong 24h."}
+{"domain": "TECHNICAL", "difficulty": "medium", "prompt": "Tích hợp ANSER Brain với thiết bị camera AI tại cửa hàng: camera đếm khách vào ra → n8n tổng hợp traffic data → ANSER Brain phân tích correlation với doanh thu → insights tự động."}
+{"domain": "TECHNICAL", "difficulty": "medium", "prompt": "Workflow n8n cho customer segmentation tự động: weekly, chạy RFM analysis (Recency/Frequency/Monetary) trên database khách hàng, gán segment và trigger marketing phù hợp cho từng segment."}
+{"domain": "TECHNICAL", "difficulty": "medium", "prompt": "Thiết kế hệ thống n8n để monitor và auto-heal: nếu ANSER Brain API response time > 3s, tự scale up Colab resources hoặc switch sang fallback model."}
+{"domain": "TECHNICAL", "difficulty": "medium", "prompt": "Workflow xử lý nhập kho multi-location: hàng nhập kho trung tâm, n8n tự phân bổ theo demand forecast của từng chi nhánh, tạo lệnh chuyển kho nội bộ và cập nhật tồn kho từng điểm."}
+{"domain": "TECHNICAL", "difficulty": "medium", "prompt": "Tạo n8n workflow để xử lý reconciliation ngân hàng: download sao kê ngân hàng → match với đơn hàng → flag unmatched transactions → tạo báo cáo chênh lệch cho kế toán."}
+{"domain": "TECHNICAL", "difficulty": "medium", "prompt": "Thiết kế workflow phòng ngừa gian lận: n8n monitor realtime các giao dịch bất thường (vé số lớn bất thường, hủy đơn nhiều, giảm giá không được phép), alert manager ngay."}
+{"domain": "TECHNICAL", "difficulty": "medium", "prompt": "Workflow n8n cho loyalty point management: mỗi giao dịch → cộng điểm → check milestones → gửi notification khi đủ điểm đổi quà → tạo voucher điện tử và gửi cho khách."}
+{"domain": "TECHNICAL", "difficulty": "medium", "prompt": "Tích hợp n8n với ESP32 tại cửa hàng: đọc nhiệt độ, độ ẩm, cân điện tử qua MQTT → store vào TimescaleDB → alert khi vượt ngưỡng → visualize trên dashboard Grafana."}
+{"domain": "TECHNICAL", "difficulty": "hard", "prompt": "Thiết kế kiến trúc event-driven cho ANSER: events từ POS → Kafka/RabbitMQ → multiple consumers (inventory, accounting, analytics, notification). Xử lý out-of-order events và idempotency."}
+{"domain": "TECHNICAL", "difficulty": "hard", "prompt": "Tạo workflow n8n với circuit breaker pattern: nếu ANSER Brain API fail 3 lần liên tiếp, tự động switch sang fallback logic, log incident và alert, tự recover khi API healthy trở lại."}
+{"domain": "TECHNICAL", "difficulty": "hard", "prompt": "Thiết kế multi-tenant architecture cho ANSER phục vụ nhiều cửa hàng: dữ liệu isolation, rate limiting per tenant, billing automation, và n8n workflow cho tenant onboarding tự động."}
+{"domain": "TECHNICAL", "difficulty": "hard", "prompt": "Workflow n8n phức tạp cho demand forecasting với AI: pull historical data 2 năm → gửi ANSER Brain để sinh time-series forecast → validate accuracy → auto-generate purchase orders nếu confidence > 85%."}
+{"domain": "TECHNICAL", "difficulty": "hard", "prompt": "Thiết kế hệ thống real-time pricing engine: ANSER Brain nhận competitor prices, current inventory, demand signals → tính dynamic price → n8n cập nhật giá trên tất cả kênh đồng thời với rollback plan."}
+{"domain": "TECHNICAL", "difficulty": "hard", "prompt": "Workflow audit bảo mật tự động: weekly scan cấu hình n8n, check API keys rotation, review access logs ANSER, detect anomalies và tự động revoke suspicious sessions."}
+{"domain": "TECHNICAL", "difficulty": "hard", "prompt": "Thiết kế pipeline xử lý ảnh sản phẩm tự động: upload ảnh thô → ANSER Vision resize/crop → background removal → watermark → CDN upload → cập nhật URL trong database → thông báo team marketing."}
+{"domain": "TECHNICAL", "difficulty": "hard", "prompt": "Tạo n8n workflow cho vendor managed inventory (VMI): nhà cung cấp access real-time stock level qua API, n8n tự tạo replenishment order theo thỏa thuận min/max stock level, verify delivery và invoice matching."}
+{"domain": "TECHNICAL", "difficulty": "hard", "prompt": "Thiết kế hệ thống A/B testing automation với n8n: random split khách hàng vào nhóm test/control, track metrics 14 ngày, tự phân tích statistical significance, chọn winner và rollout 100%."}
+{"domain": "TECHNICAL", "difficulty": "hard", "prompt": "Workflow n8n cho regulatory reporting tự động: cuối tháng, tổng hợp dữ liệu bán hàng, tự sinh báo cáo GSO (General Statistics Office), báo cáo thuế và báo cáo ngân hàng theo đúng template format."}
+{"domain": "TECHNICAL", "difficulty": "hard", "prompt": "Thiết kế disaster recovery workflow với n8n: nếu primary DB NeonDB down, tự failover sang read replica, switch connection string trong tất cả services, alert team và tự test recovery sau khi primary restored."}
+{"domain": "TECHNICAL", "difficulty": "hard", "prompt": "Tạo semantic search pipeline cho catalog sản phẩm: khi thêm sản phẩm mới → ANSER Brain embed mô tả → store vào ChromaDB → expose API cho chatbot tư vấn sản phẩm realtime."}
+{"domain": "TECHNICAL", "difficulty": "hard", "prompt": "Workflow n8n cho automated testing của ANSER trước khi deploy: pull code mới → chạy unit tests → integration tests → load test 100 concurrent users → report results → auto-deploy nếu tất cả pass."}
+{"domain": "TECHNICAL", "difficulty": "hard", "prompt": "Thiết kế hệ thống anomaly detection realtime: ANSER Brain monitor log streams từ POS, detect gian lận (discount abuse, void abuse, refund fraud) với ML model, flag suspicious transactions và tự block nếu confidence > 95%."}
+{"domain": "TECHNICAL", "difficulty": "hard", "prompt": "Tạo composable n8n subworkflows: thiết kế library của 20 reusable modules (send-email, update-inventory, create-invoice, notify-slack...) với chuẩn input/output JSON schema, version control và documentation tự động."}
+{"domain": "GENERAL", "difficulty": "easy", "prompt": "Tôi muốn mở cửa hàng tạp hóa ở khu dân cư 500 hộ tại Hà Nội. Vốn ban đầu 200 triệu. Tôi nên bắt đầu từ đâu và cần chuẩn bị gì?"}
+{"domain": "GENERAL", "difficulty": "easy", "prompt": "Chuỗi siêu thị lớn vừa mở gần cửa hàng tôi. Làm thế nào để cửa hàng nhỏ cạnh tranh và giữ khách trung thành?"}
+{"domain": "GENERAL", "difficulty": "easy", "prompt": "Tôi đang bán thực phẩm sạch offline. Có nên mở thêm kênh bán online không? Ưu nhược điểm và cách bắt đầu với ngân sách 20 triệu."}
+{"domain": "GENERAL", "difficulty": "easy", "prompt": "Làm thế nào để xác định đúng đối tượng khách hàng mục tiêu cho cửa hàng bán đồ thể thao tại khu vực ngoại thành?"}
+{"domain": "GENERAL", "difficulty": "easy", "prompt": "Tôi muốn tăng doanh thu 30% trong 6 tháng tới mà không tăng chi phí marketing. Có 5 chiến lược nào phù hợp với cửa hàng bán lẻ nhỏ?"}
+{"domain": "GENERAL", "difficulty": "easy", "prompt": "Nên chọn mô hình kinh doanh nào cho cửa hàng thực phẩm hữu cơ: bán lẻ đơn thuần, kết hợp cafe, hay dịch vụ giao hàng subscription?"}
+{"domain": "GENERAL", "difficulty": "easy", "prompt": "Làm thế nào để đàm phán giá tốt hơn với nhà cung cấp khi mình là cửa hàng nhỏ và đơn hàng không lớn?"}
+{"domain": "GENERAL", "difficulty": "easy", "prompt": "Tôi bán mỹ phẩm nhập khẩu. Xu hướng khách hàng đang ưa chuộng K-beauty hay J-beauty? Nên đánh vào phân khúc giá nào?"}
+{"domain": "GENERAL", "difficulty": "easy", "prompt": "Chiến lược giá nào phù hợp nhất cho cửa hàng bán đồ gia dụng tại khu vực thu nhập trung bình? So sánh cost-plus vs. competitive pricing."}
+{"domain": "GENERAL", "difficulty": "easy", "prompt": "Làm thế nào để xây dựng quy trình vận hành chuẩn (SOP) cho cửa hàng 3 nhân viên giúp đảm bảo chất lượng kể cả khi tôi không có mặt?"}
+{"domain": "GENERAL", "difficulty": "easy", "prompt": "Tôi đang bán qua nhiều kênh: cửa hàng vật lý, Shopee, Facebook. Làm sao quản lý tồn kho tập trung tránh oversell?"}
+{"domain": "GENERAL", "difficulty": "easy", "prompt": "Cửa hàng tôi có tỉ lệ khách quay lại chỉ 20%. Các chiến lược nào để tăng lên 40% trong vòng 3 tháng?"}
+{"domain": "GENERAL", "difficulty": "easy", "prompt": "Tôi muốn mở rộng sang cửa hàng thứ 2 ở quận mới. Những tiêu chí nào để chọn vị trí và khi nào là thời điểm phù hợp?"}
+{"domain": "GENERAL", "difficulty": "easy", "prompt": "Làm thế nào để xây dựng đội ngũ bán hàng 5 người cam kết, tránh tình trạng nhân viên nghỉ việc thường xuyên ở cửa hàng bán lẻ?"}
+{"domain": "GENERAL", "difficulty": "easy", "prompt": "Sản phẩm tôi chất lượng tốt nhưng ít người biết đến. Chiến lược marketing online với ngân sách 5 triệu/tháng nào hiệu quả nhất?"}
+{"domain": "GENERAL", "difficulty": "medium", "prompt": "Phân tích cơ hội và thách thức khi mở rộng chuỗi cửa hàng từ 3 lên 10 điểm bán trong 18 tháng: vốn, nhân sự, vận hành, công nghệ cần chuẩn bị gì?"}
+{"domain": "GENERAL", "difficulty": "medium", "prompt": "Xây dựng kế hoạch kinh doanh năm cho cửa hàng bán lẻ hàng tiêu dùng với mục tiêu doanh thu 5 tỷ VND. Bao gồm phân bổ ngân sách marketing, chi phí vận hành và KPI từng quý."}
+{"domain": "GENERAL", "difficulty": "medium", "prompt": "Phân tích mô hình 4P (Product, Price, Place, Promotion) cho cửa hàng thực phẩm sức khỏe tại TP.HCM cạnh tranh với Circle K và GS25."}
+{"domain": "GENERAL", "difficulty": "medium", "prompt": "Làm thế nào để thiết kế trải nghiệm khách hàng (CX) vượt trội cho cửa hàng offline trong bối cảnh TMĐT phát triển mạnh? 5 điểm chạm quan trọng nhất."}
+{"domain": "GENERAL", "difficulty": "medium", "prompt": "Phân tích SWOT cho cửa hàng dược phẩm độc lập cạnh tranh với chuỗi Long Châu, Pharmacity. Từ SWOT, xây dựng 3 chiến lược khả thi."}
+{"domain": "GENERAL", "difficulty": "medium", "prompt": "Thiết kế chương trình khách hàng thân thiết (loyalty program) cho cửa hàng bán lẻ 2,000 khách hàng thường xuyên. Cơ cấu điểm, phần thưởng và chi phí vận hành."}
+{"domain": "GENERAL", "difficulty": "medium", "prompt": "Xây dựng chiến lược omnichannel cho cửa hàng bán lẻ: tích hợp offline, website, app, Shopee, TikTok Shop thành trải nghiệm liền mạch. Ưu tiên triển khai theo thứ tự nào?"}
+{"domain": "GENERAL", "difficulty": "medium", "prompt": "Phân tích kinh tế đơn vị (unit economics) cho mô hình cửa hàng tiện lợi: CAC, LTV, payback period, gross margin trên mỗi đơn hàng. Khi nào mô hình mới có lãi?"}
+{"domain": "GENERAL", "difficulty": "medium", "prompt": "Chiến lược pricing cho sản phẩm mới tung ra thị trường: penetration pricing vs. skimming pricing. Phân tích phù hợp với loại sản phẩm nào trong ngành bán lẻ Việt Nam."}
+{"domain": "GENERAL", "difficulty": "medium", "prompt": "Làm thế nào để cửa hàng bán lẻ SME xây dựng thương hiệu (brand building) với ngân sách dưới 50 triệu/năm và cạnh tranh với các thương hiệu lớn?"}
+{"domain": "GENERAL", "difficulty": "medium", "prompt": "Phân tích xu hướng D2C (Direct to Consumer) cho nhà sản xuất nhỏ muốn bỏ qua kênh phân phối truyền thống. Lợi ích, thách thức và điều kiện để thành công tại Việt Nam."}
+{"domain": "GENERAL", "difficulty": "hard", "prompt": "Thiết kế chiến lược phòng thủ cạnh tranh khi Amazon/Temu thâm nhập mạnh vào thị trường bán lẻ Việt Nam. Cửa hàng SME có thể tồn tại bằng cách nào?"}
+{"domain": "GENERAL", "difficulty": "hard", "prompt": "Phân tích tác động của AI và automation đến ngành bán lẻ Việt Nam trong 5 năm tới. Cửa hàng nên đầu tư vào công nghệ gì ngay bây giờ để không bị bỏ lại?"}
+{"domain": "GENERAL", "difficulty": "hard", "prompt": "Xây dựng kế hoạch chuyển đổi số toàn diện cho chuỗi 5 cửa hàng truyền thống với tổng ngân sách 500 triệu: ưu tiên hệ thống nào, lộ trình 3 giai đoạn 6 tháng."}
+{"domain": "GENERAL", "difficulty": "hard", "prompt": "Phân tích case study thất bại của Vinmart rút lui và thành công của WinMart: bài học gì cho doanh nghiệp bán lẻ Việt Nam muốn xây dựng chuỗi?"}
+{"domain": "GENERAL", "difficulty": "easy", "prompt": "Làm thế nào để bố trí cửa hàng 50m² bán đồ gia dụng tối ưu để tăng doanh thu/m² và trải nghiệm khách hàng? Nguyên tắc merchandising cơ bản."}
+{"domain": "GENERAL", "difficulty": "easy", "prompt": "Cách quản lý hàng tồn kho cho cửa hàng 300 SKU mà không dùng phần mềm phức tạp. Các phương pháp thủ công hiệu quả nhất."}
+{"domain": "GENERAL", "difficulty": "easy", "prompt": "Tôi cần thuê 2 nhân viên bán hàng part-time cho cuối tuần. Làm thế nào để tuyển dụng nhanh, đào tạo hiệu quả và giữ chân họ?"}
+{"domain": "GENERAL", "difficulty": "easy", "prompt": "Cách xử lý tình huống hàng nhập kho bị hỏng 20% so với đơn đặt hàng. Quy trình khiếu nại nhà cung cấp và bồi thường thiệt hại."}
+{"domain": "GENERAL", "difficulty": "easy", "prompt": "Làm thế nào để tối ưu lịch làm việc nhân viên cửa hàng để đảm bảo giờ cao điểm luôn đủ người mà không phát sinh overtime?"}
+{"domain": "GENERAL", "difficulty": "easy", "prompt": "Cửa hàng bị nhân viên lấy cắp hàng. Các biện pháp phòng ngừa gian lận nội bộ hiệu quả mà không tốn kém cho SME."}
+{"domain": "GENERAL", "difficulty": "easy", "prompt": "Quy trình đóng cửa hàng cuối ngày chuẩn: chốt sổ, kiểm kê tiền mặt, kiểm tra tồn kho, backup dữ liệu. Checklist chi tiết."}
+{"domain": "GENERAL", "difficulty": "easy", "prompt": "Xử lý khách hàng khó tính khiếu nại về chất lượng sản phẩm: quy trình xử lý 5 bước để giữ khách và bảo vệ thương hiệu."}
+{"domain": "GENERAL", "difficulty": "easy", "prompt": "Cửa hàng tôi hay hết hàng vào cuối tuần và ế hàng thứ 2-3. Cách điều chỉnh lịch nhập hàng để tối ưu tồn kho theo ngày trong tuần."}
+{"domain": "GENERAL", "difficulty": "easy", "prompt": "Làm thế nào để xây dựng mối quan hệ tốt với nhà cung cấp để được ưu tiên hàng tốt, giá ổn định và hỗ trợ marketing?"}
+{"domain": "GENERAL", "difficulty": "medium", "prompt": "Phân tích quy trình quản lý chuỗi cung ứng (supply chain) cho cửa hàng bán lẻ thực phẩm tươi sống: đặt hàng, nhận hàng, bảo quản, bán, xử lý hàng sắp hết hạn."}
+{"domain": "GENERAL", "difficulty": "medium", "prompt": "Xây dựng hệ thống KPI cho nhân viên bán hàng cửa hàng lẻ: chỉ tiêu gì, đo lường thế nào, liên kết với lương thưởng ra sao để khuyến khích đúng hành vi?"}
+{"domain": "GENERAL", "difficulty": "medium", "prompt": "Thiết kế quy trình kiểm kê hàng hóa định kỳ cho cửa hàng 1,000 SKU: tần suất, phương pháp (full count vs. cycle count), xử lý chênh lệch."}
+{"domain": "GENERAL", "difficulty": "medium", "prompt": "Phân tích các nguyên nhân gây ra 'dead stock' (hàng tồn kho không bán được) và chiến lược xử lý hàng tồn khó bán hiệu quả."}
+{"domain": "GENERAL", "difficulty": "medium", "prompt": "Xây dựng dashboard vận hành cửa hàng: những metrics nào cần theo dõi daily/weekly/monthly để đưa ra quyết định kịp thời?"}
+{"domain": "GENERAL", "difficulty": "medium", "prompt": "Thiết kế quy trình đào tạo nhân viên mới từ ngày 1 đến ngày 30: kiến thức sản phẩm, kỹ năng bán hàng, quy trình vận hành, đánh giá cuối kỳ."}
+{"domain": "GENERAL", "difficulty": "medium", "prompt": "Phân tích tại sao nhiều cửa hàng bán lẻ thất bại trong năm đầu tiên: Top 5 nguyên nhân và cách phòng tránh từ giai đoạn lập kế hoạch."}
+{"domain": "GENERAL", "difficulty": "medium", "prompt": "Làm thế nào để cửa hàng bán lẻ quản lý dòng tiền (cash flow) hiệu quả khi phải thanh toán nhà cung cấp trước nhưng bán hàng thu tiền sau?"}
+{"domain": "GENERAL", "difficulty": "medium", "prompt": "Xây dựng chính sách đổi trả hàng hóa cân bằng giữa lợi ích khách hàng và bảo vệ cửa hàng khỏi lạm dụng. Điều khoản cụ thể và quy trình thực hiện."}
+{"domain": "GENERAL", "difficulty": "medium", "prompt": "Phân tích lợi ích và rủi ro khi cửa hàng SME chấp nhận thanh toán crypto (Bitcoin, USDT). Có phù hợp với thị trường Việt Nam hiện tại không?"}
+{"domain": "GENERAL", "difficulty": "hard", "prompt": "Xây dựng mô hình tài chính 3 năm (P&L, Balance Sheet, Cash Flow) cho kế hoạch mở rộng chuỗi 5 cửa hàng. Điểm hòa vốn và IRR của dự án."}
+{"domain": "GENERAL", "difficulty": "hard", "prompt": "Thiết kế hệ thống quản lý nhân sự cho chuỗi 10 cửa hàng 100 nhân viên: cơ cấu tổ chức, phân quyền, KPI, lương thưởng và phát triển nghề nghiệp."}
+{"domain": "GENERAL", "difficulty": "hard", "prompt": "Phân tích quyết định build vs. buy cho hệ thống công nghệ bán lẻ: tự phát triển ANSER hay mua phần mềm SaaS có sẵn (KiotViet, MISA). TCO 5 năm."}
+{"domain": "GENERAL", "difficulty": "hard", "prompt": "Xây dựng chiến lược phát triển thị trường mới: chuỗi cửa hàng Hà Nội muốn mở rộng vào thị trường miền Nam. Phân tích sự khác biệt tiêu dùng và điều chỉnh cần thiết."}
+{"domain": "GENERAL", "difficulty": "hard", "prompt": "Phân tích xu hướng M&A trong ngành bán lẻ Việt Nam: khi nào nên sell business, khi nào nên acquire đối thủ? Định giá doanh nghiệp bán lẻ SME theo phương pháp nào?"}
+{"domain": "GENERAL", "difficulty": "hard", "prompt": "Thiết kế scenario planning cho 3 tình huống kinh tế: tăng trưởng mạnh, stagnation, và recession. Chiến lược ứng phó của chuỗi bán lẻ cho từng kịch bản."}
+{"domain": "GENERAL", "difficulty": "hard", "prompt": "Phân tích ảnh hưởng của gen Z trở thành nhóm tiêu dùng chủ lực đến 2030: cửa hàng bán lẻ cần thay đổi gì về sản phẩm, trải nghiệm và kênh phân phối?"}
+{"domain": "GENERAL", "difficulty": "hard", "prompt": "Xây dựng hệ thống quản lý chất lượng ISO 9001 cho chuỗi bán lẻ: quy trình, tài liệu, đào tạo và audit nội bộ. Chi phí và thời gian chứng nhận."}
+{"domain": "GENERAL", "difficulty": "hard", "prompt": "Phân tích tác động ESG (Environmental, Social, Governance) đến chiến lược dài hạn của chuỗi bán lẻ Việt Nam: đây là cơ hội hay gánh nặng?"}
+{"domain": "GENERAL", "difficulty": "hard", "prompt": "Thiết kế franchise model cho chuỗi cửa hàng bán lẻ Việt Nam muốn nhượng quyền: tài liệu pháp lý, phí nhượng quyền, hỗ trợ franchisee và kiểm soát chất lượng."}
+{"domain": "ATISO", "difficulty": "easy", "prompt": "Lịch thu hoạch atiso (artichoke) tại Đà Lạt: tháng mấy trong năm có chất lượng tốt nhất? Yếu tố thời tiết ảnh hưởng đến hàm lượng cynarin."}
+{"domain": "ATISO", "difficulty": "easy", "prompt": "Hàm lượng cynarin trong atiso Đà Lạt cao nhất ở bộ phận nào: hoa, thân, hay rễ? Và thu hoạch ở giai đoạn phát triển nào là tối ưu?"}
+{"domain": "ATISO", "difficulty": "easy", "prompt": "So sánh atiso Đà Lạt với atiso nhập khẩu từ Pháp và Morocco về hàm lượng cynarin, flavonoid và chất lượng dược liệu."}
+{"domain": "ATISO", "difficulty": "easy", "prompt": "Phân biệt trồng atiso theo phương pháp hữu cơ và thông thường: chi phí, năng suất và giá bán chênh lệch bao nhiêu?"}
+{"domain": "ATISO", "difficulty": "easy", "prompt": "Thời gian sinh trưởng của cây atiso từ trồng đến thu hoạch lần đầu là bao lâu? Cây cho thu hoạch được mấy vụ/năm?"}
+{"domain": "ATISO", "difficulty": "easy", "prompt": "Điều kiện đất đai và khí hậu lý tưởng để trồng atiso chất lượng cao tại Đà Lạt: pH đất, độ ẩm, nhiệt độ ngày/đêm tối ưu."}
+{"domain": "ATISO", "difficulty": "easy", "prompt": "Các bệnh và sâu hại phổ biến trên cây atiso ở Lâm Đồng và phương pháp phòng trừ theo tiêu chuẩn GACP."}
+{"domain": "ATISO", "difficulty": "easy", "prompt": "Chuẩn GACP (Good Agricultural and Collection Practice) WHO áp dụng cho atiso: những yêu cầu chính về canh tác và thu hoạch để được chứng nhận."}
+{"domain": "ATISO", "difficulty": "easy", "prompt": "Quy trình thu hái atiso đúng kỹ thuật để bảo toàn tối đa hoạt chất cynarin: thời điểm trong ngày, dụng cụ, cách xử lý sau thu hoạch."}
+{"domain": "ATISO", "difficulty": "easy", "prompt": "Năng suất trung bình atiso tươi/ha tại Đà Lạt và tỉ lệ chuyển đổi từ atiso tươi sang dạng khô (sấy lạnh) là bao nhiêu?"}
+{"domain": "ATISO", "difficulty": "medium", "prompt": "Thiết kế kế hoạch thu mua atiso tươi theo mùa vụ cho Ngọc Duy Group: tháng cao điểm, tháng thấp điểm, chiến lược dự trữ nguyên liệu và hợp đồng với nông dân."}
+{"domain": "ATISO", "difficulty": "medium", "prompt": "Phân tích rủi ro nguồn cung atiso: ảnh hưởng của El Niño/La Niña đến Đà Lạt, biến đổi khí hậu và chiến lược đa dạng hóa vùng trồng để đảm bảo nguồn nguyên liệu ổn định."}
+{"domain": "ATISO", "difficulty": "medium", "prompt": "Xây dựng hệ thống kiểm soát chất lượng nguyên liệu atiso đầu vào: tiêu chuẩn nghiệm thu, kiểm tra hàm lượng cynarin, vi sinh vật và dư lượng thuốc trừ sâu."}
+{"domain": "ATISO", "difficulty": "medium", "prompt": "So sánh chi phí và lợi ích của mô hình tự trồng atiso (backward integration) vs. thu mua từ nông dân hợp đồng cho doanh nghiệp quy mô Ngọc Duy Group."}
+{"domain": "ATISO", "difficulty": "hard", "prompt": "Phân tích chuỗi giá trị đầy đủ atiso Đà Lạt: từ nông dân → thu mua → chế biến → đóng gói → phân phối → xuất khẩu. Margin ở mỗi mắt xích và cơ hội tối ưu lợi nhuận."}
+{"domain": "ATISO", "difficulty": "easy", "prompt": "Quy trình chế biến trà atiso đóng túi: từ thu hoạch → rửa → cắt → sấy → xay nghiền → đóng túi. Nhiệt độ và thời gian sấy ảnh hưởng đến cynarin thế nào?"}
+{"domain": "ATISO", "difficulty": "easy", "prompt": "So sánh 3 phương pháp chiết xuất cynarin từ atiso: chiết xuất nước nóng, ethanol và CO2 siêu tới hạn. Ưu nhược điểm về hiệu suất, chi phí và chất lượng."}
+{"domain": "ATISO", "difficulty": "easy", "prompt": "Tiêu chuẩn hàm lượng cynarin trong trà atiso thành phẩm: mức tối thiểu theo quy định, cách kiểm tra HPLC và tần suất kiểm nghiệm."}
+{"domain": "ATISO", "difficulty": "medium", "prompt": "Thiết kế dây chuyền chế biến trà atiso hiện đại cho năng suất 1 tấn nguyên liệu tươi/ngày: thiết bị cần thiết, layout nhà xưởng và tiêu chuẩn GMP cần đáp ứng."}
+{"domain": "ATISO", "difficulty": "medium", "prompt": "Phân tích ảnh hưởng của phương pháp sấy (sấy thường, sấy lạnh freeze-dry, sấy phun spray-dry) đến hàm lượng hoạt chất và chi phí sản xuất trà atiso."}
+{"domain": "ATISO", "difficulty": "medium", "prompt": "Xây dựng FMEA (Failure Mode and Effect Analysis) cho quy trình sản xuất trà atiso Ngọc Duy: điểm rủi ro nào có thể ảnh hưởng đến chất lượng và cách kiểm soát."}
+{"domain": "ATISO", "difficulty": "medium", "prompt": "Thiết kế gói packaging cho trà atiso xuất khẩu sang Nhật: yêu cầu nhãn mác, thông tin dinh dưỡng, chứng nhận organic, thiết kế bao bì bắt mắt thị trường Nhật."}
+{"domain": "ATISO", "difficulty": "hard", "prompt": "Phân tích ROI của đầu tư công nghệ chế biến tiên tiến cho Ngọc Duy Group: từ dây chuyền truyền thống lên dây chuyền GMP-certified với sấy freeze-dry. Chi phí đầu tư và payback period."}
+{"domain": "ATISO", "difficulty": "hard", "prompt": "Xây dựng chiến lược R&D sản phẩm mới từ atiso: chiết xuất cynarin tiêu chuẩn hóa, viên nang thực phẩm bảo vệ sức khỏe, và nước uống atiso đóng chai. Thứ tự ưu tiên và nguồn lực cần thiết."}
+{"domain": "ATISO", "difficulty": "hard", "prompt": "Phân tích yêu cầu đăng ký sản phẩm thực phẩm bảo vệ sức khỏe từ atiso tại Việt Nam (Cục ATTP), Mỹ (FDA DSHEA) và EU (EFSA): so sánh quy trình, chi phí và thời gian."}
+{"domain": "ATISO", "difficulty": "easy", "prompt": "Ngọc Duy Group sản xuất trà atiso từ 1992. Làm thế nào để tận dụng lịch sử lâu đời này như một lợi thế cạnh tranh trong marketing hiện đại?"}
+{"domain": "ATISO", "difficulty": "easy", "prompt": "Phân khúc khách hàng tiềm năng cho trà atiso và thảo dược Ngọc Duy: người cao tuổi quan tâm sức khỏe, người bị gan, hay giới trẻ uống thảo dược trend?"}
+{"domain": "ATISO", "difficulty": "easy", "prompt": "Chiến lược phân phối trà atiso Ngọc Duy: nên tập trung B2B (nhà thuốc, bệnh viện, spa) hay B2C (siêu thị, online)? Phân tích margin và volume cho từng kênh."}
+{"domain": "ATISO", "difficulty": "easy", "prompt": "Định giá cho trà atiso chất lượng cao Đà Lạt: so sánh với sản phẩm atiso bình thường trên thị trường và sản phẩm nhập khẩu. Mức premium có thể đặt bao nhiêu %?"}
+{"domain": "ATISO", "difficulty": "easy", "prompt": "Xu hướng thị trường trà thảo dược ở Việt Nam và Đông Nam Á: cơ hội nào cho dòng sản phẩm atiso trong bối cảnh người tiêu dùng ngày càng quan tâm sức khỏe?"}
+{"domain": "ATISO", "difficulty": "medium", "prompt": "Xây dựng kế hoạch xuất khẩu trà atiso Ngọc Duy sang thị trường Đài Loan và Hàn Quốc: yêu cầu chứng nhận, tiêu chuẩn nhập khẩu, đối tác phân phối và chi phí gia nhập thị trường."}
+{"domain": "ATISO", "difficulty": "medium", "prompt": "Thiết kế chiến lược digital marketing cho Ngọc Duy Group: từ sản phẩm truyền thống, làm thế nào để xây dựng brand online trên Facebook, Zalo và TikTok tiếp cận khách hàng trẻ?"}
+{"domain": "ATISO", "difficulty": "medium", "prompt": "Phân tích quy định pháp lý về nhãn hiệu và quảng cáo cho sản phẩm thực phẩm bảo vệ sức khỏe tại Việt Nam: điều gì được phép nói về tác dụng atiso và điều gì bị cấm?"}
+{"domain": "ATISO", "difficulty": "medium", "prompt": "Xây dựng hệ thống truy xuất nguồn gốc (traceability) cho atiso Ngọc Duy: từ vùng trồng → chế biến → phân phối. Công nghệ nào phù hợp (QR code, blockchain)?"}
+{"domain": "ATISO", "difficulty": "medium", "prompt": "Phân tích cơ hội áp dụng chỉ dẫn địa lý (Geographic Indication) cho atiso Đà Lạt: quy trình đăng ký, lợi ích kinh tế và yêu cầu quản lý sau khi được công nhận."}
+{"domain": "ATISO", "difficulty": "hard", "prompt": "Xây dựng chiến lược 5 năm cho Ngọc Duy Group chuyển đổi từ doanh nghiệp sản xuất truyền thống sang thương hiệu dược liệu cao cấp: tái định vị thương hiệu, mở rộng sản phẩm, kênh phân phối mới và mục tiêu doanh thu."}
+{"domain": "ATISO", "difficulty": "hard", "prompt": "Phân tích feasibility cho dự án mở trung tâm du lịch nông nghiệp (agri-tourism) tại vùng trồng atiso Đà Lạt của Ngọc Duy: mô hình doanh thu, đầu tư cần thiết và tác động đến thương hiệu."}
+{"domain": "ATISO", "difficulty": "hard", "prompt": "Thiết kế chiến lược IP (sở hữu trí tuệ) cho Ngọc Duy Group: đăng ký thương hiệu ở các thị trường xuất khẩu, bảo hộ công thức sản phẩm và chống hàng nhái. Ưu tiên thị trường nào trước?"}
+{"domain": "ATISO", "difficulty": "hard", "prompt": "Phân tích tác động của EVFTA (Hiệp định thương mại tự do EU-Việt Nam) đến xuất khẩu trà atiso và thảo dược Ngọc Duy sang châu Âu: thuế suất, quy tắc xuất xứ và yêu cầu SPS."}
+{"domain": "ATISO", "difficulty": "hard", "prompt": "Xây dựng kế hoạch thành lập công ty con chuyên phân phối sản phẩm thảo dược Việt Nam tại Nhật Bản: cơ cấu pháp lý, vốn đầu tư, đối tác địa phương và lộ trình 3 năm đầu."}
+{"domain": "GENERAL", "difficulty": "medium", "prompt": "Làm thế nào để sử dụng dữ liệu từ hệ thống POS để đưa ra quyết định mua hàng thông minh hơn? Phân tích velocity, margin và turnover cùng nhau."}
+{"domain": "GENERAL", "difficulty": "medium", "prompt": "Thiết kế chương trình khuyến mãi Tết cho cửa hàng bán lẻ: combo sản phẩm, quà tặng, và cơ chế thu hút khách mà không phá giá thương hiệu."}
+{"domain": "GENERAL", "difficulty": "medium", "prompt": "Phân tích phương pháp tính điểm hòa vốn (break-even analysis) cho cửa hàng mới: chi phí cố định, biến phí, và doanh thu cần đạt mỗi tháng."}
+{"domain": "GENERAL", "difficulty": "medium", "prompt": "Cửa hàng bán lẻ nên thuê hay mua mặt bằng trong bối cảnh lãi suất cao 2025? Phân tích tài chính và các yếu tố phi tài chính."}
+{"domain": "GENERAL", "difficulty": "medium", "prompt": "Xây dựng kế hoạch marketing cho cửa hàng bán mỹ phẩm nhắm đến Gen Z (18-25 tuổi): kênh ưu tiên, loại nội dung và KPI đánh giá hiệu quả."}
+{"domain": "GENERAL", "difficulty": "easy", "prompt": "Làm thế nào để cửa hàng nhỏ cạnh tranh về giá với Shopee và Lazada mà không bán lỗ? Chiến lược value-add thay cho price war."}
+{"domain": "GENERAL", "difficulty": "easy", "prompt": "Tôi mới mở cửa hàng và muốn xây dựng database khách hàng. Cách thu thập thông tin khách mà không làm họ khó chịu và tuân thủ PDPA."}
+{"domain": "GENERAL", "difficulty": "easy", "prompt": "Cách tính và theo dõi gross margin theo từng danh mục sản phẩm (category) để biết danh mục nào đang kéo lợi nhuận xuống."}
+{"domain": "GENERAL", "difficulty": "medium", "prompt": "Phân tích mô hình kinh doanh second-hand / vintage tại Việt Nam: cơ hội cho cửa hàng đồ cũ chất lượng cao và xu hướng circular economy."}
+{"domain": "GENERAL", "difficulty": "medium", "prompt": "Thiết kế customer journey map cho khách hàng mua sắm tại cửa hàng offline: từ nhận biết → ghé thăm → mua → sau mua. Điểm đau nào cần cải thiện nhất?"}
+{"domain": "GENERAL", "difficulty": "hard", "prompt": "Phân tích tác động của lãi suất tăng cao đến quyết định đầu tư mở rộng chuỗi cửa hàng bán lẻ: khi nào nên hoãn và khi nào vẫn nên tiến tới?"}
+{"domain": "GENERAL", "difficulty": "hard", "prompt": "Xây dựng chiến lược thoát (exit strategy) cho chủ cửa hàng bán lẻ: M&A, IPO, hay franchise? Điều kiện và timeline chuẩn bị cho từng con đường."}
+{"domain": "GENERAL", "difficulty": "medium", "prompt": "Phân tích quy trình ra quyết định nhập hàng mới: nghiên cứu thị trường, test nhỏ, scale up. Framework nào giúp giảm rủi ro nhập hàng ế?"}
+{"domain": "GENERAL", "difficulty": "medium", "prompt": "Làm thế nào để cửa hàng bán lẻ SME tiếp cận vốn vay ngân hàng khi không có tài sản thế chấp lớn? Các sản phẩm tín dụng phù hợp."}
+{"domain": "GENERAL", "difficulty": "easy", "prompt": "Chiến lược cross-sell và up-sell cho nhân viên bán hàng cửa hàng lẻ: cách đề xuất tự nhiên không gây cảm giác bị ép mua."}
+{"domain": "GENERAL", "difficulty": "medium", "prompt": "Phân tích seasonal business cycle của ngành bán lẻ Việt Nam: tháng cao điểm, thấp điểm và cách quản lý dòng tiền qua các giai đoạn khác nhau."}
+{"domain": "GENERAL", "difficulty": "easy", "prompt": "Tôi muốn bắt đầu bán trên TikTok Shop. Những bước cần chuẩn bị và loại sản phẩm nào phù hợp với nền tảng này?"}
+{"domain": "GENERAL", "difficulty": "medium", "prompt": "Xây dựng ma trận sản phẩm BCG (Stars, Cash Cows, Question Marks, Dogs) cho portfolio 200 SKU của cửa hàng bán lẻ để quyết định đầu tư."}
+{"domain": "GENERAL", "difficulty": "hard", "prompt": "Phân tích chiến lược đa dạng hóa vs. tập trung chuyên sâu cho chuỗi bán lẻ SME: thời điểm nào nên pivot sang sản phẩm/thị trường mới?"}
+{"domain": "GENERAL", "difficulty": "medium", "prompt": "Thiết kế hệ thống đánh giá và phân loại nhà cung cấp: tiêu chí, trọng số, chu kỳ đánh giá và hành động với nhà cung cấp kém hiệu quả."}
+{"domain": "RETRIEVAL", "difficulty": "easy", "prompt": "Tỉ lệ thâm nhập internet và smartphone tại Việt Nam năm 2024 và ý nghĩa với chiến lược digital marketing của cửa hàng bán lẻ."}
+{"domain": "RETRIEVAL", "difficulty": "easy", "prompt": "Dữ liệu về số lượng cửa hàng KiotViet và MISA AMIS đang phục vụ và % thị phần trong phân khúc phần mềm quản lý bán lẻ SME."}
+{"domain": "RETRIEVAL", "difficulty": "easy", "prompt": "Giá thuê mặt bằng thương mại tại các quận nội thành Hà Nội theo m²: quận Hoàn Kiếm vs. Đống Đa vs. Cầu Giấy năm 2024."}
+{"domain": "RETRIEVAL", "difficulty": "easy", "prompt": "Số liệu về thói quen mua sắm grocery online tại Việt Nam: tần suất, giá trị đơn hàng trung bình và nền tảng được ưa chuộng nhất."}
+{"domain": "RETRIEVAL", "difficulty": "easy", "prompt": "Báo cáo về tình trạng thiếu hụt lao động trong ngành bán lẻ Việt Nam 2024 và mức lương trung bình nhân viên bán hàng theo vùng."}
+{"domain": "RETRIEVAL", "difficulty": "medium", "prompt": "Nghiên cứu về tỉ lệ thành công của các startup bán lẻ D2C tại Việt Nam sau 3 năm: nguyên nhân thất bại và yếu tố thành công."}
+{"domain": "RETRIEVAL", "difficulty": "medium", "prompt": "Số liệu thống kê về inventory turnover ratio trung bình theo từng ngành hàng bán lẻ Việt Nam: thực phẩm, thời trang, điện tử, FMCG."}
+{"domain": "RETRIEVAL", "difficulty": "medium", "prompt": "Báo cáo về mức độ hài lòng khách hàng (CSAT) của các kênh bán lẻ tại Việt Nam và yếu tố ảnh hưởng lớn nhất đến satisfaction."}
+{"domain": "RETRIEVAL", "difficulty": "medium", "prompt": "Dữ liệu về chi phí acquisition khách hàng (CAC) trên các kênh digital: Google Ads vs Facebook Ads vs TikTok Ads cho ngành bán lẻ VN."}
+{"domain": "RETRIEVAL", "difficulty": "medium", "prompt": "Thống kê về mức độ ứng dụng AI trong vận hành cửa hàng bán lẻ tại Đông Nam Á và khoảng cách so với Việt Nam."}
+{"domain": "RETRIEVAL", "difficulty": "medium", "prompt": "Báo cáo về tỉ lệ sử dụng thanh toán không tiền mặt trong giao dịch bán lẻ tại Việt Nam và xu hướng tăng trưởng QR code payment."}
+{"domain": "RETRIEVAL", "difficulty": "medium", "prompt": "Số liệu về mức độ ô nhiễm thực phẩm và vụ bê bối an toàn thực phẩm ảnh hưởng đến hành vi tiêu dùng và yêu cầu truy xuất nguồn gốc."}
+{"domain": "RETRIEVAL", "difficulty": "medium", "prompt": "Theo nghiên cứu Nielsen/Kantar, tần suất mua sắm tạp hóa của hộ gia đình đô thị Việt Nam và kênh mua sắm theo danh mục sản phẩm."}
+{"domain": "RETRIEVAL", "difficulty": "medium", "prompt": "Dữ liệu về tỉ lệ thâm nhập private label (nhãn hàng riêng) trong siêu thị Việt Nam so với các nước trong khu vực."}
+{"domain": "RETRIEVAL", "difficulty": "medium", "prompt": "Báo cáo về xu hướng đóng gói xanh (sustainable packaging) trong bán lẻ Việt Nam: % doanh nghiệp đã chuyển đổi và chi phí tăng thêm."}
+{"domain": "RETRIEVAL", "difficulty": "hard", "prompt": "Phân tích từ báo cáo chuyên ngành: ROI của đầu tư vào công nghệ RFID cho quản lý tồn kho trong bán lẻ và thời gian payback tại Đông Nam Á."}
+{"domain": "RETRIEVAL", "difficulty": "hard", "prompt": "Tổng hợp research về tác động của review và user-generated content đến quyết định mua hàng của người tiêu dùng Việt Nam theo từng danh mục sản phẩm."}
+{"domain": "RETRIEVAL", "difficulty": "hard", "prompt": "Dữ liệu về chi phí logistics last-mile delivery tại Việt Nam và cách các chuỗi bán lẻ đang tối ưu chi phí giao hàng theo km."}
+{"domain": "RETRIEVAL", "difficulty": "hard", "prompt": "Nghiên cứu về ảnh hưởng của livestream selling (TikTok, Facebook Live) đến doanh thu offline: hiệu ứng halo hay cannibalization?"}
+{"domain": "RETRIEVAL", "difficulty": "hard", "prompt": "Báo cáo về mức độ tích hợp ERP trong chuỗi cung ứng bán lẻ Việt Nam và khoảng cách số hóa (digital gap) giữa doanh nghiệp lớn và SME."}
+{"domain": "RETRIEVAL", "difficulty": "medium", "prompt": "Theo số liệu Tổng cục Thống kê, cơ cấu chi tiêu của hộ gia đình Việt Nam theo nhóm hàng hóa dịch vụ và xu hướng thay đổi 5 năm gần đây."}
+{"domain": "RETRIEVAL", "difficulty": "medium", "prompt": "Dữ liệu về tỉ lệ sử dụng loyalty app của người tiêu dùng Việt Nam và tần suất redeem điểm thưởng trong các chương trình khách hàng thân thiết."}
+{"domain": "RETRIEVAL", "difficulty": "medium", "prompt": "Báo cáo về tác động của chính sách giảm thuế VAT 2% đến CPI (chỉ số giá tiêu dùng) và hành vi chi tiêu thực tế của người dân."}
+{"domain": "RETRIEVAL", "difficulty": "easy", "prompt": "Số lượng cơ sở sản xuất và kinh doanh thực phẩm chức năng (TPCN) được cấp phép tại Việt Nam và tốc độ tăng trưởng thị trường."}
+{"domain": "RETRIEVAL", "difficulty": "easy", "prompt": "Thị trường trà và đồ uống thảo dược Việt Nam: quy mô, tốc độ tăng trưởng và các thương hiệu dẫn đầu theo doanh thu."}
+{"domain": "RETRIEVAL", "difficulty": "easy", "prompt": "Số liệu xuất khẩu nông sản Việt Nam sang Hàn Quốc và Nhật Bản năm 2024: sản phẩm chủ lực và tốc độ tăng trưởng."}
+{"domain": "RETRIEVAL", "difficulty": "medium", "prompt": "Nghiên cứu về hiệu quả của chứng nhận hữu cơ quốc tế (USDA Organic, EU Organic) đối với giá bán và khả năng thâm nhập thị trường xuất khẩu."}
+{"domain": "RETRIEVAL", "difficulty": "medium", "prompt": "Báo cáo về tình trạng hàng giả, hàng nhái trong ngành FMCG Việt Nam và thiệt hại kinh tế ước tính hàng năm cho doanh nghiệp chính hãng."}
+{"domain": "RETRIEVAL", "difficulty": "hard", "prompt": "Phân tích dữ liệu thị trường trà thảo dược khu vực ASEAN: Việt Nam xếp thứ mấy về sản lượng xuất khẩu và cơ hội tăng market share."}
+{"domain": "RETRIEVAL", "difficulty": "hard", "prompt": "Tổng hợp nghiên cứu lâm sàng về tác dụng của cynarin từ atiso trong hỗ trợ chức năng gan: mức liều hiệu quả và bằng chứng khoa học mới nhất."}
+{"domain": "RETRIEVAL", "difficulty": "hard", "prompt": "Báo cáo về rào cản kỹ thuật (TBT) và các biện pháp kiểm dịch (SPS) của Nhật Bản đối với nhập khẩu thực phẩm chức năng từ Việt Nam."}
+{"domain": "RETRIEVAL", "difficulty": "hard", "prompt": "Phân tích dữ liệu về xu hướng mua sắm của người cao tuổi Việt Nam (60+): kênh ưa thích, danh mục chi tiêu và cách tiếp cận segment này hiệu quả."}
+{"domain": "RETRIEVAL", "difficulty": "medium", "prompt": "Theo nghiên cứu, ảnh hưởng của mùi hương (scent marketing) và âm nhạc đến thời gian ở lại cửa hàng và doanh thu bán lẻ."}
+{"domain": "RETRIEVAL", "difficulty": "medium", "prompt": "Dữ liệu về tỉ lệ khách hàng tìm hiểu thông tin online trước khi mua offline (ROPO - Research Online, Purchase Offline) tại Việt Nam theo danh mục."}
+{"domain": "RETRIEVAL", "difficulty": "medium", "prompt": "Số liệu về average basket size (giá trị giỏ hàng bình quân) tại các định dạng bán lẻ Việt Nam: hypermarket, supermarket, convenience store, tạp hóa."}
+{"domain": "RETRIEVAL", "difficulty": "hard", "prompt": "Phân tích từ báo cáo ngành về impact của AI chatbot trong customer service bán lẻ: tỉ lệ tự giải quyết (containment rate) và customer satisfaction score."}
+{"domain": "RETRIEVAL", "difficulty": "hard", "prompt": "Nghiên cứu về hiệu quả của personalization marketing trong bán lẻ Việt Nam: tỉ lệ chuyển đổi cao hơn bao nhiêu % so với mass marketing?"}
+{"domain": "RETRIEVAL", "difficulty": "hard", "prompt": "Tổng hợp case study doanh nghiệp bán lẻ Việt Nam ứng dụng thành công machine learning cho demand forecasting: giảm tồn kho bao nhiêu % và tăng service level thế nào."}
+{"domain": "RETRIEVAL", "difficulty": "hard", "prompt": "Phân tích về ảnh hưởng của chuỗi cung ứng toàn cầu bị gián đoạn (COVID, Suez Canal, Taiwan conflict) đến chiến lược nguồn cung của bán lẻ Việt Nam."}
+{"domain": "RETRIEVAL", "difficulty": "hard", "prompt": "Báo cáo về tỉ lệ chấp nhận và hiệu quả của social commerce (mua hàng trực tiếp qua mạng xã hội) tại Việt Nam so với các nước Đông Nam Á khác."}
+{"domain": "TECHNICAL", "difficulty": "medium", "prompt": "Thiết kế kiến trúc caching layer cho ANSER Brain: Redis cache cho responses thường gặp, invalidation strategy và cache hit rate target."}
+{"domain": "TECHNICAL", "difficulty": "medium", "prompt": "Tạo n8n workflow cho customer feedback collection: sau mỗi đơn hàng giao thành công, tự gửi survey 3 câu qua Zalo, tổng hợp sentiment và alert khi điểm thấp."}
+{"domain": "TECHNICAL", "difficulty": "medium", "prompt": "Thiết kế hệ thống notification ưu tiên cho cửa hàng: phân loại alert theo severity (Critical/High/Medium/Low), route đúng channel (SMS/Zalo/Email/Slack) cho từng mức."}
+{"domain": "TECHNICAL", "difficulty": "medium", "prompt": "Tạo workflow n8n tích hợp với hệ thống ERP kế toán: khi đơn hàng completed, tự tạo journal entry trong kế toán, match với bank statement và flag discrepancies."}
+{"domain": "TECHNICAL", "difficulty": "hard", "prompt": "Thiết kế data governance framework cho ANSER: data dictionary, lineage tracking, quality rules, PII handling và retention policy theo PDPA Việt Nam."}
+{"domain": "TECHNICAL", "difficulty": "hard", "prompt": "Tạo CI/CD pipeline hoàn chỉnh cho ANSER: GitHub Actions → build → test (unit/integration) → staging deploy → smoke test → production deploy với canary release."}
+{"domain": "TECHNICAL", "difficulty": "medium", "prompt": "Workflow n8n cho price elasticity testing: A/B test giá sản phẩm trên 2 nhóm khách, theo dõi conversion và revenue, tự chọn giá tối ưu sau 14 ngày."}
+{"domain": "TECHNICAL", "difficulty": "medium", "prompt": "Thiết kế API rate limiting và quota management cho ANSER Brain: free tier, paid tier, burst allowance và graceful degradation khi vượt quota."}
+{"domain": "TECHNICAL", "difficulty": "hard", "prompt": "Xây dựng observability stack cho ANSER: OpenTelemetry traces, Prometheus metrics, structured logs → Grafana dashboard. Alerts gì cần setup để monitor health production."}
+{"domain": "TECHNICAL", "difficulty": "medium", "prompt": "Thiết kế workflow n8n cho automated reorder với dynamic lead time: theo dõi actual vs. promised delivery time của từng nhà cung cấp, tự điều chỉnh reorder point."}
+{"domain": "TECHNICAL", "difficulty": "hard", "prompt": "Tạo semantic caching layer cho ANSER Brain: cache similar questions bằng embedding similarity, tránh gọi LLM cho queries đã có trong cache với cosine similarity > 0.92."}
+{"domain": "TECHNICAL", "difficulty": "medium", "prompt": "Workflow n8n cho competitor monitoring tự động: daily crawl giá từ 3 đối thủ chính, generate price comparison report, alert khi bị undercut > 10% trên SKU chiến lược."}
+{"domain": "TECHNICAL", "difficulty": "medium", "prompt": "Thiết kế schema versioning cho ANSER database: khi thay đổi schema production, đảm bảo backward compatibility, zero-downtime migration và rollback plan."}
+{"domain": "TECHNICAL", "difficulty": "hard", "prompt": "Tạo hệ thống feature flags cho ANSER: rollout features dần dần theo % user, A/B test features, instant kill switch và audit log mọi thay đổi flag."}
+{"domain": "TECHNICAL", "difficulty": "medium", "prompt": "Workflow n8n tích hợp IoT cân điện tử tại kho: khi cân báo cáo trọng lượng, tự tính số lượng sản phẩm (theo trọng lượng đơn vị), cập nhật inventory và alert khi sắp hết."}
