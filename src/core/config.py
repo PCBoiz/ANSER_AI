@@ -49,7 +49,7 @@ class Config:
         # =================================================================
 
         # --- Brain: Text reasoning (chạy qua vLLM) ---
-        self.text_model_id = "Qwen/Qwen2.5-7B-Instruct-AWQ"
+        self.text_model_id = "/content/drive/MyDrive/ANSER_data/anser-qwen-distill-awq"
 
         # --- Eye: Vision/VLM (load riêng qua transformers, NẰM NGOÀI ngân sách vLLM) ---
         # Mặc định FP bf16 ~4.5GB — KHỚP cách engine.py hiện load (torch_dtype=bfloat16).
