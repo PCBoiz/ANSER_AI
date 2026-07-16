@@ -99,7 +99,8 @@ class ModelEngine:
             gpu_memory_utilization=vc["gpu_memory_utilization"],
             max_model_len=vc["max_model_len"],
             dtype=vc["dtype"],
-            quantization=vc.get("quantization"),   # <-- FIX: trước đây KHÔNG truyền -> AWQ không có hiệu lực
+            quantization=vc.get("quantization"),   # AWQ phải khai báo rõ
+            enforce_eager=vc.get("enforce_eager", False),  # fix CUDA graph bug với Qwen
             trust_remote_code=True,
         )
 
@@ -129,7 +130,11 @@ class ModelEngine:
         from vllm import SamplingParams
 
         loop = asyncio.get_running_loop()
-        params = SamplingParams(temperature=temperature, max_tokens=max_tokens)
+        params = SamplingParams(
+            temperature=temperature,
+            max_tokens=max_tokens,
+            repetition_penalty=1.15,   # ngăn model lặp câu
+        )
 
         def _blocking_generate():
             outputs = self.llm.generate([prompt], params)
@@ -151,7 +156,11 @@ class ModelEngine:
         from vllm import SamplingParams
 
         loop = asyncio.get_running_loop()
-        params = SamplingParams(temperature=temperature, max_tokens=max_tokens)
+        params = SamplingParams(
+            temperature=temperature,
+            max_tokens=max_tokens,
+            repetition_penalty=1.15,   # ngăn model lặp câu
+        )
         messages = [
             {"role": "system", "content": system},
             {"role": "user", "content": user},
