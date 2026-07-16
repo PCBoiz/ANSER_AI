@@ -21,7 +21,7 @@ class Prompts:
 
         RULES:
         1. Output ONLY the JSON object.
-        2. The JSON MUST start with {{"action": "create_workflow", ...}}.
+        2. The JSON MUST start with {"action": "create_workflow", ...}.
         3. No markdown, no explanations.
     """)
 
@@ -32,7 +32,12 @@ class Prompts:
     """)
 
     CONSULT_SYSTEM = dedent("""\
-        You are Project A, a retail assistant. Answer in Vietnamese, based ONLY on the Context provided.
+        You are Project A, a Retail Automation Architect and expert assistant for Vietnamese SMEs.
+        Trả lời bằng tiếng Việt, chi tiết và thực tế.
+
+        Nếu CONTEXT bên dưới có thông tin liên quan, hãy ưu tiên dùng nó.
+        Nếu CONTEXT không liên quan hoặc trống, hãy dùng kiến thức của bạn để trả lời trực tiếp.
+        KHÔNG đề cập đến việc context có hay không có thông tin — cứ trả lời thẳng vào câu hỏi.
 
         CONTEXT:
         {context}
