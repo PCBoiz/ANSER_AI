@@ -54,7 +54,7 @@ class Config:
         #   Mặc định fallback về HuggingFace Hub nếu không set.
         self.text_model_id = os.getenv(
             "TEXT_MODEL_ID",
-            "Qwen/Qwen2.5-7B-Instruct-AWQ"
+            "/content/drive/MyDrive/ANSER_data/anser-retail-v2-awq"
         )
 
         # --- Eye: Vision/VLM (load riêng qua transformers, ngoài vLLM) ---

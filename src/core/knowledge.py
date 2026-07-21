@@ -14,6 +14,11 @@ logger = logging.getLogger("projecta.knowledge")
 
 class KnowledgeBase:
     def __init__(self, persist_dir="./data/vector_db", doc_dir="./src/data/docs"):
+        # Ngưỡng điểm cross-encoder để coi là liên quan.
+        # Tăng lên nếu vẫn lọt tài liệu lạc đề, giảm nếu bỏ sót.
+        self.relevance_threshold = float(
+            os.getenv("KB_RELEVANCE_THRESHOLD", "0.0")
+        )
         logger.info("Initializing KnowledgeBase (hybrid search)")
 
         self.doc_dir = doc_dir
@@ -136,6 +141,24 @@ class KnowledgeBase:
 
         # Sort by score
         scored_docs = sorted(zip(scores, candidates), key=lambda x: x[0], reverse=True)
-        best_docs = [doc for score, doc in scored_docs[:top_k]]
 
+        # Stage 3: Lọc theo ngưỡng liên quan
+        # Cross-encoder ms-marco cho logit: dương = liên quan, âm sâu = không liên quan.
+        # Không lọc thì câu hỏi ngoài lĩnh vực vẫn nhận được tài liệu ngẫu nhiên
+        # -> model bị nhồi ngữ cảnh sai -> sinh nội dung vô nghĩa.
+        relevant = [(s, d) for s, d in scored_docs if s >= self.relevance_threshold]
+
+        if not relevant:
+            logger.info(
+                "KB: không có tài liệu vượt ngưỡng %.1f (điểm cao nhất %.2f) — trả rỗng",
+                self.relevance_threshold,
+                scored_docs[0][0] if scored_docs else float("nan"),
+            )
+            return ""
+
+        best_docs = [doc for _, doc in relevant[:top_k]]
+        logger.info(
+            "KB: %d/%d tài liệu vượt ngưỡng, điểm cao nhất %.2f",
+            len(relevant), len(scored_docs), relevant[0][0],
+        )
         return "\n\n---\n\n".join(best_docs)
