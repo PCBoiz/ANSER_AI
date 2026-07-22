@@ -118,6 +118,6 @@ class ManagerAgent(BaseAgent):
         )
 
     async def consult(self, task: str, context: str = "", history: str = ""):
-        system = Prompts.CONSULT_SYSTEM.format(context=context)
+        system = Prompts.CONSULT_SYSTEM.format(schema=Prompts.DB_SCHEMA, context=context)
         user = task if not history else f"{history}\n\n{task}"
         return await self.generate_chat(system=system, user=user, max_new_tokens=512)
