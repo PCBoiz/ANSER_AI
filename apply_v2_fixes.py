@@ -176,10 +176,17 @@ NEW_ROUTING = '''        decision = await runtime.manager.analyze_task(user_msg)
             "len lich", "l\u00ean l\u1ecbch", "t\u1ef1 \u0111\u1ed9ng g\u1eedi"))
 
         if any(k in low for k in ("hoa don", "h\u00f3a \u0111\u01a1n", "invoice", "qwen2-vl", "vlm")):
-            # KHONG them directive o day: da thu, no lam reasoning dai them va
-            # T4 tut tu 2/3 xuong 1/3 (dap rong do cham tran token).
+            # Ep NEU RO con so dung + trinh bay ngan, tranh dung bang markdown dai
+            # roi cham tran token truoc khi kip ket luan.
+            _inv = (
+                "[KIEM TRA HOA DON] Trinh bay NGAN GON, KHONG lap bang dai. "
+                "Voi moi dong sai, PHAI neu ro con so DUNG la bao nhieu "
+                "(dang: 'dong N: amount dung phai la <so dung>, khong phai <so ghi tren hoa don>'). "
+                "KHONG tu sua du lieu goc, chi bao loi. "
+                "Du lieu: " + user_msg
+            )
             resp = await runtime.manager.consult(
-                user_msg, system_prompt=Prompts.INVOICE_SYSTEM)
+                _inv, system_prompt=Prompts.INVOICE_SYSTEM)
 
         elif _tao:
             _tech = (
@@ -192,13 +199,10 @@ NEW_ROUTING = '''        decision = await runtime.manager.analyze_task(user_msg)
                 _tech, system_prompt=Prompts.ACTION_SYSTEM)
 
         elif cat == "TECHNICAL":
-            # TECHNICAL nhung khong co y dinh tao -> thuong la cau ngoai domain bi
-            # router xep nham. Nhac lai rule 4 o LUOT USER de model chiu redirect.
-            _od = ("[LUU Y] Neu cau hoi NGOAI linh vuc ban le, tra loi that ngan "
-                   "(1-2 cau) roi huong nguoi dung ve chu de ban le / quan ly cua hang. "
-                   "Cau hoi: " + user_msg)
+            # TECHNICAL nhung khong co y dinh tao -> de PROTOCOL tu quyet,
+            # ke ca rule 4 (ngoai ban le -> tra loi ngan roi huong ve ban le).
             resp = await runtime.manager.consult(
-                _od, system_prompt=Prompts.ACTION_SYSTEM)
+                user_msg, system_prompt=Prompts.ACTION_SYSTEM)
 
         elif cat == "DATA_INTERNAL":
             _sql = (
@@ -226,11 +230,8 @@ NEW_ROUTING = '''        decision = await runtime.manager.analyze_task(user_msg)
                 user_msg, context=context_docs, system_prompt=Prompts.ACTION_SYSTEM)
 
         else:
-            _od = ("[LUU Y] Neu cau hoi NGOAI linh vuc ban le, tra loi that ngan "
-                   "(1-2 cau) roi huong nguoi dung ve chu de ban le / quan ly cua hang. "
-                   "Cau hoi: " + user_msg)
             resp = await runtime.manager.consult(
-                _od, system_prompt=Prompts.ACTION_SYSTEM)
+                user_msg, system_prompt=Prompts.ACTION_SYSTEM)
 
 '''
 
