@@ -163,7 +163,10 @@ def patch_manager():
 # ──────────────────────────────────────────────────────────────────────────
 NEW_ROUTING = '''        decision = await runtime.manager.analyze_task(user_msg)
         cat = decision.get("category", "GENERAL")
-        logger.info("Route selected", extra={"request_id": request_id, "route": cat})
+        # In THANG ten route vao message: formatter bo qua extra={} nen log cu
+        # chi hien "Route selected", khong the chan doan cau nao di nhanh nao.
+        logger.info("Route selected: %s | %s", cat, user_msg[:60],
+                    extra={"request_id": request_id, "route": cat})
 
         resp = ""
         low = user_msg.lower()
