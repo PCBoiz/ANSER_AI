@@ -73,7 +73,7 @@ def extract_action_json(text: str):
     for obj in reversed(cands):
         if isinstance(obj, dict) and "action" in obj:
             return obj
-    # v2r: khong co "action" -> object NGOAI co the bi CAT hoac chua ky tu dieu
+    # v2r-b: khong co "action" -> object NGOAI co the bi CAT hoac chua ky tu dieu
     # khien. Va lai tu dau "{" bang json_repair, thay vi roi xuong node con.
     i = text.find("{")
     if i != -1:
@@ -98,7 +98,7 @@ def extract_action_json(text: str):
 def patch_dependencies():
     p = "src/api/dependencies.py"
     s = rd(p)
-    if "v2r:" in s and "def extract_action_json" in s:
+    if "_rj2" in s and "def extract_action_json" in s:
         report.append("deps: extract_action_json da co, bo qua")
         return
     if "def extract_action_json" in s:
@@ -167,13 +167,28 @@ NEW_ROUTING = '''        decision = await runtime.manager.analyze_task(user_msg)
 
         resp = ""
         low = user_msg.lower()
-        if any(k in low for k in ("hoa don", "h\u00f3a \u0111\u01a1n", "invoice", "qwen2-vl", "vlm")):
-            resp = await runtime.manager.consult(
-                user_msg, system_prompt=Prompts.INVOICE_SYSTEM)
+        # v2r-b: directive CHI bat khi that su co Y DINH TAO. Router hay xep nham
+        # cau hoi ngoai domain ("giai thich thuat toan...") vao TECHNICAL; ep
+        # create_workflow vo dieu kien se sinh workflow cho ca cau hoi do.
+        _tao = any(k in low for k in (
+            "tao quy trinh", "t\u1ea1o quy tr\u00ecnh", "tao workflow", "t\u1ea1o workflow",
+            "workflow", "tu dong hoa", "t\u1ef1 \u0111\u1ed9ng h\u00f3a",
+            "len lich", "l\u00ean l\u1ecbch", "t\u1ef1 \u0111\u1ed9ng g\u1eedi"))
 
-        elif cat == "TECHNICAL" or any(k in low for k in (
-                "tao quy trinh", "t\u1ea1o quy tr\u00ecnh", "t\u1ea1o workflow",
-                "workflow", "tu dong", "t\u1ef1 \u0111\u1ed9ng", "len lich", "l\u00ean l\u1ecbch")):
+        if any(k in low for k in ("hoa don", "h\u00f3a \u0111\u01a1n", "invoice", "qwen2-vl", "vlm")):
+            # Ep NEU RO con so dung + trinh bay ngan, tranh dung bang markdown dai
+            # roi cham tran token truoc khi kip ket luan.
+            _inv = (
+                "[KIEM TRA HOA DON] Trinh bay NGAN GON, KHONG lap bang dai. "
+                "Voi moi dong sai, PHAI neu ro con so DUNG la bao nhieu "
+                "(dang: 'dong N: amount dung phai la <so dung>, khong phai <so ghi tren hoa don>'). "
+                "KHONG tu sua du lieu goc, chi bao loi. "
+                "Du lieu: " + user_msg
+            )
+            resp = await runtime.manager.consult(
+                _inv, system_prompt=Prompts.INVOICE_SYSTEM)
+
+        elif _tao:
             _tech = (
                 "[YEU CAU TAO WORKFLOW TU DONG HOA] BAT BUOC xuat JSON co "
                 "action=create_workflow kem name va payload gom nodes, edges. "
@@ -182,6 +197,12 @@ NEW_ROUTING = '''        decision = await runtime.manager.analyze_task(user_msg)
             )
             resp = await runtime.manager.consult(
                 _tech, system_prompt=Prompts.ACTION_SYSTEM)
+
+        elif cat == "TECHNICAL":
+            # TECHNICAL nhung khong co y dinh tao -> de PROTOCOL tu quyet,
+            # ke ca rule 4 (ngoai ban le -> tra loi ngan roi huong ve ban le).
+            resp = await runtime.manager.consult(
+                user_msg, system_prompt=Prompts.ACTION_SYSTEM)
 
         elif cat == "DATA_INTERNAL":
             _sql = (
@@ -296,7 +317,7 @@ def patch_benchmark():
         report.append("benchmark: khong thay file, bo qua")
         return
     s = rd(p)
-    if "v2r:" in s and "for obj in reversed(cands)" in s:
+    if "_rj2" in s and "for obj in reversed(cands)" in s:
         report.append("benchmark: da uu-tien-action, bo qua")
         return
     m = re.search(r"^def extract_json\(.*?(?=^def )", s, re.M | re.S)
@@ -363,7 +384,23 @@ def patch_engine_lock():
     report.append(f"engine: + _GEN_LOCK quanh llm.generate ({n} cho) - fix Forward context")
 
 
-for fn in (patch_dependencies, patch_manager, patch_chat, patch_benchmark, patch_engine_lock):
+
+
+# 6) config.py : GIU max_model_len = 4096 (khong nang token).
+#    8192 se di ra ngoai vung da SFT (max_seq_length=4096 luc train) va lam
+#    latency tang. Neu lan chay truoc da doi thanh 8192 thi ham nay tra ve 4096.
+def patch_config_revert():
+    p = "src/core/config.py"
+    s = rd(p)
+    if '"max_model_len":          8192' in s:
+        wr(p, s.replace('"max_model_len":          8192', '"max_model_len":          4096', 1))
+        report.append("config: max_model_len 8192 -> 4096 (giu nguyen, khong nang token)")
+    else:
+        report.append("config: max_model_len giu 4096, bo qua")
+
+
+for fn in (patch_dependencies, patch_manager, patch_chat, patch_benchmark,
+           patch_engine_lock, patch_config_revert):
     try:
         fn()
     except Exception as e:
