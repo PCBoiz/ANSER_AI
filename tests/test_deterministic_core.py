@@ -13,12 +13,19 @@ import pytest
 
 from src.core import workflow_schema as ws
 from src.core.carrier_selection import (
-    Carrier, QuoteOffer, RouteRequest, haversine_km, select_carrier,
+    Carrier,
+    QuoteOffer,
+    RouteRequest,
+    haversine_km,
+    select_carrier,
 )
 from src.core.forecasting import (
-    classify_demand, croston, forecast_demand, mase, reorder_point,
+    classify_demand,
+    croston,
+    forecast_demand,
+    mase,
+    reorder_point,
 )
-
 
 # ===========================================================================
 # workflow_schema — định dạng n8n

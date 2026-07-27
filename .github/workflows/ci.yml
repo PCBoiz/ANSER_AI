@@ -13,13 +13,19 @@ jobs:
         with:
           python-version: "3.11"
       - name: Install dependencies
+        # CHỦ ĐÍCH không cài requirements.txt đầy đủ: torch/vllm/chromadb quá nặng
+        # cho CI và ENV=LOCAL không cần chúng (manager.py đã import lười — thiếu
+        # torch thì router lùi về lớp từ khoá, suite vẫn chạy đủ).
+        # Danh sách dưới = đúng những gì tầng API + tầng tất định import trực tiếp.
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements-dev.txt
-          pip install sqlalchemy requests ddgs
+          pip install fastapi httpx pydantic numpy json_repair sqlalchemy requests ddgs
       - name: Ruff
         run: ruff check src/core/tools.py src/core/memory.py src/core/context.py tests
       - name: Mypy
         run: mypy src/core/tools.py src/core/memory.py src/core/context.py
       - name: Pytest
+        env:
+          ENV: LOCAL
         run: pytest -q

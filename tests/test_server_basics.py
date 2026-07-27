@@ -1,7 +1,7 @@
 from fastapi.testclient import TestClient
 
-from src.api.main import app
 import src.api.dependencies as deps
+from src.api.main import app
 
 client = TestClient(app)
 
