@@ -1,5 +1,6 @@
-from src.agents.base import BaseAgent
 from ddgs import DDGS
+
+from src.agents.base import BaseAgent
 
 
 class ResearcherAgent(BaseAgent):

@@ -29,6 +29,7 @@ from pydantic import BaseModel, Field
 from src.api.dependencies import require_api_token
 from src.core import carrier_selection as cs
 from src.core import forecasting as fc
+from src.core import reporting as rp
 from src.core.mcp_server import MCPServer
 from src.core.pricing import PricingRule, Surcharge, compute_quote
 
@@ -117,6 +118,31 @@ class VatRequest(BaseModel):
     items: list[dict]
     stated_total: float
     default_is_reduced: bool = False
+
+
+class SaleLineIn(BaseModel):
+    date: str = Field(..., description="Ngày bán, YYYY-MM-DD")
+    revenue: float = Field(..., description="Tiền thu về, đã trừ chiết khấu (VND)")
+    product: str = ""
+    quantity: float = 0.0
+    cogs: Optional[float] = Field(
+        None, description="Giá vốn hàng bán. Bỏ trống = CHƯA BIẾT, không phải 0"
+    )
+
+
+class ExpenseLineIn(BaseModel):
+    date: str = Field(..., description="Ngày phát sinh, YYYY-MM-DD")
+    amount: float
+    category: str = "khác"
+
+
+class ReportRequestIn(BaseModel):
+    """POST /tools/report — DT/CP/LN theo kỳ + xếp hạng mặt hàng."""
+    granularity: str = Field("quarter", description="month | quarter | half | year")
+    periods_back: int = Field(4, ge=1, le=40)
+    top_n: int = Field(10, ge=1, le=100)
+    sales: list[SaleLineIn] = []
+    expenses: list[ExpenseLineIn] = []
 
 
 # ===========================================================================
@@ -210,6 +236,27 @@ async def tool_vat(req: VatRequest, x_api_token: Optional[str] = Header(None)):
     )
 
 
+@router.post("/report")
+async def tool_report(req: ReportRequestIn, x_api_token: Optional[str] = Header(None)):
+    """
+    Báo cáo doanh thu / giá vốn / lãi theo kỳ + xếp hạng mặt hàng.
+
+    Thay cho đường "LLM viết SQL": số tài chính sai mà nghe có vẻ đúng là loại
+    lỗi không ai phát hiện cho tới lúc quyết toán (quyết định 27/07/2026).
+    """
+    require_api_token(x_api_token)
+    try:
+        return rp.build_report(rp.ReportRequest(
+            granularity=req.granularity,
+            periods_back=req.periods_back,
+            top_n=req.top_n,
+            sales=[rp.SaleLine(**s.model_dump()) for s in req.sales],
+            expenses=[rp.ExpenseLine(**e.model_dump()) for e in req.expenses],
+        ))
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+
+
 # ===========================================================================
 # Manifest — nguồn cho agentic tool-calling và lớp MCP sau này
 # ===========================================================================
@@ -253,6 +300,17 @@ _TOOL_DEFS: list[dict[str, Any]] = [
         "description": "Tính lại tổng hoá đơn + VAT theo NĐ 72/2024 bằng code thuần.",
         "input_schema": VatRequest.model_json_schema(),
     },
+    {
+        "name": "report",
+        "method": "POST",
+        "path": "/tools/report",
+        "description": (
+            "Báo cáo doanh thu / giá vốn / lãi gộp / lãi ròng theo kỳ "
+            "(tháng, quý, nửa năm, năm) kèm tăng trưởng so với kỳ trước và "
+            "xếp hạng mặt hàng theo lãi. Báo rõ phần doanh thu chưa có giá vốn."
+        ),
+        "input_schema": ReportRequestIn.model_json_schema(),
+    },
 ]
 
 
@@ -260,3 +318,99 @@ _TOOL_DEFS: list[dict[str, Any]] = [
 async def tool_manifest():
     """Danh mục tool. Vòng agentic và lớp MCP đọc từ đây — không định nghĩa lại."""
     return {"tools": _TOOL_DEFS, "count": len(_TOOL_DEFS)}
+
+
+def get_tool_defs() -> list[dict[str, Any]]:
+    """Manifest cho vòng agentic + lớp MCP. MỘT định nghĩa, ba nơi dùng (P4)."""
+    return _TOOL_DEFS
+
+
+# Ánh xạ tên tool -> (model request, hàm xử lý). Vòng agentic và MCP gọi THẲNG
+# hàm Python ở đây thay vì tự HTTP về chính mình: cùng process nên đi vòng qua
+# mạng chỉ thêm độ trễ, thêm một chỗ hỏng, và cần token cho chính mình.
+_TOOL_IMPL: dict[str, tuple[type[BaseModel], Any]] = {
+    "quote": (QuoteRequest, tool_quote),
+    "carrier_selection": (CarrierSelectionRequest, tool_carrier_selection),
+    "forecast_reorder": (ForecastRequest, tool_forecast_reorder),
+    "vat": (VatRequest, tool_vat),
+    "report": (ReportRequestIn, tool_report),
+}
+
+
+async def run_tool(name: str, arguments: dict) -> Any:
+    """
+    Chạy một tool theo tên + tham số thô (từ model hoặc từ MCP client).
+
+    Tham số được validate bằng ĐÚNG pydantic model của endpoint REST — model
+    điền thiếu/sai kiểu thì báo lỗi có cấu trúc để vòng agentic sửa ở bước sau,
+    thay vì ném ngoại lệ ra ngoài.
+    """
+    entry = _TOOL_IMPL.get(name)
+    if entry is None:
+        return {"error": f"không có tool tên '{name}'",
+                "available": sorted(_TOOL_IMPL)}
+    model_cls, handler = entry
+    try:
+        req = model_cls(**(arguments or {}))
+    except Exception as exc:
+        return {"error": "tham số không hợp lệ", "detail": str(exc)}
+    try:
+        # x_api_token=None: gọi nội bộ, đã qua kiểm tra token ở tầng /chat
+        return await handler(req, None)
+    except HTTPException as exc:
+        return {"error": exc.detail}
+    except Exception as exc:
+        logger.warning("Tool %s lỗi: %s", name, exc)
+        return {"error": str(exc)}
+
+
+# ===========================================================================
+# Lớp MCP — bọc đúng manifest trên ("MCP bọc REST", quyết định 27/07/2026)
+# ===========================================================================
+# Không định nghĩa lại tool. Chỉ dịch manifest sang hình dạng MCP để n8n
+# (node MCP Client Tool) và mọi MCP host khác dùng được cùng bộ tool.
+
+mcp_router = APIRouter(prefix="/mcp")
+
+
+@mcp_router.get("/tools/list")
+async def mcp_tools_list(x_api_token: Optional[str] = Header(None)):
+    """tools/list của MCP — tên trường theo đúng đặc tả (inputSchema camelCase)."""
+    require_api_token(x_api_token)
+    return {
+        "tools": [
+            {
+                "name": t["name"],
+                "description": t["description"],
+                "inputSchema": t["input_schema"],
+            }
+            for t in _TOOL_DEFS
+        ]
+    }
+
+
+class MCPCallRequest(BaseModel):
+    name: str
+    arguments: dict = {}
+
+
+@mcp_router.post("/tools/call")
+async def mcp_tools_call(
+    req: MCPCallRequest, x_api_token: Optional[str] = Header(None)
+):
+    """
+    tools/call của MCP. Kết quả bọc trong `content` dạng text (JSON đã seri hoá)
+    — đúng hình dạng MCP client mong đợi.
+
+    `isError` bật khi tool trả về khối lỗi, để client phân biệt được "chạy xong
+    nhưng thất bại" với "chạy thành công".
+    """
+    require_api_token(x_api_token)
+    result = await run_tool(req.name, req.arguments)
+    is_error = isinstance(result, dict) and "error" in result
+    import json as _json
+    return {
+        "content": [{"type": "text",
+                     "text": _json.dumps(result, ensure_ascii=False, default=str)}],
+        "isError": is_error,
+    }

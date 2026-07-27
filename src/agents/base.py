@@ -1,4 +1,5 @@
 from abc import ABC
+
 from src.core.engine import ModelEngine
 
 
@@ -18,6 +19,8 @@ class BaseAgent(ABC):
         Chat đúng chuẩn Qwen — để tokenizer.apply_chat_template lo định dạng ChatML.
 
         `json_schema` (tuỳ chọn): bật guided decoding, ép output khớp JSON Schema.
+        `history` (tuỳ chọn): các lượt trước [{role, content}] — cho hội thoại
+        nhiều lượt. Bỏ trống thì mỗi tin nhắn là một phiên độc lập.
         """
         max_tokens = kwargs.get('max_new_tokens', 1024)
         temperature = kwargs.get('temperature', 0.1)
@@ -27,4 +30,5 @@ class BaseAgent(ABC):
             max_tokens,
             temperature,
             json_schema=kwargs.get('json_schema'),
+            history=kwargs.get('history'),
         )

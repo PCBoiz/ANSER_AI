@@ -564,9 +564,34 @@ Riêng việc bỏ lần retry 1200 token cắt được phần lớn độ tr�
 | 1 | `sales.amount` vs `sales.total_amount` — hai nguồn mâu thuẫn, một cái sai. Benchmark T2 cũng kiểm tra `total_amount` | [`saas_api.py:29`](src/core/saas_api.py#L29) vs [`prompts.py:28`](src/core/prompts.py#L28) |
 | 2 | `TASK_REGISTRY` in-memory → mất task khi restart, không dùng được nhiều worker | [`engine.py:41`](src/core/engine.py#L41) |
 | 3 | Không có hàng đợi giới hạn / backpressure → nguồn gốc "quá tải, treo" | [`chat.py:343`](src/api/routes/chat.py#L343) |
+| 7 | ~~Chưa có `ai_metrics_log`~~ **ĐÃ SỬA (28/07/2026):** [`metrics.py`](src/core/metrics.py) ghi mọi lượt (nhánh, độ trễ, hỏi-lại, workflow hợp lệ); `summarize()` so sánh trước/sau. Nội dung tin nhắn chỉ ghi khi bật `AI_METRICS_LOG_CONTENT=1`; biên lợi nhuận + secret luôn bị che | [`metrics.py`](src/core/metrics.py) |
 | 4 | ~~5 file nguồn tập train không có trong repo → không train lại được~~ **ĐANG ĐÓNG (27/07/2026):** file còn trên Drive (xác nhận của chủ dự án); đích đến [`offline_training/v2_sources/`](offline_training/v2_sources/), `build_dataset_v3.py` convert + quét secret trước khi commit | [`merge_all.py:23-29`](offline_training/merge_all.py#L23-L29) |
 | 5 | ngrok là điểm public duy nhất — SPOF. Thay bằng Cloudflare Tunnel | `launch_demo.py` |
-| 6 | Chưa có `ai_metrics_log` → không đo được cải tiến nào có tác dụng | — |
+| 6 | ~~Chưa có `ai_metrics_log`~~ → xem mục 7 bên trên | — |
+
+### 11.9. ✅ ĐÃ SỬA (28/07/2026) — Brain không có hội thoại nhiều lượt
+
+`generate_chat(system, user)` chỉ nhận MỘT lượt. [`memory.py`](src/core/memory.py) có `add_message()` và được khởi tạo ở [`dependencies.py:72`](src/api/dependencies.py#L72), nhưng `chat.py` **chưa bao giờ gọi** — không đọc, không ghi lịch sử.
+
+Hệ quả với khách logistics: *"báo giá xe 5 tấn Hữu Nghị đi Hải Phòng"* → OK; *"thế xe 3 tấn thì sao?"* → hỏng, vì không biết tuyến nào. Đây là năng lực bắt buộc của một chatbot và **không lượng dữ liệu fine-tune nào cứu được** — nó là code, không phải model.
+
+**Đã sửa ở cả hai tầng:**
+- *Runtime*: `generate_chat(..., history=[...])` đưa lượt cũ vào **đúng khe hội thoại** của chat template (không nối vào system prompt — nối tay khiến model coi lời của chính nó là chỉ thị hệ thống). `sanitize_history()` lọc vai sai, cắt lượt quá dài, giữ `MAX_HISTORY_TURNS` lượt gần nhất. `chat.py` đọc/ghi qua `MemoryManager.get_history_messages()`; DB lỗi thì suy giảm mềm về một lượt chứ không hỏng request.
+- *Dữ liệu*: 25% seed trích xuất là **cặp 2 lượt** — lượt 2 chỉ nêu thứ thay đổi, ground truth kế thừa phần còn lại; teacher bị chặn nếu lượt 2 nhắc lại ngữ cảnh cũ. `benchmark_v3` chấm **riêng** tỷ lệ câu nối tiếp (`EXTRACT_FOLLOWUP_MIN`), vì điểm chung đẹp mà câu nối tiếp kém nghĩa là tính năng chưa dùng được.
+
+### 11.10. ✅ ĐÃ SỬA (28/07/2026) — router thay model quyết định, chưa có vòng agentic
+
+Router chọn cứng một nhánh → gọi LLM đúng một lần → trả lời. Model **chưa bao giờ được tự chọn công cụ**, nên câu nhiều bước (*"tháng này lãi bao nhiêu, mặt hàng nào lãi nhất, có nên nhập thêm không"*) không thể phục vụ.
+
+[`agents/agentic.py`](src/agents/agentic.py) bổ sung vòng *suy nghĩ → gọi tool → quan sát*: danh mục tool dẫn xuất từ manifest `/tools` (P4), `build_decision_schema()` đưa vào guided_json với `oneOf` gọi-tool/trả-lời để grammar **không cho** model vừa gọi tool vừa tuyên bố đáp án. Trần `max_steps`, chặn gọi lặp đúng tham số, tool lỗi đi vào observation thay vì làm sập vòng, chạm trần thì **nói thật là chưa xong** chứ không bịa kết luận.
+
+Lớp **MCP bọc REST** (`/mcp/tools/list`, `/mcp/tools/call`) dịch đúng manifest đó sang hình dạng MCP cho n8n MCP Client Tool — không định nghĩa lại tool lần nào.
+
+### 11.11. ✅ ĐÃ SỬA (28/07/2026) — xAI có dữ liệu giải thích nhưng không có đường ra
+
+`select_carrier()` trả `explain` đầy đủ (trọng số, tiêu chí thiếu, `is_close_call`), `compute_quote()` trả breakdown — nhưng chưa endpoint/nhánh nào để hỏi *"vì sao chọn hãng này?"*. Giải thích bị chôn trong payload n8n.
+
+Thêm nhánh router **EXPLAIN** (đặt trước LOGISTICS vì *"vì sao chọn hãng này"* chứa "hãng"/"giá") + `EXPLAIN_SYSTEM` + `_find_explainable()` lấy khối kết quả engine gần nhất trong lịch sử. Chỉ nhận **JSON có cấu trúc của engine**, không nhận văn xuôi — giải thích dựa trên văn xuôi của chính model là bịa lý do cho một kết luận đã bịa. Không có gì để giải thích thì nói rõ.
 
 ### 11.6. ✅ ĐÃ SỬA (27/07/2026) — `no_repeat_ngram_size` sập MỌI lần gọi /chat trên GPU
 

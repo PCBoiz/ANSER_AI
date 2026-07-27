@@ -73,6 +73,27 @@ def _cosine_sim(query_vec, matrix) -> np.ndarray:
 # xuất hiện ở nhiều nhánh thì để embedding quyết định.
 
 _KEYWORD_RULES = [
+    # Giải thích kết quả vừa đưa ra (xAI). Đặt ĐẦU TIÊN: "vì sao chọn hãng này"
+    # chứa "hãng"/"giá" nên sẽ bị LOGISTICS nuốt mất nếu xếp sau. Câu hỏi lý do
+    # luôn là câu NỐI TIẾP một kết quả trước đó, không phải yêu cầu tính mới.
+    ("EXPLAIN", re.compile(
+        r"^\s*(vì sao|tại sao|vi sao|tai sao|sao lại|lý do|ly do)"
+        r"|giải thích (giúp|cho|thêm|rõ)|giai thich"
+        r"|dựa (vào|trên) (đâu|cơ sở nào)|căn cứ nào"
+        r"|(sao|vì sao).{0,20}(chọn|cao|thấp|đắt|rẻ) (hơn|thế|vậy)",
+        re.IGNORECASE)),
+
+    # Báo cáo / phân tích văn dài theo kỳ. Trước DATA_INTERNAL vì "doanh thu
+    # quý này" là báo cáo (nhiều kỳ, cần engine), không phải tra một con số.
+    ("REPORT", re.compile(
+        r"(báo cáo|bao cao|phân tích|phan tich|tổng kết|tong ket)"
+        r".{0,30}(quý|quy \d|nửa năm|nua nam|cả năm|ca nam|năm nay|năm ngoái|kỳ)"
+        r"|(lãi|lỗ|lợi nhuận|loi nhuan|lai lo)"
+        r"|(doanh thu|chi phí|chi phi).{0,25}(quý|nửa năm|cả năm|theo (kỳ|quý|năm))"
+        r"|mặt hàng nào (lãi|lời|có lãi|sinh lời)"
+        r"|(so sánh|so sanh).{0,20}(quý|kỳ|năm)",
+        re.IGNORECASE)),
+
     # Báo giá vận tải — nghiệp vụ logistics. Đặt TRƯỚC TECHNICAL vì "báo giá"
     # có thể dính regex "tự động ... gửi" của nhánh đó khi câu dài.
     ("LOGISTICS", re.compile(
@@ -102,8 +123,8 @@ _KEYWORD_RULES = [
 
 class SemanticRouter:
     """
-    Định tuyến câu hỏi vào 1 trong 4 nhánh: TECHNICAL / DATA_INTERNAL /
-    RETRIEVAL / GENERAL.
+    Định tuyến câu hỏi vào 1 trong 7 nhánh: LOGISTICS / REPORT / EXPLAIN /
+    TECHNICAL / DATA_INTERNAL / RETRIEVAL / GENERAL.
 
     Thứ tự quyết định:
       1. Luật từ khoá (chắc chắn nhất, rẻ nhất)
@@ -208,6 +229,26 @@ class SemanticRouter:
                 "bán 10 triệu thì tiền thuế phải nộp là bao nhiêu",
                 "hộ kinh doanh doanh thu bao nhiêu thì phải đóng thuế",
                 "thủ tục đăng ký hộ kinh doanh cá thể gồm những gì",
+            ],
+            # Báo cáo / phân tích nhiều kỳ -> engine reporting + văn dài
+            "REPORT": [
+                "báo cáo doanh thu chi phí lợi nhuận quý này",
+                "quý vừa rồi lãi hay lỗ",
+                "phân tích lợi nhuận nửa năm đầu",
+                "mặt hàng nào lãi nhất năm nay",
+                "so sánh doanh thu quý này với quý trước",
+                "tổng kết kinh doanh cả năm giúp tôi",
+                "chi phí vận hành chiếm bao nhiêu phần trăm doanh thu",
+                "tuyến nào đang lỗ",
+            ],
+            # Hỏi lý do cho một kết quả đã đưa ra -> diễn giải khối explain
+            "EXPLAIN": [
+                "vì sao lại chọn hãng xe này",
+                "tại sao giá lại cao hơn lần trước",
+                "giải thích giúp tôi cách ra con số này",
+                "dựa vào đâu mà đề xuất nhập thêm hàng",
+                "lý do hãng kia bị loại là gì",
+                "căn cứ nào để nói mặt hàng này nên bỏ",
             ],
             # Hội thoại tự do
             "GENERAL": [
@@ -373,11 +414,16 @@ class ManagerAgent(BaseAgent):
 
     # -- nhánh LOGISTICS ---------------------------------------------------
 
-    async def extract_quote_request(self, message: str):
+    async def extract_quote_request(self, message: str,
+                                    history: list[dict] | None = None):
         """
         Trích xuất yêu cầu báo giá vận tải thành JSON theo schema QuoteExtraction.
         Cấu trúc do guided_json ép; trường thiếu là null — KHÔNG đoán (P1:
         đây là 1 trong 2 việc duy nhất LLM làm trong luồng báo giá).
+
+        `history` để câu nối tiếp giữ được ngữ cảnh: "thế xe 3 tấn thì sao?"
+        phải kế thừa tuyến đường từ lượt trước. Không có lịch sử thì trường
+        thiếu vẫn là null -> chat.py hỏi lại, không đoán.
         """
         from src.core.schemas import QuoteExtraction
         return await self.generate_chat(
@@ -388,6 +434,7 @@ class ManagerAgent(BaseAgent):
             max_new_tokens=256,
             temperature=0.0,   # trích xuất cần xác định tuyệt đối
             json_schema=QuoteExtraction.model_json_schema(),
+            history=history,
         )
 
     # -- nhánh TECHNICAL ---------------------------------------------------
@@ -403,7 +450,7 @@ class ManagerAgent(BaseAgent):
 
     # -- nhánh GENERAL -----------------------------------------------------
 
-    async def answer_general(self, task: str):
+    async def answer_general(self, task: str, history: list[dict] | None = None):
         """Hội thoại tự do, tính toán đơn giản, giải thích ngắn."""
         system = self._get_prompt("GENERAL_SYSTEM")
         if "{context}" in system:      # trường hợp fallback về CONSULT_SYSTEM
@@ -413,11 +460,13 @@ class ManagerAgent(BaseAgent):
             user=task,
             max_new_tokens=384,
             temperature=0.3,
+            history=history,
         )
 
     # -- nhánh RETRIEVAL ---------------------------------------------------
 
-    async def answer_retrieval(self, task: str, context: str = ""):
+    async def answer_retrieval(self, task: str, context: str = "",
+                               history: list[dict] | None = None):
         """Trả lời dựa trên tài liệu nội bộ hoặc kết quả tìm kiếm web."""
         system = self._get_prompt("RETRIEVAL_SYSTEM")
         ctx = context or "(không có tài liệu liên quan)"
@@ -431,11 +480,13 @@ class ManagerAgent(BaseAgent):
             user=task,
             max_new_tokens=512,
             temperature=0.2,
+            history=history,
         )
 
     # -- nhánh DATA_INTERNAL -----------------------------------------------
 
-    async def answer_data(self, task: str, context: str = ""):
+    async def answer_data(self, task: str, context: str = "",
+                          history: list[dict] | None = None):
         """Trả lời CHỈ dựa trên dữ liệu thật lấy từ DB cửa hàng."""
         system = self._get_prompt("DATA_SYSTEM")
         ctx = context or "(chưa có dữ liệu)"
@@ -448,6 +499,47 @@ class ManagerAgent(BaseAgent):
             user=task,
             max_new_tokens=384,
             temperature=0.1,   # thấp nhất: dữ liệu thật, không được bịa
+            history=history,
+        )
+
+    # -- nhánh REPORT (văn dài) --------------------------------------------
+
+    async def answer_report(self, task: str, context: str = "",
+                            history: list[dict] | None = None):
+        """
+        Báo cáo/phân tích văn dài từ output engine tất định.
+
+        Tách khỏi answer_general vì GENERAL cap "tối đa 5 câu" — đúng cho chat
+        lúc đang lái xe, sai cho "báo cáo lãi lỗ quý này".
+        """
+        system = self._get_prompt("REPORT_SYSTEM").format(
+            context=context or "(chưa có số liệu)"
+        )
+        return await self.generate_chat(
+            system=system,
+            user=task,
+            max_new_tokens=1200,       # văn dài: gấp ~3 lần nhánh chat
+            temperature=0.2,
+            history=history,
+        )
+
+    # -- nhánh EXPLAIN (xAI) -----------------------------------------------
+
+    async def explain_result(self, question: str, context: str,
+                             history: list[dict] | None = None):
+        """
+        Diễn giải khối `explain` mà engine tất định trả về.
+
+        Đây là việc thứ hai (và cuối) mà LLM được làm trong luồng quyết định
+        (P1): struct -> ngôn ngữ tự nhiên. Không đánh giá lại, không tự tính.
+        """
+        system = self._get_prompt("EXPLAIN_SYSTEM").format(context=context)
+        return await self.generate_chat(
+            system=system,
+            user=question,
+            max_new_tokens=420,
+            temperature=0.2,
+            history=history,
         )
 
     # -- tương thích ngược -------------------------------------------------

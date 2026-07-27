@@ -126,6 +126,72 @@ def make_date_phrase(anchor: date, rng: random.Random):
 # Sinh một seed
 # ---------------------------------------------------------------------------
 
+# Trường mà câu nối tiếp thường đổi, kèm mẫu câu người Việt hay dùng.
+# Đây là thứ dạy model KẾ THỪA ngữ cảnh: "thế xe 3 tấn thì sao?" phải giữ
+# nguyên tuyến đường của lượt trước chứ không để null.
+FOLLOWUP_CHANGES = {
+    "vehicle_type": "đổi sang loại xe khác",
+    "destination": "đổi điểm giao hàng",
+    "pickup_date": "đổi ngày lấy hàng",
+    "cargo_type": "đổi loại hàng",
+}
+
+
+def make_followup_seed(base: dict, index: int, rng: random.Random) -> dict:
+    """
+    Biến một seed ĐẦY ĐỦ thành cặp 2 lượt.
+
+    Lượt 1 = yêu cầu đầy đủ (đã có trong `base`).
+    Lượt 2 = câu ngắn chỉ nêu THỨ THAY ĐỔI; ground truth kế thừa mọi trường
+    còn lại từ lượt 1. Không có lịch sử thì bài toán này bất khả — đó chính là
+    điều cần dạy.
+    """
+    gt2 = dict(base["ground_truth"])
+    facts2: dict[str, str] = {}
+
+    field = rng.choice([f for f in FOLLOWUP_CHANGES if base["ground_truth"].get(f)]
+                       or ["vehicle_type"])
+
+    if field == "vehicle_type":
+        canonical = rng.choice([v for v in VEHICLE_PHRASES
+                                if v != base["ground_truth"]["vehicle_type"]])
+        gt2["vehicle_type"] = canonical
+        facts2["vehicle_phrase"] = rng.choice(VEHICLE_PHRASES[canonical])
+    elif field == "destination":
+        new_dest = rng.choice([d for d in DESTINATIONS
+                               if d != base["ground_truth"]["destination"]])
+        gt2["destination"] = facts2["destination"] = new_dest
+    elif field == "pickup_date":
+        anchor = date.fromisoformat(base["today"])
+        phrase, resolved = make_date_phrase(anchor, rng)
+        while resolved is None:                 # câu nối tiếp cần ngày rõ ràng
+            phrase, resolved = make_date_phrase(anchor, rng)
+        facts2["date_phrase"] = phrase
+        gt2["pickup_date"] = resolved.isoformat()
+    else:
+        new_cargo = rng.choice([c for c in CARGO_TYPES
+                                if c != base["ground_truth"].get("cargo_type")])
+        gt2["cargo_type"] = facts2["cargo"] = new_cargo
+
+    QuoteExtraction(**gt2)
+
+    return {
+        "_id": f"FU{index:04d}",
+        "today": base["today"],
+        "style": base["style"],
+        "kind": "followup",
+        "changed_field": field,
+        "change_desc": FOLLOWUP_CHANGES[field],
+        # lượt 1
+        "facts": base["facts"],
+        "must_not_mention": base["must_not_mention"],
+        "ground_truth": base["ground_truth"],
+        # lượt 2
+        "facts2": facts2,
+        "ground_truth2": gt2,
+    }
+
+
 def make_seed(index: int, rng: random.Random) -> dict:
     # Ngày "hôm nay" ngẫu nhiên -> model học CÁCH tính từ mốc, không học vẹt mốc
     anchor = date(2026, 1, 1) + timedelta(days=rng.randrange(360))
@@ -166,15 +232,30 @@ def make_seed(index: int, rng: random.Random) -> dict:
         "_id": f"EX{index:04d}",
         "today": anchor.isoformat(),
         "style": rng.choice(STYLES),
+        "kind": "single",
         "facts": facts,
         "must_not_mention": sorted(missing),
         "ground_truth": gt,
     }
 
 
+# Tỷ lệ seed đa lượt. 1/4 đủ dạy kỹ năng kế thừa ngữ cảnh mà không lấn át
+# phân phối câu một lượt (vẫn là đa số ca dùng thật).
+FOLLOWUP_RATIO = 0.25
+
+
 def generate(n_train: int, n_eval: int, seed: int) -> tuple[list[dict], list[dict]]:
     rng = random.Random(seed)
-    seeds = [make_seed(i, rng) for i in range(n_train + n_eval)]
+    total = n_train + n_eval
+    seeds = [make_seed(i, rng) for i in range(total)]
+
+    # Chỉ seed ĐỦ 3 trường bắt buộc mới làm được lượt nối tiếp — câu "thế xe 3
+    # tấn thì sao?" chỉ có nghĩa khi lượt trước đã đủ thông tin.
+    complete = [s for s in seeds if not s["must_not_mention"]]
+    rng.shuffle(complete)
+    for i, base in enumerate(complete[: int(total * FOLLOWUP_RATIO)]):
+        seeds[seeds.index(base)] = make_followup_seed(base, i, rng)
+
     rng.shuffle(seeds)
     return seeds[:n_train], seeds[n_train:]
 
@@ -203,8 +284,10 @@ def main() -> None:
         1 for s in train + eval_
         if "date_phrase" in s["facts"] and s["ground_truth"]["pickup_date"] is None
     )
+    n_followup = sum(1 for s in train + eval_ if s.get("kind") == "followup")
     print(f"  Thiếu trường bắt buộc : {n_missing} (dạy nhánh hỏi-lại)")
     print(f"  Ngày mơ hồ -> null    : {n_ambiguous} (dạy kỷ luật không đoán)")
+    print(f"  Câu nối tiếp 2 lượt   : {n_followup} (dạy kế thừa ngữ cảnh)")
     print("\nBước tiếp: python offline_training/reverse_generate.py")
 
 

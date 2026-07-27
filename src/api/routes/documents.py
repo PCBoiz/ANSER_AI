@@ -12,7 +12,7 @@ from typing import Optional
 
 from fastapi import APIRouter, File, Header, HTTPException, Request, UploadFile
 
-from src.api.dependencies import runtime, require_api_token, MAX_UPLOAD_BYTES
+from src.api.dependencies import MAX_UPLOAD_BYTES, require_api_token, runtime
 from src.core.mcp_server import MCPServer
 from src.core.schemas import InvoicePayload
 

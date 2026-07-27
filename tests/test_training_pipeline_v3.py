@@ -79,6 +79,135 @@ def test_seeds_deterministic_by_seed():
 
 
 # ===========================================================================
+# Seed đa lượt — dạy model kế thừa ngữ cảnh
+# ===========================================================================
+
+
+def test_followup_seeds_inherit_context():
+    """
+    Lượt 2 chỉ đổi ĐÚNG MỘT trường; mọi trường khác kế thừa từ lượt 1.
+    Không có lịch sử thì bài toán này bất khả — đó là điều cần dạy.
+    """
+    train, _ = generate(200, 0, seed=7)
+    followups = [s for s in train if s.get("kind") == "followup"]
+    assert followups, "phải có seed nối tiếp"
+
+    for seed in followups:
+        gt1, gt2 = seed["ground_truth"], seed["ground_truth2"]
+        QuoteExtraction(**gt2)
+        changed = [f for f in gt1 if gt1.get(f) != gt2.get(f)]
+        assert changed == [seed["changed_field"]], (
+            f"{seed['_id']}: đổi {changed}, khai báo đổi {seed['changed_field']}"
+        )
+        # 3 trường bắt buộc của lượt 2 phải đủ (kế thừa hoặc vừa đổi)
+        for field in QUOTE_REQUIRED_FIELDS:
+            assert gt2[field], f"{seed['_id']}: lượt 2 thiếu {field}"
+
+
+def test_followup_teacher_prompt_forbids_repeating_context():
+    from offline_training.reverse_generate import build_followup_prompt
+
+    train, _ = generate(200, 0, seed=7)
+    seed = next(s for s in train if s.get("kind") == "followup")
+    prompt = build_followup_prompt(seed)
+    assert "LƯỢT 1:" in prompt and "LƯỢT 2:" in prompt
+    assert "KHÔNG nhắc lại điểm lấy hàng" in prompt
+
+
+def test_split_two_turns_parses_teacher_output():
+    from offline_training.reverse_generate import split_two_turns
+
+    t1, t2 = split_two_turns(
+        "LƯỢT 1: Báo giá xe 5 tấn từ Hữu Nghị đi Hải Phòng\n"
+        "LƯỢT 2: thế xe 3 tấn thì sao"
+    )
+    assert t1.startswith("Báo giá") and t2 == "thế xe 3 tấn thì sao"
+    assert split_two_turns("không đúng mẫu") == (None, None)
+
+
+def test_verify_followup_rejects_repeated_context():
+    """Lượt 2 lặp lại tuyến đường -> mẫu không còn dạy được kỹ năng kế thừa."""
+    from offline_training.reverse_generate import verify_followup
+
+    seed = {
+        "changed_field": "vehicle_type",
+        "ground_truth": {"origin": "Hữu Nghị", "destination": "Hải Phòng",
+                         "vehicle_type": "5T", "cargo_type": None,
+                         "pickup_date": None, "customer_name": None,
+                         "customer_email": None},
+        "ground_truth2": {"origin": "Hữu Nghị", "destination": "Hải Phòng",
+                          "vehicle_type": "3T", "cargo_type": None,
+                          "pickup_date": None, "customer_name": None,
+                          "customer_email": None},
+    }
+    turn1 = "Báo giá xe 5 tấn từ Hữu Nghị đi Hải Phòng giúp anh"
+    assert verify_followup(turn1, "thế xe 3 tấn thì sao", seed) is None
+    reason = verify_followup(turn1, "thế xe 3 tấn đi Hải Phòng thì sao", seed)
+    assert reason and "lặp lại thông tin cũ" in reason
+
+
+def test_multiturn_train_entry_has_five_messages():
+    """train_v3 tính loss trên message cuối -> mẫu 5 message dạy đúng lượt 2."""
+    from offline_training.reverse_generate import to_train_entry
+
+    train, _ = generate(200, 0, seed=7)
+    seed = next(s for s in train if s.get("kind") == "followup")
+    entry = to_train_entry(seed, ("tin nhắn lượt 1", "thế xe 3 tấn thì sao"))
+    roles = [m["role"] for m in entry["messages"]]
+    assert roles == ["system", "user", "assistant", "user", "assistant"]
+    assert json.loads(entry["messages"][-1]["content"]) == seed["ground_truth2"]
+    assert entry["_source"] == "logistics_extract_multiturn"
+
+
+def test_benchmark_scores_followup_separately():
+    """Điểm chung đẹp mà câu nối tiếp kém = hội thoại nhiều lượt chưa dùng được."""
+    from offline_training.benchmark_v3 import score_extraction
+
+    gt = {"origin": "Hữu Nghị", "destination": "Hải Phòng", "vehicle_type": "5T",
+          "cargo_type": None, "pickup_date": None, "customer_name": None,
+          "customer_email": None}
+    rows = [
+        {"kind": "single", "ground_truth": gt},
+        {"kind": "followup", "ground_truth": gt},
+    ]
+    outputs = [json.dumps(gt), json.dumps({**gt, "origin": None})]  # nối tiếp sai
+    result = score_extraction(rows, outputs)
+    assert result["ready_by_kind"]["single"] == 1.0
+    assert result["ready_by_kind"]["followup"] == 0.0
+
+
+# ===========================================================================
+# Nhánh REPORT — cứu mẫu văn dài thay vì vứt
+# ===========================================================================
+
+
+def test_long_consult_goes_to_report_branch():
+    """436 mẫu distill R1 dài ~5.800 ký tự: đúng hợp đồng REPORT, không phải rác."""
+    long_answer = "Phân tích chi tiết. " * 200          # ~4.000 ký tự
+    obj = {"messages": [
+        {"role": "system", "content": "You are Project A."},
+        {"role": "user", "content": "Phân tích thị trường bán lẻ 2026"},
+        {"role": "assistant", "content": f"<think>x</think>\n{long_answer}"},
+    ]}
+    entry, reason = convert_v2_entry(obj)
+    assert reason == "report_ok"
+    assert entry["_source"] == "v2_report"
+    assert "DỮ LIỆU:" in entry["messages"][0]["content"]
+    # context trống phải nói rõ là không có số liệu, để model không học bịa số
+    assert "không có số liệu" in entry["messages"][0]["content"]
+
+
+def test_absurdly_long_still_dropped():
+    obj = {"messages": [
+        {"role": "system", "content": "You are Project A."},
+        {"role": "user", "content": "Viết sách"},
+        {"role": "assistant", "content": "x" * 20_000},
+    ]}
+    entry, reason = convert_v2_entry(obj)
+    assert entry is None and reason == "too_long"
+
+
+# ===========================================================================
 # dgen_common — chốt chặn P1/P2
 # ===========================================================================
 

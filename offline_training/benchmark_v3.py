@@ -28,7 +28,6 @@ import json
 import os
 import sys
 from collections import Counter
-from datetime import date
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -61,12 +60,17 @@ def score_extraction(rows: list[dict], outputs: list[str]) -> dict:
     rows: eval_extraction.jsonl. outputs: JSON model sinh (cùng thứ tự).
     Đếm theo trường: correct / wrong / miss (có mà nói null) /
     false_fill (null mà đoán bừa — lỗi tệ nhất: phá nhánh hỏi-lại).
+
+    Tách riêng điểm câu MỘT LƯỢT và câu NỐI TIẾP: câu nối tiếp đo đúng khả năng
+    kế thừa ngữ cảnh — điểm thấp ở đây nghĩa là hội thoại nhiều lượt chưa dùng
+    được, dù điểm chung có đẹp.
     """
     from src.core.schemas import QuoteExtraction
 
     fields = list(QuoteExtraction.model_fields)
     counts = {f: Counter() for f in fields}
     n_ready = 0
+    by_kind: dict[str, list[bool]] = {"single": [], "followup": []}
 
     for row, raw in zip(rows, outputs):
         try:
@@ -88,6 +92,7 @@ def score_extraction(rows: list[dict], outputs: list[str]) -> dict:
             if field in REQUIRED_FIELDS and gt_v != pred_v:
                 ready = False
         n_ready += ready
+        by_kind.setdefault(row.get("kind", "single"), []).append(ready)
 
     n = max(len(rows), 1)
     per_field = {f: counts[f]["correct"] / n for f in fields}
@@ -96,6 +101,9 @@ def score_extraction(rows: list[dict], outputs: list[str]) -> dict:
         "per_field": per_field,
         "field_avg": sum(per_field.values()) / len(fields),
         "ready_rate": n_ready / n,
+        "ready_by_kind": {
+            kind: round(sum(v) / len(v), 4) for kind, v in by_kind.items() if v
+        },
         "counts": {f: dict(c) for f, c in counts.items()},
     }
 
@@ -131,6 +139,28 @@ def build_llm(model_path: str):
         enforce_eager=os.getenv("BENCH_ENFORCE_EAGER", "1") == "1",
         trust_remote_code=True,
     )
+
+
+def build_extraction_chat(row: dict, prompts) -> list[dict]:
+    """
+    Dựng hội thoại cho một ca eval — kèm lịch sử nếu là câu nối tiếp.
+
+    Lịch sử đi vào ĐÚNG khe hội thoại, giống hệt engine.generate_chat lúc
+    serve (P4): benchmark đo cùng đường đi mà production dùng.
+    """
+    from datetime import date as _date
+
+    today = _date.fromisoformat(row["today"])
+    chat = [{"role": "system", "content": prompts.LOGISTICS_EXTRACT_SYSTEM}]
+    for turn in row.get("history", []):
+        if turn["role"] == "user":
+            chat.append({"role": "user",
+                         "content": prompts.format_extraction_user(turn["content"], today)})
+        else:
+            chat.append(turn)
+    chat.append({"role": "user",
+                 "content": prompts.format_extraction_user(row["message"], today)})
+    return chat
 
 
 def generate(llm, chats: list[list[dict]], json_schema: dict | None,
@@ -195,12 +225,7 @@ def main() -> None:
     if "extraction" not in args.skip:
         rows = cap(load_jsonl(GENERATED_DIR / "eval_extraction.jsonl"))
         if rows:
-            chats = [
-                [{"role": "system", "content": Prompts.LOGISTICS_EXTRACT_SYSTEM},
-                 {"role": "user", "content": Prompts.format_extraction_user(
-                     r["message"], date.fromisoformat(r["today"]))}]
-                for r in rows
-            ]
+            chats = [build_extraction_chat(r, Prompts) for r in rows]
             outputs = generate(llm, chats, QuoteExtraction.model_json_schema(),
                                max_tokens=256, temperature=0.0)
             result = score_extraction(rows, outputs)
@@ -211,9 +236,19 @@ def main() -> None:
             print(f"  {'TB các trường':15s} {result['field_avg'] * 100:5.1f}%")
             print(f"  {'sẵn sàng báo giá':15s} {result['ready_rate'] * 100:5.1f}%"
                   " (3 trường bắt buộc đều đúng)")
+            for kind, rate in result["ready_by_kind"].items():
+                label = "câu nối tiếp" if kind == "followup" else "câu một lượt"
+                print(f"    {label:14s} {rate * 100:5.1f}%")
 
             field_min = float(os.getenv("EXTRACT_FIELD_MIN", "0.85"))
             ready_min = float(os.getenv("EXTRACT_READY_MIN", "0.80"))
+            followup_min = float(os.getenv("EXTRACT_FOLLOWUP_MIN", "0.70"))
+            followup_rate = result["ready_by_kind"].get("followup")
+            if followup_rate is not None and followup_rate < followup_min:
+                gate_fail.append(
+                    f"extraction followup {followup_rate:.2f} < {followup_min} "
+                    "(hội thoại nhiều lượt chưa dùng được)"
+                )
             if result["field_avg"] < field_min:
                 gate_fail.append(f"extraction field_avg {result['field_avg']:.2f} < {field_min}")
             if result["ready_rate"] < ready_min:

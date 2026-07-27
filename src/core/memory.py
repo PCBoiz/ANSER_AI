@@ -95,6 +95,41 @@ class MemoryManager:
         except Exception:
             logger.error("DB error saving message user_id=%s role=%s", user_id, role, exc_info=True)
 
+    def get_history_messages(self, user_id, limit=6) -> list:
+        """
+        Lịch sử hội thoại dạng [{"role": ..., "content": ...}] — ĐÚNG khe
+        hội thoại của chat template.
+
+        Khác `get_context_string` (ghép thành một chuỗi "user: ...\\nassistant:
+        ..."): chuỗi ghép phải nhét vào system prompt hoặc user turn, khiến
+        model coi lời của chính nó là chỉ thị hệ thống và dễ nhại lại định
+        dạng "user:". Danh sách messages đi đúng chỗ của nó.
+
+        Trả [] khi chưa có DB hoặc lỗi — hội thoại một lượt vẫn chạy được,
+        chỉ mất ngữ cảnh (suy giảm mềm, không sập request).
+        """
+        if not self.engine:
+            return []
+        try:
+            with self.get_conn() as conn:
+                sid = self._get_active_session(conn, user_id)
+                rows = conn.execute(
+                    text(f"SELECT {M_ROLE}, {M_CONTENT} FROM {MESSAGES_TABLE} "
+                         f"WHERE {M_SESSION} = :sid ORDER BY {M_CREATED} DESC LIMIT :lim"),
+                    {"sid": sid, "lim": limit},
+                ).fetchall()
+            out = []
+            for role, content in reversed(rows):
+                role = (role or "").strip().lower()
+                if role in ("bot", "ai", "model"):     # tên vai cũ của Body
+                    role = "assistant"
+                if role in ("user", "assistant") and content:
+                    out.append({"role": role, "content": str(content)})
+            return out
+        except Exception:
+            logger.error("DB error fetching history user_id=%s", user_id, exc_info=True)
+            return []
+
     def get_context_string(self, user_id, limit=6):
         try:
             with self.get_conn() as conn:

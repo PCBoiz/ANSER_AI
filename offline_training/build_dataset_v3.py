@@ -52,6 +52,7 @@ REPO_V2_FILES = [
 FORBIDDEN_INPUTS = {"training_dataset.jsonl"}     # Make.com — cấm nạp
 
 MAX_CONSULT_CHARS = 1_400   # dài hơn là lệch hẳn chuẩn "tối đa 5-6 câu" của runtime
+MAX_REPORT_CHARS = 12_000   # trần nhánh REPORT; dài hơn nữa là bài viết, không phải báo cáo
 V2_MAX_SHARE = 0.55         # data cũ không được lấn át tín hiệu logistics mới
 
 SECRET_PATTERNS = [
@@ -202,8 +203,28 @@ def convert_v2_entry(obj: dict):
     if isinstance(payload, dict) and answer.strip().startswith(("{", "```")):
         return None, "malformed"
 
+    # Bài dài -> nhánh REPORT (văn dài), KHÔNG vứt.
+    #
+    # 436/1000 mẫu v2 dài trung bình ~5.800 ký tự vì distill từ R1. Chúng lệch
+    # hợp đồng GENERAL ("tối đa 5 câu") nhưng ĐÚNG hợp đồng REPORT — nhánh sinh
+    # ra chính vì chat ngắn và báo cáo dài là hai nhu cầu trái ngược không thể
+    # dùng chung một cap độ dài (quyết định 27/07/2026).
     if len(answer) > MAX_CONSULT_CHARS:
-        return None, "too_long"
+        if len(answer) > MAX_REPORT_CHARS:
+            return None, "too_long"        # dài quá cả nhánh báo cáo
+        return {
+            "_source": "v2_report",
+            "messages": [
+                # REPORT_SYSTEM có {context}: mẫu v2 là tư vấn từ kiến thức
+                # chung, không có số liệu engine -> ghi rõ là không có, để
+                # model không học thói quen bịa số khi context trống.
+                {"role": "system", "content": Prompts.REPORT_SYSTEM.format(
+                    context="(câu hỏi kiến thức chung — không có số liệu nội bộ)"
+                )},
+                {"role": "user", "content": user},
+                {"role": "assistant", "content": answer},
+            ],
+        }, "report_ok"
 
     # Tư vấn thuần -> system prompt runtime hiện hành (P4)
     return {

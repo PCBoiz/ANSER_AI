@@ -35,8 +35,12 @@ Khi một việc cần Body đổi (ví dụ thêm bảng logistics ở [ARCHITE
 | Cho LLM tự cộng dòng hóa đơn | `validate_invoice_total()` tính lại toàn bộ |
 | Cho LLM suy ra "vì sao lệch 3 triệu" | `reconciliation.py` phân rã kèm bằng chứng, LLM chỉ diễn giải |
 | Cho LLM sinh SQL tự do rồi chạy | Tool có tham số ràng buộc, SQL viết sẵn |
+| Cho LLM tự cộng doanh thu/chi phí ra lợi nhuận | `reporting.build_report()` — code thuần, LLM chỉ diễn giải |
+| Trong vòng agentic: model tự tính rồi tuyên bố kết quả | Grammar `oneOf` gọi-tool/trả-lời; mọi con số phải đến từ kết quả tool |
 
 Kiểm tra nhanh trước khi commit: *nếu model đọc sai một chữ số, có bản ghi sổ sách nào sai theo không?* Nếu có — thiếu lớp tất định.
+
+**Thiếu dữ liệu thì nói thiếu, không điền 0.** `reporting.py` không coi giá vốn trống là 0 (làm thế thì lãi gộp = doanh thu — một con số sai mà trông rất đẹp); nó tính `cogs_coverage_pct`, hạ `confidence` và cảnh báo. Con số tài chính sai mà *nghe có vẻ đúng* là loại lỗi tệ nhất: không ai phát hiện tới lúc quyết toán.
 
 ### R2 — Chủ quyền dữ liệu
 
@@ -228,11 +232,14 @@ Theo [ARCHITECTURE.md §12](ARCHITECTURE.md):
 | Thứ tự | Việc | Trạng thái |
 |---|---|---|
 | S0 | Tài liệu chiến lược — ARCHITECTURE.md + AGENTS.md | ✅ Xong |
-| **S1** | **Chốt n8n làm định dạng duy nhất + bật `guided_json` + xoá vòng retry** | 🔵 **Đang làm** |
-| S2 | Hạ tầng: vLLM server riêng, Qwen3-8B, ctx 32k, Redis, Cloudflare Tunnel | ⚪ Chờ |
-| S3 | Tầng tool + vòng lặp agentic (gói Logistics) | ⚪ Chờ |
-| S4 | Metrics `ai_metrics_log` | ⚪ Chờ |
-| S5 | XAI: `reconciliation.py` + `InvoiceFieldValidator` | ⚪ Chờ |
-| S6 | Lược đồ Logistics bên Body — **cần phối hợp repo Body** | ⚪ Chặn |
+| S1 | Chốt n8n làm định dạng duy nhất + bật `guided_json` + xoá vòng retry | ✅ Xong |
+| S1b | Pipeline fine-tune v3 (Qwen3-8B, reverse-generation) + khôi phục data v2 | ✅ Xong |
+| S3 | Tầng tool + vòng lặp agentic + MCP bọc REST | ✅ Xong |
+| S4 | Metrics `ai_metrics_log` | ✅ Xong |
+| S7 | Hội thoại nhiều lượt (runtime + data đa lượt) | ✅ Xong |
+| S8 | Kênh giải thích xAI (nhánh EXPLAIN) + engine báo cáo DT/CP/LN | ✅ Xong |
+| **S2** | **Hạ tầng: vLLM server riêng, Qwen3-8B, ctx 32k, Redis, Cloudflare Tunnel** | 🔵 **Kế tiếp** |
+| S5 | XAI hoá đơn: `reconciliation.py` + `InvoiceFieldValidator` + gộp prompt hoá đơn | ⚪ Chờ |
+| S6 | Lược đồ Logistics bên Body + API xuất dòng bán/chi phí cho `/tools/report` — **cần phối hợp repo Body** | ⚪ Chặn |
 
 Nghiệp vụ ưu tiên 1 là **logistics / báo giá vận tải**. Bán lẻ giữ lại vì code đã có, nhưng không phải đích tối ưu hoá hiện tại.

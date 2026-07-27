@@ -40,6 +40,46 @@ class TaskRegistry:
 
 TASK_REGISTRY = TaskRegistry(max_size=1000)
 
+# Số lượt hội thoại tối đa đưa lại vào prompt. 6 lượt (3 cặp hỏi-đáp) đủ cho
+# các câu nối tiếp thực tế ("thế xe 3 tấn thì sao?") mà không ăn hết ngân sách
+# ngữ cảnh — mỗi lượt cũ đẩy chi phí mọi request sau đó lên.
+MAX_HISTORY_TURNS = int(os.getenv("MAX_HISTORY_TURNS", "6"))
+# Lượt cũ dài hơn mức này bị cắt: câu trả lời workflow JSON có thể vài nghìn
+# token, nhét nguyên vào lượt sau là vô ích mà tốn ngữ cảnh.
+MAX_HISTORY_CHARS = int(os.getenv("MAX_HISTORY_CHARS", "1200"))
+
+
+def sanitize_history(history: list[dict] | None) -> list[dict]:
+    """
+    Lọc lịch sử hội thoại trước khi đưa vào chat template.
+
+    Bỏ bản ghi sai vai/rỗng, cắt lượt quá dài, giữ N lượt gần nhất, và đảm bảo
+    lượt đầu tiên là 'user' — chat template của Qwen kỳ vọng user/assistant xen
+    kẽ, mở đầu bằng 'assistant' làm hỏng cấu trúc ChatML.
+    """
+    if not history:
+        return []
+
+    cleaned = []
+    for item in history:
+        if not isinstance(item, dict):
+            continue
+        role = item.get("role")
+        content = item.get("content")
+        if role not in ("user", "assistant") or not isinstance(content, str):
+            continue
+        content = content.strip()
+        if not content:
+            continue
+        if len(content) > MAX_HISTORY_CHARS:
+            content = content[:MAX_HISTORY_CHARS] + " […đã rút gọn]"
+        cleaned.append({"role": role, "content": content})
+
+    cleaned = cleaned[-MAX_HISTORY_TURNS:]
+    while cleaned and cleaned[0]["role"] != "user":
+        cleaned.pop(0)
+    return cleaned
+
 
 class ModelEngine:
     """
@@ -177,14 +217,21 @@ class ModelEngine:
         max_tokens=1024,
         temperature=0.1,
         json_schema: dict | None = None,
+        history: list[dict] | None = None,
     ):
         """
         Sinh text theo ĐÚNG định dạng chat của Qwen.
-        Tự dựng messages [system, user] rồi để tokenizer.apply_chat_template chèn
-        token ChatML chuẩn — KHÔNG nhúng tay <|im_start|> trong prompt nữa.
+        Tự dựng messages [system, ...history, user] rồi để
+        tokenizer.apply_chat_template chèn token ChatML chuẩn.
 
         `json_schema`: bật guided decoding, ép output khớp schema. Dùng cho nhánh
         sinh workflow và trích xuất hoá đơn.
+
+        `history`: các lượt trước dạng [{"role": "user"|"assistant", "content": ...}].
+        Không có nó thì mọi tin nhắn là một phiên độc lập — "thế xe 3 tấn thì
+        sao?" không thể hiểu được. Lịch sử đi vào ĐÚNG khe hội thoại của chat
+        template, KHÔNG nối vào system prompt (nối tay khiến model coi lời của
+        chính nó là chỉ thị hệ thống).
         """
         if self.env == "LOCAL":
             await asyncio.sleep(0.05)
@@ -212,10 +259,9 @@ class ModelEngine:
             sampling_kwargs["repetition_penalty"] = 1.0
 
         params = SamplingParams(**sampling_kwargs)
-        messages = [
-            {"role": "system", "content": system},
-            {"role": "user", "content": user},
-        ]
+        messages = [{"role": "system", "content": system}]
+        messages.extend(sanitize_history(history))
+        messages.append({"role": "user", "content": user})
 
         def _blocking_generate():
             tokenizer = self.llm.get_tokenizer()

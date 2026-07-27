@@ -22,6 +22,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import json
+import re
 import sys
 import time
 from pathlib import Path
@@ -68,16 +69,23 @@ _MISSING_LABELS = {
 }
 
 
+def _fact_lines(facts: dict) -> list[str]:
+    """Các dòng 'phải có' trong prompt teacher, theo thứ tự nhãn cố định."""
+    lines = []
+    for key, label in _FACT_LABELS.items():
+        if key in facts:
+            value = facts[key]
+            if key in ("vehicle_phrase", "date_phrase"):
+                lines.append(f'- {label} "{value}"')   # cụm phải dùng nguyên văn
+            else:
+                lines.append(f"- {label}: {value}")
+    return lines
+
+
 def build_teacher_prompt(seed: dict) -> str:
     lines = ["Viết MỘT tin nhắn duy nhất theo ràng buộc sau.", "",
              "THÔNG TIN PHẢI CÓ (diễn đạt tự nhiên, không liệt kê máy móc):"]
-    for key, label in _FACT_LABELS.items():
-        if key in seed["facts"]:
-            value = seed["facts"][key]
-            if key in ("vehicle_phrase", "date_phrase"):
-                lines.append(f'- {label} "{value}"')
-            else:
-                lines.append(f"- {label}: {value}")
+    lines += _fact_lines(seed["facts"])
 
     if seed["must_not_mention"]:
         lines.append("")
@@ -93,14 +101,57 @@ def build_teacher_prompt(seed: dict) -> str:
     return "\n".join(lines)
 
 
-def verify_message(message: str, seed: dict) -> str | None:
+def build_followup_prompt(seed: dict) -> str:
+    """
+    Prompt cho seed 2 lượt: teacher viết CẢ HAI lượt trong một lần gọi.
+
+    Lượt 2 cố tình KHÔNG được nhắc lại thông tin cũ — đó chính là điều làm bài
+    toán bất khả nếu thiếu lịch sử, và là kỹ năng cần dạy.
+    """
+    lines = [
+        "Viết HAI tin nhắn liên tiếp của cùng một người, theo đúng mẫu:",
+        "LƯỢT 1: <tin nhắn>",
+        "LƯỢT 2: <tin nhắn>",
+        "",
+        "LƯỢT 1 — yêu cầu báo giá đầy đủ, phải có:",
+    ]
+    lines += _fact_lines(seed["facts"])
+    lines += [
+        "",
+        f"LƯỢT 2 — câu hỏi NGẮN nối tiếp, {seed['change_desc']}, phải có:",
+    ]
+    lines += _fact_lines(seed["facts2"])
+
+    lines += [
+        "",
+        "LƯỢT 2 TUYỆT ĐỐI KHÔNG nhắc lại điểm lấy hàng, điểm giao hàng hay các",
+        "thông tin đã nêu ở lượt 1 (trừ đúng thứ thay đổi). Viết như người ta",
+        'nhắn tiếp thật: "thế xe 3 tấn thì sao", "đổi sang thứ 6 được không".',
+        "",
+        f"PHONG CÁCH cả hai lượt: {seed['style']}.",
+        "LƯỢT 1 dưới 220 ký tự; LƯỢT 2 dưới 90 ký tự.",
+    ]
+    return "\n".join(lines)
+
+
+def split_two_turns(raw: str):
+    """Bóc 'LƯỢT 1: ... LƯỢT 2: ...'. Trả (t1, t2) hoặc (None, None)."""
+    match = re.search(
+        r"LƯỢT\s*1\s*:\s*(.+?)\s*LƯỢT\s*2\s*:\s*(.+)", raw, re.DOTALL | re.IGNORECASE
+    )
+    if not match:
+        return None, None
+    return match.group(1).strip().strip('"'), match.group(2).strip().strip('"')
+
+
+def verify_message(message: str, seed: dict, gt_key: str = "ground_truth") -> str | None:
     """Trả None nếu đạt, ngược lại trả lý do rớt (đưa vào retry feedback)."""
     if not message or len(message) > 350:
         return "tin nhắn rỗng hoặc quá dài"
     if "{" in message or "json" in message.lower():
         return "tin nhắn chứa JSON/markup"
 
-    gt = seed["ground_truth"]
+    gt = seed[gt_key]
     for field in ("origin", "destination", "customer_name"):
         if gt[field] and not fuzzy_contains(message, gt[field]):
             return f"thiếu thông tin bắt buộc: {gt[field]!r}"
@@ -114,14 +165,67 @@ def verify_message(message: str, seed: dict) -> str | None:
     return None
 
 
-def to_train_entry(seed: dict, message: str) -> dict:
-    """Format messages — system/user dựng bằng ĐÚNG code runtime (P4)."""
+def verify_followup(turn1: str, turn2: str, seed: dict) -> str | None:
+    """Lượt 1 đủ thông tin; lượt 2 nêu thứ đổi và KHÔNG lặp lại ngữ cảnh cũ."""
+    reason = verify_message(turn1, seed, "ground_truth")
+    if reason:
+        return f"lượt 1: {reason}"
+    if not turn2 or len(turn2) > 200:
+        return "lượt 2 rỗng hoặc quá dài"
+
+    gt1, gt2 = seed["ground_truth"], seed["ground_truth2"]
+
+    # Lượt 2 phải nhắc thứ đã đổi (trừ ngày — cụm ngày được diễn đạt tự do)
+    field = seed["changed_field"]
+    if field in ("destination", "cargo_type"):
+        if not fuzzy_contains(turn2, gt2[field]):
+            return f"lượt 2 không nêu {gt2[field]!r}"
+
+    # Lượt 2 KHÔNG được lặp lại ngữ cảnh kế thừa — nếu lặp thì mẫu này không
+    # còn dạy được kỹ năng kế thừa nữa (model chỉ cần đọc lượt 2 là đủ).
+    for inherited in ("origin", "destination"):
+        if inherited == field:
+            continue
+        value = gt1.get(inherited)
+        if value and fuzzy_contains(turn2, value):
+            return f"lượt 2 lặp lại thông tin cũ {value!r} — phải để ngầm hiểu"
+
+    return None
+
+
+def to_train_entry(seed: dict, message) -> dict:
+    """
+    Format messages — system/user dựng bằng ĐÚNG code runtime (P4).
+
+    Seed 2 lượt cho ra 5 message; train_v3.py tính loss trên message CUỐI nên
+    model học đúng việc: sinh JSON lượt 2 KHI ĐÃ CÓ ngữ cảnh lượt 1.
+    """
     today = date.fromisoformat(seed["today"])
+    system = {"role": "system", "content": Prompts.LOGISTICS_EXTRACT_SYSTEM}
+
+    if seed.get("kind") == "followup":
+        turn1, turn2 = message
+        return {
+            "_id": seed["_id"],
+            "_source": "logistics_extract_multiturn",
+            "messages": [
+                system,
+                {"role": "user",
+                 "content": Prompts.format_extraction_user(turn1, today)},
+                {"role": "assistant",
+                 "content": json.dumps(seed["ground_truth"], ensure_ascii=False)},
+                {"role": "user",
+                 "content": Prompts.format_extraction_user(turn2, today)},
+                {"role": "assistant",
+                 "content": json.dumps(seed["ground_truth2"], ensure_ascii=False)},
+            ],
+        }
+
     return {
         "_id": seed["_id"],
         "_source": "logistics_extract",
         "messages": [
-            {"role": "system", "content": Prompts.LOGISTICS_EXTRACT_SYSTEM},
+            system,
             {"role": "user", "content": Prompts.format_extraction_user(message, today)},
             # Xuất đủ 7 key, thiếu = null tường minh — dạy kỷ luật không đoán
             {"role": "assistant",
@@ -130,10 +234,25 @@ def to_train_entry(seed: dict, message: str) -> dict:
     }
 
 
-def to_eval_entry(seed: dict, message: str) -> dict:
+def to_eval_entry(seed: dict, message) -> dict:
+    if seed.get("kind") == "followup":
+        turn1, turn2 = message
+        return {
+            "_id": seed["_id"],
+            "today": seed["today"],
+            "kind": "followup",
+            "history": [
+                {"role": "user", "content": turn1},
+                {"role": "assistant",
+                 "content": json.dumps(seed["ground_truth"], ensure_ascii=False)},
+            ],
+            "message": turn2,
+            "ground_truth": seed["ground_truth2"],
+        }
     return {
         "_id": seed["_id"],
         "today": seed["today"],
+        "kind": "single",
         "message": message,
         "ground_truth": seed["ground_truth"],
     }
@@ -141,6 +260,9 @@ def to_eval_entry(seed: dict, message: str) -> dict:
 
 async def process_seed(client, semaphore, seed: dict, out_path: Path,
                        formatter, stats: dict) -> None:
+    is_followup = seed.get("kind") == "followup"
+    prompt = build_followup_prompt(seed) if is_followup else build_teacher_prompt(seed)
+
     async with semaphore:
         feedback = ""
         for attempt in (1, 2):
@@ -149,23 +271,33 @@ async def process_seed(client, semaphore, seed: dict, out_path: Path,
                     model=MODEL,
                     messages=[
                         {"role": "system", "content": TEACHER_SYSTEM},
-                        {"role": "user", "content": build_teacher_prompt(seed) + feedback},
+                        {"role": "user", "content": prompt + feedback},
                     ],
                     temperature=TEMPERATURE,
-                    max_tokens=MAX_TOKENS,
+                    max_tokens=MAX_TOKENS * (2 if is_followup else 1),
                 )
             except Exception as exc:
                 print(f"  ✗ {seed['_id']} lỗi API: {exc}")
                 stats["api_fail"] += 1
                 return
 
-            message = (resp.choices[0].message.content or "").strip().strip('"')
-            reason = verify_message(message, seed)
+            raw = (resp.choices[0].message.content or "").strip()
+
+            if is_followup:
+                turn1, turn2 = split_two_turns(raw)
+                if turn1 is None:
+                    reason, payload = "không đúng mẫu 'LƯỢT 1:/LƯỢT 2:'", None
+                else:
+                    reason, payload = verify_followup(turn1, turn2, seed), (turn1, turn2)
+            else:
+                payload = raw.strip('"')
+                reason = verify_message(payload, seed)
+
             if reason is None:
-                append_jsonl(out_path, formatter(seed, message))
+                append_jsonl(out_path, formatter(seed, payload))
                 stats["ok"] += 1
                 return
-            feedback = f"\n\nTin nhắn trước bị loại vì: {reason}. Viết lại cho đúng."
+            feedback = f"\n\nBản trước bị loại vì: {reason}. Viết lại cho đúng."
             if attempt == 2:
                 print(f"  ⚠ {seed['_id']} loại sau retry: {reason}")
                 stats["rejected"] += 1

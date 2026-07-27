@@ -69,7 +69,7 @@ async def test_missing_fields_asks_back(monkeypatch):
     """Trích xuất thiếu trường bắt buộc -> hỏi lại, nêu ĐÚNG tên trường thiếu."""
     from src.api.routes import chat as chat_mod
 
-    async def fake_extract(msg):
+    async def fake_extract(msg, history=None):
         return json.dumps({"origin": "Hữu Nghị", "destination": None,
                            "vehicle_type": "5T"})
 
@@ -91,7 +91,7 @@ async def test_webhook_not_configured_message(monkeypatch):
     from src.api import dependencies
     from src.api.routes import chat as chat_mod
 
-    async def fake_extract(msg):
+    async def fake_extract(msg, history=None):
         return json.dumps({"origin": "Hữu Nghị", "destination": "Hải Phòng",
                            "vehicle_type": "5T"})
 
@@ -111,7 +111,7 @@ async def test_unparseable_extraction_gives_guidance(monkeypatch):
     from src.api import dependencies
     from src.api.routes import chat as chat_mod
 
-    async def fake_extract(msg):
+    async def fake_extract(msg, history=None):
         return "xin lỗi tôi không hiểu"
 
     class FakeManager:
@@ -129,7 +129,7 @@ async def test_happy_path_calls_webhook(monkeypatch):
     from src.api.routes import chat as chat_mod
     from src.core import utils as utils_mod
 
-    async def fake_extract(msg):
+    async def fake_extract(msg, history=None):
         return json.dumps({
             "origin": "Hữu Nghị", "destination": "Hải Phòng",
             "vehicle_type": "5T", "cargo_type": "Hàng lạnh",

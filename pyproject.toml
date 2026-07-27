@@ -11,6 +11,8 @@ ignore = ["E501"]
 "tests/test_server.py" = ["E402"]
 # Script offline chạy độc lập: sys.path.insert TRƯỚC khi import src — E402 là chủ đích
 "offline_training/*.py" = ["E402"]
+# Router phải import SAU khi tạo app (routes đọc runtime của dependencies) — E402 chủ đích
+"src/api/main.py" = ["E402"]
 
 [tool.pytest.ini_options]
 pythonpath = ["."]

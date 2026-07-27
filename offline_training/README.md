@@ -8,16 +8,20 @@ còn Qwen3 đã có thinking mode gốc bật/tắt được từng request.
 
 Guided decoding đã gánh phần **cú pháp** (JSON sai schema là bất khả thi),
 nên fine-tune v3 chỉ dạy **ngữ nghĩa**: "xe năm tấn"→`"5T"`, đổi "thứ 3 tuần
-sau" ra ngày đúng, kỷ luật *thiếu-thì-null*, chọn node n8n hợp lý, và văn
-phong diễn giải số liệu do engine tính (P1 — model không bao giờ tự tính).
+sau" ra ngày đúng, kỷ luật *thiếu-thì-null*, **kế thừa ngữ cảnh lượt trước**,
+chọn node n8n hợp lý, và văn phong diễn giải số liệu do engine tính (P1 —
+model không bao giờ tự tính).
+
+Dữ liệu v2 khôi phục từ Drive nằm ở [`v2_sources/`](v2_sources/) — xem README
+ở đó để biết file nào đi về nhánh nào.
 
 ## Trình tự chạy
 
 | # | Script | Cần gì | Ra gì |
 |---|---|---|---|
 | 0 | *(tay)* copy 5 file v2 từ Drive vào `v2_sources/` | Drive | `train_retail_base`, `module_a_clean`, `module_b`, `module_c`, `module_d` |
-| 1 | `make_extraction_seeds.py` | — | ground truth trích xuất (tất định, nhãn đúng tuyệt đối) |
-| 2 | `reverse_generate.py` | `DEEPSEEK_API_KEY` | teacher viết tin nhắn cho ground truth có sẵn + verify tất định |
+| 1 | `make_extraction_seeds.py` | — | ground truth trích xuất (tất định, nhãn đúng tuyệt đối); **25% là cặp 2 lượt** dạy kế thừa ngữ cảnh |
+| 2 | `reverse_generate.py` | `DEEPSEEK_API_KEY` | teacher viết tin nhắn cho ground truth có sẵn + verify tất định (lượt 2 bị loại nếu nhắc lại ngữ cảnh cũ) |
 | 3 | `make_narration_pairs.py` | `DEEPSEEK_API_KEY` | data diễn giải — **số từ `compute_quote`/`select_carrier` thật**, teacher chỉ viết lời, chốt chặn "không bịa số" |
 | 4 | `make_n8n_pairs.py` | — | cặp yêu cầu→workflow từ 32 template Body + 4 logistics, lọc qua `validate_workflow()` |
 | 5 | `build_dataset_v3.py` | — | `generated/train_v3.jsonl` + `eval_v3.jsonl` (gộp, lọc Make.com/think/secret, downsample v2) |

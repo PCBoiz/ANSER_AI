@@ -6,7 +6,7 @@ Khôi phục từ `ANSER_data` trên Google Drive — **đóng bug #4** ARCHITEC
 
 | File | Dòng | Nội dung | Số phận trong v3 |
 |---|---|---|---|
-| `train_final.jsonl` | 487 | Tư vấn bán lẻ distill R1 (`<think>` + văn dài) | 79 giữ, **403 quá dài so với hợp đồng runtime** |
+| `train_final.jsonl` | 487 | Tư vấn bán lẻ distill R1 (`<think>` + văn dài) | 79 → nhánh chat ngắn, **403 → nhánh REPORT** (văn dài) |
 | `module_c.jsonl` | 190 | Workflow n8n dạng **export gốc** `{name, nodes, connections}` | **130 giữ** (bọc lại thành envelope `create_workflow`, node `code`→`noOp`) |
 | `module_b.jsonl` | 250 | Text-to-SQL `{"action":"query_db","sql":...}` | 0 — hợp đồng `query_db` không còn trong runtime |
 | `distillation_v2_test.jsonl` | 20 | Mẫu thử distill vòng 2 | 2 giữ |
