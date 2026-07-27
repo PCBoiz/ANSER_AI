@@ -39,6 +39,7 @@ ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(ROOT))
 
 from offline_training.dgen_common import GENERATED_DIR, load_jsonl
+from offline_training.make_n8n_pairs import _stage_catalog_dir, wrap_as_answer
 from src.core.prompts import Prompts
 from src.core.workflow_schema import validate_workflow
 
@@ -54,16 +55,44 @@ MAX_CONSULT_CHARS = 1_400   # dài hơn là lệch hẳn chuẩn "tối đa 5-6 
 V2_MAX_SHARE = 0.55         # data cũ không được lấn át tín hiệu logistics mới
 
 SECRET_PATTERNS = [
-    re.compile(r"postgres(?:ql)?://[^\s\"']+"),
+    re.compile(r"postgres(?:ql)?://[^\s\"'\\]+"),
     re.compile(r"npg_[A-Za-z0-9]{8,}"),
     re.compile(r"sk-[A-Za-z0-9]{20,}"),
     re.compile(r"AKIA[A-Z0-9]{16}"),
     re.compile(r"AIza[A-Za-z0-9_\-]{30,}"),
 ]
 
+# Mật khẩu/username hiển nhiên là ví dụ giảng dạy — URL chứa chúng KHÔNG phải
+# secret (train_final.jsonl có mẫu dạy disaster-recovery với
+# postgres://read_replica_user:pass@... — chặn nó là chặn oan cả file).
+# Mọi thứ KHÔNG nằm trong danh sách này vẫn bị coi là secret thật.
+_PLACEHOLDER_TOKENS = {
+    "pass", "password", "secret", "xxx", "xxxx", "your_password",
+    "user", "username", "example", "changeme", "123456", "***",
+}
+
+
+def _is_placeholder_pg_url(url: str) -> bool:
+    m = re.match(r"postgres(?:ql)?://([^:/@]+)(?::([^@]*))?@(.*)", url)
+    if not m:
+        return False        # không parse được -> coi là secret cho chắc
+    user, password, host = m.group(1), m.group(2) or "", m.group(3)
+    if password.lower() in _PLACEHOLDER_TOKENS or not password:
+        return True
+    if user.lower() in _PLACEHOLDER_TOKENS:
+        return True
+    return host.startswith(("...", "host", "<", "example."))
+
 
 def scan_secrets(text: str) -> list[str]:
-    return [m.group(0)[:24] + "…" for p in SECRET_PATTERNS for m in p.finditer(text)]
+    hits = []
+    for pattern in SECRET_PATTERNS:
+        for m in pattern.finditer(text):
+            value = m.group(0)
+            if value.startswith("postgres") and _is_placeholder_pg_url(value):
+                continue
+            hits.append(value[:24] + "…")
+    return hits
 
 
 def strip_think(text: str) -> str:
@@ -72,6 +101,38 @@ def strip_think(text: str) -> str:
     if last == -1:
         return text.replace("<think>", "").strip()
     return text[last + len("</think>"):].strip()
+
+
+def _coder_system() -> str:
+    """System prompt sinh workflow ĐÚNG như coder.py dựng lúc runtime (P4)."""
+    from src.core.workflow_schema import render_examples, render_node_catalog
+    return Prompts.CODER_SYSTEM.format(
+        tools=render_node_catalog(), example=render_examples()
+    )
+
+
+def extract_json(text: str):
+    """
+    Bóc object JSON đầu tiên cân ngoặc trong text.
+
+    Cách cũ (bóc fence bằng regex) chết trên 151/190 mẫu module_c: đáp án thật
+    có markdown fence, có chữ dẫn trước/sau, có ngoặc trong chuỗi. Ghép ngoặc
+    chịu được cả ba. Không dùng để phát hiện "có JSON hay không" — chỉ để lấy.
+    """
+    depth, start = 0, -1
+    for i, char in enumerate(text):
+        if char == "{":
+            if depth == 0:
+                start = i
+            depth += 1
+        elif char == "}":
+            depth -= 1
+            if depth == 0 and start != -1:
+                try:
+                    return json.loads(text[start:i + 1])
+                except Exception:
+                    start = -1
+    return None
 
 
 def convert_v2_entry(obj: dict):
@@ -98,30 +159,47 @@ def convert_v2_entry(obj: dict):
 
     answer = strip_think(assistant)
 
-    # Mẫu action-JSON cũ (workflow / SQL)
-    stripped = answer.strip()
-    if stripped.startswith("{") or "```json" in stripped:
-        try:
-            payload = json.loads(re.sub(r"^```(?:json)?|```$", "", stripped, flags=re.M).strip())
-        except Exception:
-            return None, "malformed"
-        action = payload.get("action") if isinstance(payload, dict) else None
-        if action == "query_db":
-            return None, "sql_action"          # hợp đồng Text-to-SQL cũ đã bỏ
-        if action == "create_workflow":
-            ok, _why = validate_workflow(payload)
-            if not ok:
+    # Phân loại theo NỘI DUNG bóc được, không theo chuỗi con trong text.
+    # (Bản trước bắt '"nodes"' xuất hiện ở đâu đó -> bài tư vấn kiến trúc có
+    #  nhắc chữ nodes bị đẩy nhầm vào nhánh JSON rồi loại là "malformed".)
+    payload = extract_json(answer) if "{" in answer else None
+
+    if isinstance(payload, dict) and payload.get("action") == "query_db":
+        return None, "sql_action"          # hợp đồng Text-to-SQL cũ đã bỏ
+
+    # Hai hình dạng workflow gặp trong tập v2:
+    #   a) envelope {action, name, payload}                   — hợp đồng chat.py
+    #   b) export gốc n8n {name, nodes, connections, settings} — module_c
+    # (b) là 170/190 mẫu module_c. Bản trước chỉ nhận (a) nên vứt sạch — đó là
+    # data n8n ĐÚNG ĐỊNH DẠNG duy nhất còn lại của v2, không được mất.
+    candidate = None
+    if isinstance(payload, dict):
+        if payload.get("action") == "create_workflow":
+            candidate = payload
+        elif isinstance(payload.get("nodes"), list):
+            candidate, _why = wrap_as_answer(payload, "Quy trình")
+            if candidate is None:
                 return None, "workflow_invalid"
-            # Workflow cũ mà vẫn hợp lệ theo chuẩn mới thì quý — giữ, gắn tag n8n
-            return {
-                "_source": "v2_n8n",
-                "messages": [
-                    {"role": "system", "content": msgs[0].get("content", "")},
-                    {"role": "user", "content": user},
-                    {"role": "assistant",
-                     "content": json.dumps(payload, ensure_ascii=False)},
-                ],
-            }, "workflow_ok"
+
+    if candidate is not None:
+        ok, _why = validate_workflow(candidate)
+        if not ok:
+            return None, "workflow_invalid"
+        # System prompt phải là bản CODER runtime — mẫu v2 dùng prompt cũ, giữ
+        # nguyên là dạy model gắn hành vi vào một prompt không còn tồn tại.
+        return {
+            "_source": "v2_n8n",
+            "messages": [
+                {"role": "system", "content": _coder_system()},
+                {"role": "user", "content": user},
+                {"role": "assistant",
+                 "content": json.dumps(candidate, ensure_ascii=False)},
+            ],
+        }, "workflow_ok"
+
+    # Có JSON nhưng không phải workflow/SQL (ví dụ mẫu trả về object khác) —
+    # không thuộc hợp đồng nào hiện hành.
+    if isinstance(payload, dict) and answer.strip().startswith(("{", "```")):
         return None, "malformed"
 
     if len(answer) > MAX_CONSULT_CHARS:
@@ -148,6 +226,12 @@ def main() -> None:
     reasons: Counter = Counter()
     merged: list[dict] = []
     secret_hits: list[tuple[str, str]] = []
+
+    # Catalog node phải là catalog THẬT (Body + logistics) trước khi validate
+    # workflow v2 — catalog dự phòng thiếu splitOut/... nên loại oan mẫu tốt.
+    _stage_catalog_dir()
+    from src.core.workflow_schema import reload_catalog
+    reload_catalog()
 
     # ---- 1. Nguồn v3 (đã đúng format, chỉ quét secret + gom) ---------------
     for name in ["train_extraction.jsonl", "train_narration.jsonl", "train_n8n.jsonl"]:

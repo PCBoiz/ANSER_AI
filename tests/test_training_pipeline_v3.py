@@ -7,6 +7,7 @@ converter v2, secret scan, và cặp n8n từ template thật.
 
 import json
 from datetime import date
+from pathlib import Path
 
 import pytest
 
@@ -153,9 +154,56 @@ def test_convert_v2_consult_gets_runtime_system_prompt():
 
 
 def test_scan_secrets_catches_connection_strings_and_keys():
-    assert scan_secrets("postgresql://user:npg_abc123XYZ@host.neon.tech/db")
+    assert scan_secrets("postgresql://admin:npg_abc123XYZ@host.neon.tech/db")
     assert scan_secrets("api_key = 'sk-" + "a" * 32 + "'")
     assert not scan_secrets("giá 25.000đ/lít, tuyến Hải Phòng")
+
+
+def test_scan_secrets_allows_teaching_placeholders():
+    """
+    train_final.jsonl có mẫu dạy disaster-recovery chứa
+    postgres://read_replica_user:pass@replica_host — mật khẩu là chữ 'pass'.
+    Chặn nó là chặn oan cả file; nhưng mật khẩu THẬT vẫn phải bị bắt.
+    """
+    assert not scan_secrets("postgres://read_replica_user:pass@replica_host:5432/db")
+    assert not scan_secrets("postgresql://user:password@example.com/db")
+    assert scan_secrets("postgresql://admin:Xk9$mQ2pLw@ep-cool-1.neon.tech/db")
+
+
+def test_convert_v2_keeps_raw_n8n_export_shape(staged_catalog):
+    """
+    module_c lưu workflow ở dạng export gốc {name, nodes, connections} chứ
+    không phải envelope {action, payload} — 170/190 mẫu. Converter phải nhận.
+    """
+    workflow = json.loads(Path("workflows/logistics/logistics_debt_reminder.json")
+                          .read_text(encoding="utf-8"))
+    obj = {"messages": [
+        {"role": "system", "content": "Bạn là ANSER Brain — sinh workflow n8n."},
+        {"role": "user", "content": "Nhắc công nợ mỗi thứ 2"},
+        {"role": "assistant",
+         "content": "<think>x</think>\n```json\n"
+                    + json.dumps(workflow, ensure_ascii=False) + "\n```"},
+    ]}
+    entry, reason = convert_v2_entry(obj)
+    assert reason == "workflow_ok", reason
+    answer = json.loads(entry["messages"][-1]["content"])
+    assert answer["action"] == "create_workflow"
+    assert answer["payload"]["nodes"]
+    # system prompt phải là bản CODER runtime, không phải prompt v2 cũ
+    assert "connections" in entry["messages"][0]["content"]
+
+
+def test_convert_v2_prose_mentioning_nodes_is_not_treated_as_json():
+    """Bài tư vấn kiến trúc có nhắc chữ "nodes" không được xếp nhầm loại JSON."""
+    prose = ("## Thiết kế Event-Driven\n\nHệ thống nên tách các consumer thành "
+             'nhiều "nodes" độc lập để chịu tải tốt hơn.')
+    obj = {"messages": [
+        {"role": "system", "content": "You are Project A."},
+        {"role": "user", "content": "Thiết kế event-driven thế nào?"},
+        {"role": "assistant", "content": prose},
+    ]}
+    entry, reason = convert_v2_entry(obj)
+    assert reason == "ok" and entry["_source"] == "v2_consult"
 
 
 # ===========================================================================

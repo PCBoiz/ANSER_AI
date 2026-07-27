@@ -41,6 +41,10 @@ offline_training/product_catalogs.json
 *.pyc
 # Staging catalog tạm do make_n8n_pairs/benchmark_v3 tự dựng lại mỗi lần chạy
 offline_training/generated/_catalog/
+# train_v3/eval_v3 là SẢN PHẨM của build_dataset_v3.py — dựng lại được từ
+# v2_sources/ + generated/train_*.jsonl, không track để tránh phình repo.
+offline_training/generated/train_v3.jsonl
+offline_training/generated/eval_v3.jsonl
 
 # Backup cuc bo — KHONG track trong git (moi ban backup nhan doi moi bi mat lo commit;
 # chinh _backups da nhan mat khau Neon thanh 12 ban trong su co 27/07/2026)

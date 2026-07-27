@@ -54,13 +54,17 @@ def _stage_catalog_dir() -> Path:
     return staging
 
 
-def build_pair_from_template(path: Path, data: dict):
-    """Trả (pair | None, lý_do_bỏ_qua). Import src SAU khi env đã set."""
-    from src.core.workflow_schema import (
-        BLOCKED_NODE_TYPES,
-        _sanitize_example_node,
-        validate_workflow,
-    )
+def wrap_as_answer(data: dict, fallback_name: str):
+    """
+    Workflow n8n dạng export gốc ({name, nodes, connections, ...}) -> envelope
+    `create_workflow` mà model phải sinh, node bị chặn thay bằng noOp.
+
+    Dùng chung với build_dataset_v3 (module_c của tập v2 cũng ở dạng export
+    gốc này) — một chỗ sửa, hai nơi đổi theo (P4).
+
+    Trả (answer | None, lý_do_bỏ_qua).
+    """
+    from src.core.workflow_schema import BLOCKED_NODE_TYPES, _sanitize_example_node
 
     nodes = data.get("nodes")
     if not isinstance(nodes, list) or not nodes:
@@ -70,6 +74,8 @@ def build_pair_from_template(path: Path, data: dict):
 
     cleaned = []
     for raw in nodes:
+        if not isinstance(raw, dict):
+            return None, "node không phải object"
         node = _sanitize_example_node(raw)
         if node["type"] in BLOCKED_NODE_TYPES:
             node["type"] = "n8n-nodes-base.noOp"
@@ -77,11 +83,21 @@ def build_pair_from_template(path: Path, data: dict):
             node["parameters"] = {}
         cleaned.append(node)
 
-    answer = {
+    return {
         "action": "create_workflow",
-        "name": data.get("name") or path.stem,
+        "name": data.get("name") or fallback_name,
         "payload": {"nodes": cleaned, "connections": data.get("connections", {})},
-    }
+    }, None
+
+
+def build_pair_from_template(path: Path, data: dict):
+    """Trả (pair | None, lý_do_bỏ_qua). Import src SAU khi env đã set."""
+    from src.core.workflow_schema import validate_workflow
+
+    answer, reason = wrap_as_answer(data, path.stem)
+    if answer is None:
+        return None, reason
+    cleaned = answer["payload"]["nodes"]
 
     ok, why = validate_workflow(answer)
     if not ok:

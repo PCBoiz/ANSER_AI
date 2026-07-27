@@ -1,16 +1,20 @@
-# v2_sources — 5 file nguồn tập train v2 khôi phục từ Drive
+# v2_sources — tập train v2 khôi phục từ Drive (27/07/2026)
 
-Copy 5 file sau từ Google Drive/Colab cũ vào đúng thư mục này
-(quyết định 27/07/2026 — đóng bug #4 ARCHITECTURE §11: "không tái tạo được
-tập train"):
+Khôi phục từ `ANSER_data` trên Google Drive — **đóng bug #4** ARCHITECTURE §11.5
+("không tái tạo được tập train ⇒ single point of failure"). Đã qua
+`build_dataset_v3.py` (quét secret sạch) trước khi commit.
 
-- `train_retail_base.jsonl`
-- `module_a_clean.jsonl`
-- `module_b.jsonl`
-- `module_c.jsonl`
-- `module_d.jsonl`
+| File | Dòng | Nội dung | Số phận trong v3 |
+|---|---|---|---|
+| `train_final.jsonl` | 487 | Tư vấn bán lẻ distill R1 (`<think>` + văn dài) | 79 giữ, **403 quá dài so với hợp đồng runtime** |
+| `module_c.jsonl` | 190 | Workflow n8n dạng **export gốc** `{name, nodes, connections}` | **130 giữ** (bọc lại thành envelope `create_workflow`, node `code`→`noOp`) |
+| `module_b.jsonl` | 250 | Text-to-SQL `{"action":"query_db","sql":...}` | 0 — hợp đồng `query_db` không còn trong runtime |
+| `distillation_v2_test.jsonl` | 20 | Mẫu thử distill vòng 2 | 2 giữ |
 
-Sau khi copy: chạy `python offline_training/build_dataset_v3.py` — script sẽ
-convert (bỏ `<think>`, đổi system prompt về chuẩn runtime, loại Make.com/SQL
-cũ, validate lại workflow) và **quét secret**; build pass thì mới commit 5
-file này vào repo.
+Tên gọi trong `merge_all.py` cũ (`train_retail_base`, `module_a_clean`,
+`module_d`) **không tồn tại trên Drive** — bản backup thật chỉ có 4 file trên,
+`train_final.jsonl` chính là kết quả đã merge của các module đó.
+
+Thư mục cũng có sẵn (không copy vào đây): 3 model đã train
+(`anser-retail-v2-lora` 323MB, `anser-retail-v2-awq` 1.1GB, `anser-qwen-lora`
+646MB) — dùng để so sánh với v3 nếu cần, nhưng weights không vào git.
