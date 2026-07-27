@@ -1,0 +1,4 @@
+name,base_margin_pct,fuel_sensitivity,fuel_baseline_price,min_margin_amount,surcharge_name,surcharge_amount,surcharge_pct
+Mặc định,12,0.35,25000,300000,,,
+Hàng lạnh,12,0.35,25000,300000,Phụ phí hàng lạnh,500000,0
+Hàng cồng kềnh,15,0.35,25000,400000,Phụ phí bốc xếp,0,2

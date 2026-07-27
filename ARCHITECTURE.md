@@ -332,6 +332,12 @@ flowchart TB
 
 ## 7. Tầng tool tất định — nơi độ rộng nghiệp vụ thực sự nằm
 
+> **Trạng thái 27/07/2026 — đã triển khai đợt đầu.** Quyết định chốt: *"tính ở Brain, DB ở rag_service"* — mọi endpoint `/tools/*` của Brain là **hàm thuần qua HTTP** (stateless, dữ liệu vào trong body, không đọc DB, không LLM); phần chở dữ liệu do n8n/agentic lo, khớp đúng mẫu `rag_service:8001` của đội (§11.7).
+>
+> Đã có ([`src/api/routes/tools.py`](src/api/routes/tools.py)): `POST /tools/quote` (engine [`pricing.py`](src/core/pricing.py) — điều chỉnh nhiên liệu + biên + phụ phí, tách `quote` đưa khách cuối / `internal` có biên theo P2), `POST /tools/carrier-selection`, `POST /tools/forecast-reorder` (bản nâng cấp Croston/SBA của rag_service `/forecast-reorder` — workflow chỉ cần đổi env var để chuyển), `POST /tools/vat`, và `GET /tools` trả manifest kèm JSON Schema — nguồn duy nhất cho agentic tool-calling và lớp MCP bọc sau (P4).
+>
+> Nhập liệu pilot: bộ Google Sheet mẫu tại [`data/sheet_templates/`](data/sheet_templates/) (Carriers, Routes, CarrierQuotes, PricingRules ⚠️, FuelIndex). Kênh đầu ra: **email** cho khách cuối (theo bản ghi), **Zalo** cho chủ doanh nghiệp (tái dùng `NOTIFY_URL` như `retail_debt_reminder`).
+
 > **"Agentic phải làm được rất nhiều việc" được hiện thực bằng số lượng tool, không bằng kích thước model.**
 > Mỗi tool là một hàm Python có schema đầu vào/ra rõ ràng, kiểm thử được, không gọi LLM.
 

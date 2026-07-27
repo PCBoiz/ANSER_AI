@@ -1,0 +1,4 @@
+carrier_id,route_id,vehicle_type,price,valid_from,valid_to,source
+C001,R001,5T,3500000,2026-07-01,2026-09-30,Báo giá qua Zalo 01/07
+C002,R001,5T,3300000,2026-07-15,2026-08-15,Gọi điện 15/07
+C001,R002,3T,1800000,2026-07-01,2026-09-30,

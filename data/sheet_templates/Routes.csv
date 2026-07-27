@@ -1,0 +1,4 @@
+id,origin,destination,distance_km,origin_lat,origin_lon,notes
+R001,Hữu Nghị,Hải Phòng,105,21.0451,105.8500,Tuyến chạy nhiều nhất
+R002,Hữu Nghị,Bắc Giang,60,21.0451,105.8500,
+R003,Hữu Nghị,Bắc Ninh,35,21.0451,105.8500,

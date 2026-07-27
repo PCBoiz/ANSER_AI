@@ -1,0 +1,3 @@
+id,name,phone,depot,depot_lat,depot_lon,vehicle_types,discount_pct,credit_days,years_partner,bank_account,notes
+C001,Vận tải Hùng Phát,0912345678,Bãi xe Lĩnh Nam,20.9781,105.8825,1.5T|3T|5T,10,30,5,VCB 0011002233445,Đối tác lâu năm - ưu tiên gọi trước
+C002,Nhà xe Thành Đạt,0987654321,Bãi Lưu Hữu Phước,21.0456,105.7625,5T|dau_keo,5,7,1,TCB 19033445566,Mới hợp tác - giá cạnh tranh
