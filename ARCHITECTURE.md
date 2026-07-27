@@ -230,15 +230,26 @@ Vừa card 16GB, dư thoải mái trên 3090/4090 24GB.
 | **`Qwen3-8B` AWQ** | ✅ Tool-calling gốc, ctx 32k, vừa mọi bậc từ T0 đến T3 |
 | `Qwen2.5-7B` (hiện tại) | Vẫn dùng được, nhưng Qwen3 mạnh hơn rõ rệt ở tool-calling — đúng năng lực ta cần nhất |
 
-### 5.3. Số phận model fine-tune `anser-retail-v2-awq`
+### 5.3. Fine-tune: v2 nghỉ hưu, v3 là pipeline hiện hành (27/07/2026)
 
-Model hiện tại là LoRA r=64 trên Qwen2.5-7B, train bằng dữ liệu distill từ DeepSeek-R1.
+Model v2 (`anser-retail-v2-awq`, LoRA r=64 trên Qwen2.5-7B, distill DeepSeek-R1) **không dùng lại** — không phải vì code tệ mà vì dữ liệu dạy ngược kiến trúc mới: system prompt cũ ("Project A"), ép `<think>` ở mọi câu trả lời (xung đột trực tiếp với guided_json — grammar ép `{` là token đầu), 24 mẫu Make.com, hợp đồng action-JSON đã bỏ, và loss tính trên cả prompt.
 
-**Rủi ro cần giải quyết trước khi dựa vào nó:** [`merge_all.py`](offline_training/merge_all.py#L23-L29) cần 5 file nguồn (`train_retail_base`, `module_a_clean`, `module_b`, `module_c`, `module_d`) — **không file nào có trong repo**. Không tái tạo được tập train ⇒ không train lại được ⇒ single point of failure.
+**Ba quyết định của chủ dự án (27/07/2026):**
 
-**Quyết định:** đưa 5 file này vào version control (hoặc object storage có backup) **trước** khi đầu tư thêm vào pipeline fine-tune.
+1. **Model gốc = `Qwen/Qwen3-8B`** (khớp bảng chọn §5.1 — tool-calling gốc).
+2. **5 file nguồn v2 còn trên Drive** → khôi phục vào [`offline_training/v2_sources/`](offline_training/v2_sources/), convert lại rồi commit (đóng bug #4 §11.5).
+3. **Dataset v3 bỏ hẳn `<think>`** — nhánh JSON không thể think dưới grammar; nhánh tư vấn dựa vào thinking mode gốc của Qwen3 (bật/tắt từng request; engine hiện render `enable_thinking=False`).
 
-Ngoài ra, một phần lớn hành vi mà fine-tune đang phải sửa (JSON đúng schema) sẽ được **constrained decoding giải quyết triệt để hơn** — xem §11.3. Sau khi bật guided decoding, cần đánh giá lại xem fine-tune còn đóng góp bao nhiêu.
+**Pipeline v3** ([`offline_training/README.md`](offline_training/README.md)): guided decoding đã gánh phần cú pháp nên fine-tune chỉ dạy **ngữ nghĩa**. Điểm thiết kế chính:
+
+| Nguồn data | Cách sinh | Vì sao đáng tin |
+|---|---|---|
+| Trích xuất báo giá | **Reverse-generation**: sinh JSON ground truth tất định trước, teacher (deepseek-chat) chỉ viết tin nhắn tự nhiên chứa đúng thông tin đó, verify tất định sau | Nhãn đúng tuyệt đối theo cấu trúc — không phải tin teacher |
+| Diễn giải XAI | Số do `compute_quote`/`select_carrier` **thật** tính trên kịch bản hư cấu; teacher viết lời; chốt chặn "mọi số ≥4 chữ số phải có trong context" + quét từ lộ biên | P1 + P2 được ép bằng code, không bằng lời dặn |
+| Sinh workflow n8n | Đáp án = 30 template **đang chạy thật** (Body + logistics) qua `validate_workflow()`, node bị chặn thay `noOp` | Khác hẳn module_c cũ để teacher tự bịa n8n JSON |
+| Tư vấn bán lẻ | Convert v2: bỏ think, đổi system prompt về `Prompts.GENERAL_SYSTEM`, chặn Make.com/SQL cũ, quét secret (R2b), downsample ≤55% tập | Không cho data cũ lấn át tín hiệu logistics |
+
+`train_v3.py` bỏ trl (API trôi làm gãy script), loss chỉ trên phần trả lời, eval split + best-checkpoint, tự nhận bf16/fp16. `merge_and_quantize.py` đóng lỗ hổng "bước AWQ không tái tạo được". `benchmark_v3.py` là cổng chặn: **đo baseline Qwen3-8B gốc trước khi tốn tiền distill** — con số baseline quyết định fine-tune cần cứu bao nhiêu điểm.
 
 ### 5.4. Serving — sửa nút thắt lớn nhất
 
@@ -553,7 +564,7 @@ Riêng việc bỏ lần retry 1200 token cắt được phần lớn độ tr�
 | 1 | `sales.amount` vs `sales.total_amount` — hai nguồn mâu thuẫn, một cái sai. Benchmark T2 cũng kiểm tra `total_amount` | [`saas_api.py:29`](src/core/saas_api.py#L29) vs [`prompts.py:28`](src/core/prompts.py#L28) |
 | 2 | `TASK_REGISTRY` in-memory → mất task khi restart, không dùng được nhiều worker | [`engine.py:41`](src/core/engine.py#L41) |
 | 3 | Không có hàng đợi giới hạn / backpressure → nguồn gốc "quá tải, treo" | [`chat.py:343`](src/api/routes/chat.py#L343) |
-| 4 | 5 file nguồn tập train không có trong repo → không train lại được | [`merge_all.py:23-29`](offline_training/merge_all.py#L23-L29) |
+| 4 | ~~5 file nguồn tập train không có trong repo → không train lại được~~ **ĐANG ĐÓNG (27/07/2026):** file còn trên Drive (xác nhận của chủ dự án); đích đến [`offline_training/v2_sources/`](offline_training/v2_sources/), `build_dataset_v3.py` convert + quét secret trước khi commit | [`merge_all.py:23-29`](offline_training/merge_all.py#L23-L29) |
 | 5 | ngrok là điểm public duy nhất — SPOF. Thay bằng Cloudflare Tunnel | `launch_demo.py` |
 | 6 | Chưa có `ai_metrics_log` → không đo được cải tiến nào có tác dụng | — |
 

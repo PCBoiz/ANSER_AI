@@ -1,0 +1,20 @@
+# Ghim cứng version cho pipeline fine-tune v3 (train_v3.py).
+#
+# VÌ SAO GHIM: train_v2.py chết trên Colab mới vì API thư viện trôi
+# (trl bỏ `SFTTrainer(tokenizer=...)`). Colab luôn cài bản mới nhất nếu
+# không ghim -> script hỏng dần theo thời gian mà không ai đụng vào code.
+#
+# Cài:  pip install -r offline_training/requirements_training.txt
+
+transformers==4.51.3     # Qwen3 cần >= 4.51
+peft==0.15.2
+datasets==3.5.0
+accelerate==1.6.0
+bitsandbytes==0.45.5
+openai==1.75.0           # client DeepSeek (base_url api.deepseek.com)
+
+# CÀI RIÊNG khi cần (không để chung vì nặng / dễ xung đột):
+#   Bước quantize : pip install autoawq==0.2.9
+#     (autoawq có thể đòi transformers khác — chạy sau khi train xong,
+#      restart runtime; hoặc dùng llm-compressor, xem README)
+#   Bước benchmark: pip install vllm==0.8.5

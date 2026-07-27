@@ -5,8 +5,8 @@ CHẠY:  python offline_training/validate_seeds.py
 """
 import json
 import sys
-from pathlib import Path
 from collections import Counter
+from pathlib import Path
 
 ROOT = Path(__file__).parent.parent
 SEED_FILE = ROOT / "offline_training" / "seed_prompts.jsonl"
@@ -87,7 +87,7 @@ def validate():
     # Độ dài prompt
     if entries:
         lens = [len(e["prompt"]) for e in entries]
-        print(f"\n  Độ dài prompt:")
+        print("\n  Độ dài prompt:")
         print(f"    Min: {min(lens):4d} ký tự")
         print(f"    Max: {max(lens):4d} ký tự")
         print(f"    Avg: {sum(lens)//len(lens):4d} ký tự")
@@ -97,7 +97,7 @@ def validate():
     est_output_tokens   = len(entries) * 1500
     cost_input  = (total_input_tokens  / 1_000_000) * 0.55
     cost_output = (est_output_tokens   / 1_000_000) * 2.19
-    print(f"\n  Ước tính chi phí DeepSeek-R1 API (deepseek-reasoner):")
+    print("\n  Ước tính chi phí DeepSeek-R1 API (deepseek-reasoner):")
     print(f"    Input  tokens: ~{total_input_tokens:,.0f} → ${cost_input:.3f}")
     print(f"    Output tokens: ~{est_output_tokens:,.0f} (ước tính) → ${cost_output:.2f}")
     print(f"    TỔNG ƯỚC TÍNH: ~${cost_input + cost_output:.2f} USD")
@@ -113,9 +113,9 @@ def validate():
         sys.exit(1)
     else:
         print("\n  ✅ VALIDATION PASSED — File sẵn sàng gửi DeepSeek API")
-        print(f"\n  Lệnh tiếp theo:")
-        print(f"    export DEEPSEEK_API_KEY=sk-xxxx")
-        print(f"    python offline_training/training.py")
+        print("\n  Lệnh tiếp theo:")
+        print("    export DEEPSEEK_API_KEY=sk-xxxx")
+        print("    python offline_training/training.py")
     print("="*55 + "\n")
 
 if __name__ == "__main__":

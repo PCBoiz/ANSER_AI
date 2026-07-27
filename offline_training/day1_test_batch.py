@@ -16,8 +16,13 @@ KẾT QUẢ:
   src/data/distillation_v2_test.jsonl — 20 entries với real reasoning traces
 """
 
-import os, sys, json, asyncio, time
+import asyncio
+import json
+import os
+import sys
+import time
 from pathlib import Path
+
 from openai import AsyncOpenAI
 
 ROOT = Path(__file__).parent.parent
@@ -117,7 +122,7 @@ def quality_report(entries: list[dict]):
     cost       = (in_tok / 1_000_000) * 0.55 + (out_tok / 1_000_000) * 2.19
 
     print(f"\n  Entries thành công : {len(entries)}/20")
-    print(f"\n  Reasoning traces:")
+    print("\n  Reasoning traces:")
     print(f"    Min  : {min(think_lens):5d} ký tự")
     print(f"    Max  : {max(think_lens):5d} ký tự")
     print(f"    Avg  : {sum(think_lens)//len(think_lens):5d} ký tự")
@@ -126,7 +131,7 @@ def quality_report(entries: list[dict]):
     if short:
         print(f"  ⚠ {len(short)} entries có reasoning < 200 chars — kiểm tra lại prompt")
 
-    print(f"\n  Tokens dùng:")
+    print("\n  Tokens dùng:")
     print(f"    Input  : {in_tok:,}")
     print(f"    Output : {out_tok:,}")
     print(f"    Chi phí thực: ${cost:.4f} USD")
@@ -135,7 +140,7 @@ def quality_report(entries: list[dict]):
     # Domain breakdown
     from collections import Counter
     domains = Counter(e["_meta"]["domain"] for e in entries)
-    print(f"\n  Phân bố domain:")
+    print("\n  Phân bố domain:")
     for d, n in sorted(domains.items()):
         print(f"    {d:12s}: {n} entries")
 

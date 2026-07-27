@@ -148,10 +148,30 @@ class Prompts:
         1. Trường nào tin nhắn KHÔNG nêu thì để null. TUYỆT ĐỐI không đoán.
         2. vehicle_type chuẩn hoá về: "1.5T", "3T", "5T", hoặc "dau_keo"
            ("xe năm tấn" -> "5T", "công-ten-nơ"/"container"/"đầu kéo" -> "dau_keo").
-        3. pickup_date đổi về YYYY-MM-DD nếu suy được từ ngữ cảnh
-           ("thứ 3 tuần sau", "ngày mai"); mơ hồ thì để null.
+        3. pickup_date đổi về YYYY-MM-DD, tính từ dòng "Hôm nay là..." ở đầu
+           tin nhắn ("thứ 3 tuần sau", "ngày mai"); mơ hồ ("cuối tuần",
+           "sớm nhất có thể") thì để null.
         4. Không thêm trường ngoài schema. Không giải thích.
     """)
+
+    # Thứ trong tuần tiếng Việt, index khớp date.weekday() (0 = thứ Hai)
+    _VN_WEEKDAYS = ("thứ Hai", "thứ Ba", "thứ Tư", "thứ Năm",
+                    "thứ Sáu", "thứ Bảy", "Chủ nhật")
+
+    @staticmethod
+    def format_extraction_user(message: str, today=None) -> str:
+        """
+        Dựng user-turn cho LOGISTICS_EXTRACT_SYSTEM.
+
+        Model KHÔNG biết hôm nay là ngày nào — không bơm dòng này vào thì
+        "ngày mai"/"thứ 3 tuần sau" không thể đổi ra YYYY-MM-DD được (chỉ có
+        thể bịa). Dữ liệu fine-tune v3 dùng ĐÚNG hàm này để train/serve khớp
+        nhau từng ký tự (P4) — sửa format ở đây là phải sinh lại dataset.
+        """
+        from datetime import date as _date
+        d = today or _date.today()
+        weekday = Prompts._VN_WEEKDAYS[d.weekday()]
+        return f"Hôm nay là {weekday}, ngày {d.isoformat()}.\nTin nhắn: {message}"
 
     # ------------------------------------------------------------------
     # Hóa đơn (giữ nguyên — nhánh này đang chạy ổn)

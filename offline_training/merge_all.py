@@ -10,9 +10,11 @@ Lọc bỏ:
 
 CHẠY:  python offline_training/merge_all.py
 """
-import json, re, hashlib
-from pathlib import Path
+import hashlib
+import json
+import re
 from collections import Counter
+from pathlib import Path
 
 ROOT = Path(__file__).parent.parent
 DATA = ROOT / "src" / "data"
@@ -163,9 +165,9 @@ def main():
     src_count = Counter(m["_source"] for m in merged)
 
     print(f"\n{'='*58}")
-    print(f"  MERGE — train_retail_v2.jsonl")
+    print("  MERGE — train_retail_v2.jsonl")
     print(f"{'='*58}")
-    print(f"\n  Phân bố nguồn:")
+    print("\n  Phân bố nguồn:")
     for tag, (ok, total) in report.items():
         pct = ok / len(merged) * 100 if merged else 0
         bar = "█" * int(pct / 2)
@@ -173,19 +175,19 @@ def main():
     print(f"    {'TỔNG':12s} {len(merged):4d}")
 
     if reasons:
-        print(f"\n  Lý do loại bỏ:")
+        print("\n  Lý do loại bỏ:")
         for r, c in reasons.most_common(12):
             print(f"    {c:4d}  {r}")
 
     if lens:
-        print(f"\n  Chuỗi suy luận:")
+        print("\n  Chuỗi suy luận:")
         print(f"    Min {min(lens):6,}  Avg {sum(lens)//len(lens):6,}  Max {max(lens):6,} ký tự")
 
     size_mb = OUT.stat().st_size / 1024 / 1024
     print(f"\n  ✅ {OUT.name} — {len(merged)} mẫu, {size_mb:.1f} MB")
 
     if len(merged) < 1200:
-        print(f"\n  ⚠ Dưới 1.200 mẫu — kiểm tra lại lý do loại bỏ ở trên")
+        print("\n  ⚠ Dưới 1.200 mẫu — kiểm tra lại lý do loại bỏ ở trên")
     print(f"{'='*58}\n")
 
 

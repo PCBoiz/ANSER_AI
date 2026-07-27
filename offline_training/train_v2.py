@@ -9,8 +9,10 @@ Vì sao train từ gốc thay vì tiếp tục checkpoint cũ:
 CHẠY TRONG COLAB (không chạy bằng !python vì cần GPU trong cùng process):
   exec(open('/content/ANSER_AI_FIX/offline_training/train_v2.py').read())
 """
-import json, os, torch, gc
+import json
 from pathlib import Path
+
+import torch
 
 ROOT = Path("/content/ANSER_AI_FIX")
 DATA_FILE = ROOT / "src" / "data" / "train_retail_v2.jsonl"
@@ -29,11 +31,11 @@ n_samples = sum(1 for l in DATA_FILE.read_text(encoding="utf-8").splitlines() if
 print(f"Data : {n_samples} mẫu\n")
 
 # ── 2. Tải mô hình gốc ──────────────────────────────────────────────────
-from modelscope import snapshot_download
-from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
-from peft import LoraConfig, get_peft_model, TaskType
 from datasets import Dataset
-from trl import SFTTrainer, SFTConfig
+from modelscope import snapshot_download
+from peft import LoraConfig, TaskType, get_peft_model
+from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
+from trl import SFTConfig, SFTTrainer
 
 print("Tải Qwen2.5-7B-Instruct...")
 model_path = snapshot_download('qwen/Qwen2.5-7B-Instruct', cache_dir='/content/models')
@@ -78,7 +80,7 @@ texts = [tokenizer.apply_chat_template(
 # Thống kê độ dài để chọn max_seq_length hợp lý
 lengths = [len(tokenizer(t)["input_ids"]) for t in texts[:200]]
 p95 = sorted(lengths)[int(len(lengths) * 0.95)]
-print(f"Độ dài token (mẫu 200):")
+print("Độ dài token (mẫu 200):")
 print(f"  Trung bình : {sum(lengths)//len(lengths):,}")
 print(f"  Phân vị 95 : {p95:,}")
 print(f"  Tối đa     : {max(lengths):,}")
@@ -129,9 +131,9 @@ tokenizer.save_pretrained(LORA_DIR)
 
 size = sum(f.stat().st_size for f in Path(LORA_DIR).rglob('*') if f.is_file()) / 1e6
 print(f"\n{'='*54}")
-print(f"  HUẤN LUYỆN XONG")
+print("  HUẤN LUYỆN XONG")
 print(f"{'='*54}")
 print(f"  LoRA lưu tại : {LORA_DIR}")
 print(f"  Kích thước   : {size:.0f} MB")
-print(f"\n  Bước tiếp: gộp LoRA + lượng tử hóa AWQ")
+print("\n  Bước tiếp: gộp LoRA + lượng tử hóa AWQ")
 print(f"{'='*54}\n")

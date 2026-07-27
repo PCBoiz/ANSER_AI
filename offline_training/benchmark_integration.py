@@ -9,7 +9,13 @@ CHẠY (sau khi server ANSER đã lên):
   export BRAIN_URL=https://xxx.ngrok-free.dev
   python offline_training/benchmark_integration.py
 """
-import os, sys, json, re, time, asyncio
+import asyncio
+import json
+import os
+import re
+import sys
+import time
+
 import httpx
 
 BRAIN_URL = os.environ.get("BRAIN_URL", "http://localhost:8000")
@@ -161,7 +167,7 @@ async def ask(client: httpx.AsyncClient, prompt: str) -> tuple[str, float]:
 
 async def main():
     print(f"\n{'='*66}")
-    print(f"  BỘ KIỂM THỬ TÍCH HỢP — ANSER Brain vòng 2")
+    print("  BỘ KIỂM THỬ TÍCH HỢP — ANSER Brain vòng 2")
     print(f"{'='*66}")
     print(f"  Endpoint : {BRAIN_URL}")
     print(f"  Số ca    : {len(TESTS)}")
@@ -210,7 +216,7 @@ async def main():
 
     # ── Tổng kết ────────────────────────────────────────────────────────
     print(f"{'='*66}")
-    print(f"  KẾT QUẢ")
+    print("  KẾT QUẢ")
     print(f"{'='*66}\n")
 
     total_checks = sum(r[3] for r in results)

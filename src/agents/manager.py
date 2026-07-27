@@ -382,7 +382,9 @@ class ManagerAgent(BaseAgent):
         from src.core.schemas import QuoteExtraction
         return await self.generate_chat(
             system=self._get_prompt("LOGISTICS_EXTRACT_SYSTEM"),
-            user=message,
+            # Bơm "Hôm nay là..." — thiếu dòng này model không thể đổi
+            # "ngày mai"/"thứ 3 tuần sau" ra YYYY-MM-DD (chỉ có thể bịa)
+            user=Prompts.format_extraction_user(message),
             max_new_tokens=256,
             temperature=0.0,   # trích xuất cần xác định tuyệt đối
             json_schema=QuoteExtraction.model_json_schema(),

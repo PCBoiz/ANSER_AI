@@ -1,6 +1,6 @@
-import os
 import asyncio
 import logging
+import os
 import threading
 import time
 from collections import OrderedDict
@@ -81,8 +81,8 @@ class ModelEngine:
         logger.info("Booting COLAB engine — target GPU L4 22.5GB")
 
         import torch
+        from transformers import AutoProcessor, Qwen2VLForConditionalGeneration
         from vllm import LLM
-        from transformers import Qwen2VLForConditionalGeneration, AutoProcessor
 
         # 1) Text brain — vLLM.
         #    gpu_memory_utilization là TỔNG ngân sách vLLM (weights + activation + KV-cache).
@@ -219,8 +219,15 @@ class ModelEngine:
 
         def _blocking_generate():
             tokenizer = self.llm.get_tokenizer()
+            # enable_thinking=False: với Qwen3, template mặc định bật thinking —
+            # model xổ chuỗi <think> dài trước mọi câu trả lời (tốn token, và
+            # dataset v3 train KHÔNG think). Qwen2.5 không có biến này trong
+            # template nên kwargs thừa bị bỏ qua — an toàn cho cả hai đời model.
             prompt = tokenizer.apply_chat_template(
-                messages, tokenize=False, add_generation_prompt=True
+                messages,
+                tokenize=False,
+                add_generation_prompt=True,
+                enable_thinking=False,
             )
             outputs = self.llm.generate([prompt], params)
             return outputs[0].outputs[0].text.strip()

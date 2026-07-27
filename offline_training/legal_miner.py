@@ -10,12 +10,12 @@ KẾT QUẢ:
   src/data/legal_chunks.jsonl — chunks ≤1500 token, sẵn sàng nạp ChromaDB
 """
 
-import os
-import sys
 import asyncio
 import json
 import logging
+import os
 import re
+import sys
 import time
 from pathlib import Path
 
@@ -242,8 +242,8 @@ async def main():
             f.write(json.dumps(c, ensure_ascii=False) + "\n")
 
     elapsed = time.time() - start
-    logger.info(f"")
-    logger.info(f"=== KẾT QUẢ ===")
+    logger.info("")
+    logger.info("=== KẾT QUẢ ===")
     logger.info(f"  Thành công : {len(ok):3d} / {len(results)}")
     logger.info(f"  Thất bại   : {len(bad):3d}")
     logger.info(f"  Chunks     : {len(chunks):3d} (sẵn sàng ChromaDB)")

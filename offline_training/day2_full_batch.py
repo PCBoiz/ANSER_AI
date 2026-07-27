@@ -14,8 +14,13 @@ KẾT QUẢ:
   src/data/distillation_v2.jsonl — 400 entries với real reasoning traces
 """
 
-import os, sys, json, asyncio, time
+import asyncio
+import json
+import os
+import sys
+import time
 from pathlib import Path
+
 from openai import AsyncOpenAI
 
 ROOT = Path(__file__).parent.parent
@@ -120,7 +125,7 @@ async def main():
     todo = [s for s in seeds if s["prompt"].strip() not in done_set]
 
     print(f"{'='*55}")
-    print(f"  DAY 2 — FULL BATCH")
+    print("  DAY 2 — FULL BATCH")
     print(f"{'='*55}")
     print(f"  Tổng seed prompts  : {len(seeds)}")
     print(f"  Đã có (resume)     : {len(done_set)}")
@@ -178,7 +183,7 @@ async def main():
             think_lens.append(end - start)
 
     print(f"\n{'='*55}")
-    print(f"  FINAL REPORT")
+    print("  FINAL REPORT")
     print(f"{'='*55}")
     print(f"  Entries trong file : {len(final_entries)}")
     print(f"  Thất bại hôm nay   : {n_fail}")
