@@ -50,6 +50,13 @@ Ngoại lệ duy nhất — nguồn công khai, **chỉ đọc, không kèm tham
 
 > ⚠️ `requirements.txt` có `openai`. Nếu package này được dùng để gọi API ngoài với dữ liệu khách — đó là vi phạm R2. Dùng nó làm client cho vLLM OpenAI-compatible server **nội bộ** thì hợp lệ.
 
+**R2b — Kỷ luật bí mật (bổ sung 27/07/2026, sau sự cố lộ mật khẩu Neon):**
+
+1. **Không bao giờ hardcode credential** — kể cả trong script một lần (`src/archive/`), kể cả trong `_backups/`. Sự cố thật: 3 script archive chứa nguyên chuỗi Neon Postgres, nhân bản thành 12 file qua các bản backup, bị đẩy lên GitHub public → Neon phát cảnh báo, phải xoay mật khẩu.
+2. **Trước khi push lịch sử lên một remote MỚI hoặc public**: bắt buộc quét bí mật trên TOÀN BỘ lịch sử (`git log --all -S` với các mẫu `postgres://.*:.*@`, `npg_`, `sk-`, `hf_`, `AIza`...), không chỉ quét HEAD. Push lịch sử = publish mọi commit từng tồn tại.
+3. **Đưa bất kỳ giá trị bảo mật nào vào env / đổi cách quản lý bí mật → HỎI Ý KIẾN chủ dự án TRƯỚC** — chỉ thị trực tiếp của chủ dự án. Tái sử dụng biến đã có (như `DATABASE_URL`) để sửa sự cố thì được, nhưng phải báo lại rõ ràng.
+4. Credential đã lộ là credential **đã chết** — xoá khỏi git không thu hồi được nó (bot quét GitHub trong vài giây). Việc đầu tiên luôn là **xoay/vô hiệu credential**, dọn repo chỉ là bước sau.
+
 **Lưu ý trung thực với khách:** ở bậc hạ tầng T0/T1 (GPU thuê), R2 mới thỏa mãn *một phần* — xem [ARCHITECTURE.md §4.3](ARCHITECTURE.md). Không quảng cáo "dữ liệu không rời hệ thống" trước khi đạt T3 (máy tự sở hữu).
 
 ### R3 — Kỷ luật ngân sách
@@ -110,6 +117,18 @@ Tiêu chí nghiệm thu: **chuyển từ GPU thuê sang máy tự sở hữu ch�
 Chế độ `LOCAL` không phải "chế độ giả vờ" — nó là thứ cho phép test toàn bộ tầng tất định (nơi P1 nói rằng phần lớn giá trị nằm ở đó) mà không cần GPU. Giữ nó hoạt động.
 
 > ❌ **Colab không còn là môi trường production.** Điều khoản Colab Paid cấm phục vụ web service. Chỉ dùng Colab cho fine-tune / quantize / thử nghiệm rời rạc — xem [ARCHITECTURE.md §4.4](ARCHITECTURE.md).
+
+### 3.1b. Kiểm thử GPU chạy trên Google Colab
+
+Chốt 27/07/2026: test có GPU thật chạy trên **Colab** (không phải máy dev). Notebook test sẽ soạn **khi chủ dự án yêu cầu** — không tự tạo sớm; cải tiến xong mới test. (Colab chỉ cho thử nghiệm rời rạc — production vẫn bị cấm theo §3.1.)
+
+### 3.1c. Dữ liệu giá phải sát thời gian thực
+
+Yêu cầu nghiệp vụ trực tiếp từ chủ dự án: *"hôm nay 25 nghìn, ngày mai 30 nghìn"* — báo giá dựa trên giá cũ là báo giá sai. Hệ quả thiết kế:
+
+1. Tool nào nhận tham số giá (`current_fuel_price`...) thì **caller phải lấy giá mới nhất tại thời điểm gọi**, không đọc giá trị cache cũ từ hôm trước.
+2. Nguồn giá công khai (dầu, tỷ giá) cập nhật bằng n8n scheduled job — được phép gọi ra ngoài vì là dữ liệu công khai một chiều (R2).
+3. Kết quả báo giá phải ghi kèm **thời điểm và giá đầu vào** đã dùng (đã có trong `internal` của `/tools/quote`) — để khi giá đổi, biết báo giá cũ dựa trên gì.
 
 ### 3.2. Cross-platform
 

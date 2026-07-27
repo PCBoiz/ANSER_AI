@@ -8,7 +8,11 @@ project_root = os.path.dirname(os.path.dirname(current_dir))
 if project_root not in sys.path: sys.path.insert(0, project_root)
 
 # 2. CONFIG
-NEON_URL = "***REMOVED-LEAKED-CREDENTIAL***"
+import os
+# SECURITY: chuoi ket noi hardcode da bi lo tren GitHub public (Neon canh bao
+# 27/07/2026) va DA PHAI xoay mat khau. Khong bao gio hardcode lai — doc tu env,
+# dung chung bien DATABASE_URL voi src/core/config.py.
+NEON_URL = os.environ["DATABASE_URL"]
 
 def fix_db():
     print(f"🔧 Integrating Chat History with existing Schema...")
