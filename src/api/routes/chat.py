@@ -116,6 +116,90 @@ def _extract_json_block(text: str):
 _validate_workflow = validate_workflow
 
 
+async def _handle_logistics_quote(user_msg: str, request_id: str) -> str:
+    """
+    Nhánh LOGISTICS: trích xuất -> kiểm tra đủ trường -> gọi webhook n8n.
+
+    Thiết kế cho tình huống thật của khách: chủ DN nhắn khi ĐANG LÁI XE.
+    Vì vậy mọi nhánh lỗi đều trả câu tiếng Việt ngắn, nói rõ cần bổ sung gì —
+    không bao giờ trả stack trace hay im lặng.
+    """
+    from src.api.dependencies import runtime
+    from src.core.schemas import QUOTE_REQUIRED_FIELDS, QuoteExtraction
+
+    # 1) Trích xuất (LLM, guided_json)
+    raw = await runtime.manager.extract_quote_request(user_msg)
+    obj, err = _extract_json_block(raw)
+    if obj is None:
+        logger.warning(
+            "LOGISTICS: không parse được trích xuất (%s)", err,
+            extra={"request_id": request_id},
+        )
+        return (
+            "Tôi chưa đọc được yêu cầu báo giá. Bạn nhắn giúp theo dạng: "
+            "\"Báo giá xe 5 tấn từ [điểm lấy] đi [điểm giao], hàng [loại], "
+            "ngày [ngày], gửi [email khách]\"."
+        )
+
+    try:
+        extracted = QuoteExtraction(**obj)
+    except Exception as exc:
+        logger.warning(
+            "LOGISTICS: trích xuất sai schema: %s", exc,
+            extra={"request_id": request_id},
+        )
+        return "Tôi chưa đọc được yêu cầu báo giá. Bạn mô tả lại tuyến, loại xe giúp tôi nhé."
+
+    # 2) Đủ trường bắt buộc chưa? Thiếu thì HỎI, không đoán (P1).
+    data = extracted.model_dump()
+    missing = [label for f, label in QUOTE_REQUIRED_FIELDS.items() if not data.get(f)]
+    if missing:
+        return (
+            "Để làm báo giá tôi cần thêm: " + ", ".join(missing) + ". "
+            "Bạn bổ sung giúp nhé."
+        )
+
+    # 3) Kích hoạt workflow n8n
+    webhook_url = os.getenv("N8N_QUOTE_WEBHOOK_URL", "").strip()
+    if not webhook_url:
+        logger.error(
+            "LOGISTICS: chưa cấu hình N8N_QUOTE_WEBHOOK_URL",
+            extra={"request_id": request_id},
+        )
+        return (
+            "Hệ thống báo giá chưa được nối với n8n (thiếu N8N_QUOTE_WEBHOOK_URL). "
+            "Báo quản trị viên cấu hình rồi thử lại."
+        )
+
+    try:
+        from src.core.utils import HttpClientPool
+        client = HttpClientPool.get_client()
+        r = await client.post(webhook_url, json=data, timeout=30.0)
+        r.raise_for_status()
+        body = r.json()
+        draft_id = body.get("draft_id", "?")
+    except Exception as exc:
+        logger.error(
+            "LOGISTICS: gọi webhook n8n thất bại: %s", exc,
+            extra={"request_id": request_id},
+        )
+        return (
+            "Tôi đã hiểu yêu cầu nhưng chưa kích hoạt được quy trình báo giá "
+            "(lỗi kết nối n8n). Thử lại sau ít phút hoặc báo quản trị viên."
+        )
+
+    summary = (
+        f"{data['origin']} → {data['destination']}, xe {data['vehicle_type']}"
+        + (f", {data['cargo_type']}" if data.get("cargo_type") else "")
+        + (f", lấy hàng {data['pickup_date']}" if data.get("pickup_date") else "")
+    )
+    return (
+        f"Đã tạo nháp báo giá {draft_id} cho chuyến {summary}. "
+        "Bản nháp kèm phân tích giá đã gửi về kênh duyệt — bạn xác nhận là email "
+        "báo giá sẽ được gửi cho khách."
+    )
+
+
 @router.get("/api/v1/task/{task_id}")
 async def get_task_status(task_id: str):
     task = TASK_REGISTRY.get(task_id)
@@ -164,9 +248,18 @@ async def chat_endpoint(
         resp = ""
 
         # ------------------------------------------------------------------
+        # LOGISTICS — trích xuất yêu cầu báo giá -> kích hoạt workflow n8n
+        # ------------------------------------------------------------------
+        # Brain CHỈ làm: (1) tiếng Việt tự do -> struct có schema, (2) trả lời
+        # xác nhận. Toàn bộ đọc Sheet + tính giá + nháp + duyệt nằm bên n8n +
+        # /tools (luồng logistics_quote_request -> logistics_quote_approve).
+        if cat == "LOGISTICS":
+            resp = await _handle_logistics_quote(user_msg, request_id)
+
+        # ------------------------------------------------------------------
         # TECHNICAL — sinh workflow n8n, validate trước khi trả
         # ------------------------------------------------------------------
-        if cat == "TECHNICAL":
+        elif cat == "TECHNICAL":
             plan = await runtime.manager.plan_or_ask(req.message)
 
             if "[PLAN]" not in plan:

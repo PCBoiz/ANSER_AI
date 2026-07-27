@@ -1,0 +1,97 @@
+{
+  "name": "logistics_debt_reminder",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 8 * * 1"
+            }
+          ]
+        }
+      },
+      "id": "ld-trigger",
+      "name": "Thứ 2 hàng tuần 8h",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [180, 300]
+    },
+    {
+      "parameters": {
+        "documentId": "={{ $env.LOGISTICS_SHEET_ID }}",
+        "sheetName": "Receivables",
+        "options": {}
+      },
+      "id": "ld-read",
+      "name": "Đọc Receivables",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [420, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Lọc công nợ quá hạn + dựng thông báo. TẤT ĐỊNH — không gọi LLM:\n// danh sách nợ là con số, template cố định đủ rõ, không có gì để 'diễn giải'.\n// (retail_debt_reminder gọi Brain viết lời vì nhắn TRỰC TIẾP cho khách nợ;\n//  bản này chỉ báo NỘI BỘ cho chủ DN nên không cần.)\nconst today = new Date().toISOString().slice(0, 10);\nconst rows = $input.all().map(i => i.json);\nconst vn = n => new Intl.NumberFormat('vi-VN').format(Number(n));\n\nconst overdue = rows.filter(r =>\n  (r.status === 'open' || r.status === 'partial') &&\n  r.due_date && String(r.due_date) < today\n).map(r => ({\n  ...r,\n  remaining: Number(r.amount) - Number(r.paid_amount || 0),\n  days_late: Math.floor((new Date(today) - new Date(r.due_date)) / 86400000)\n})).filter(r => r.remaining > 0)\n  .sort((a, b) => b.days_late - a.days_late);\n\nif (!overdue.length) {\n  return [{ json: { has_overdue: false } }];\n}\n\nconst total = overdue.reduce((s, r) => s + r.remaining, 0);\nconst lines = overdue.map(r =>\n  '• **' + r.customer_name + '** — còn nợ **' + vn(r.remaining) + ' đ**' +\n  ', quá hạn ' + r.days_late + ' ngày (hạn ' + r.due_date + ', mã ' + r.quote_id + ')'\n).join('\\n');\n\nconst body = { embeds: [{\n  title: '💰 Công nợ quá hạn — ' + overdue.length + ' khách, tổng ' + vn(total) + ' đ',\n  color: 15158332,\n  description: lines.slice(0, 3800),\n  footer: { text: 'ANSER Logistics • nhắc mỗi thứ 2' },\n  timestamp: new Date().toISOString()\n}]};\n\nreturn [{ json: { has_overdue: true, discord_body: JSON.stringify(body) } }];"
+      },
+      "id": "ld-filter",
+      "name": "Lọc quá hạn",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [660, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json.has_overdue }}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "id": "ld-if",
+      "name": "Có nợ quá hạn?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [900, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.DISCORD_WEBHOOK_URL }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [{ "name": "Content-Type", "value": "application/json" }]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.discord_body }}",
+        "options": {}
+      },
+      "id": "ld-notify",
+      "name": "Báo chủ DN",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [1140, 180]
+    }
+  ],
+  "connections": {
+    "Thứ 2 hàng tuần 8h": {
+      "main": [[{ "node": "Đọc Receivables", "type": "main", "index": 0 }]]
+    },
+    "Đọc Receivables": {
+      "main": [[{ "node": "Lọc quá hạn", "type": "main", "index": 0 }]]
+    },
+    "Lọc quá hạn": {
+      "main": [[{ "node": "Có nợ quá hạn?", "type": "main", "index": 0 }]]
+    },
+    "Có nợ quá hạn?": {
+      "main": [
+        [{ "node": "Báo chủ DN", "type": "main", "index": 0 }],
+        []
+      ]
+    }
+  }
+}

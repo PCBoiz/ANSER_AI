@@ -52,6 +52,35 @@ class RetailChatResponse(BaseModel):
         return v
 
 
+class QuoteExtraction(BaseModel):
+    """
+    Kết quả trích xuất yêu cầu báo giá vận tải từ câu tiếng Việt tự do.
+
+    Đây là MỘT TRONG HAI việc duy nhất LLM làm trong luồng báo giá (P1):
+    ngôn ngữ tự nhiên -> struct này. Mọi tính toán sau đó là code thuần
+    (n8n đọc Sheet -> /tools/quote). Schema này được đưa vào guided_json
+    nên các field đều Optional — model KHÔNG được đoán bừa trường thiếu;
+    trường bắt buộc nào thiếu thì chat.py hỏi lại người dùng.
+    """
+    origin: Optional[str] = Field(None, description="Điểm lấy hàng, ví dụ 'Hữu Nghị'")
+    destination: Optional[str] = Field(None, description="Điểm giao, ví dụ 'Hải Phòng'")
+    vehicle_type: Optional[str] = Field(
+        None, description="Loại xe: '1.5T' | '3T' | '5T' | 'dau_keo'"
+    )
+    cargo_type: Optional[str] = Field(None, description="Loại hàng, ví dụ 'Hàng lạnh'")
+    pickup_date: Optional[str] = Field(None, description="Ngày lấy hàng YYYY-MM-DD nếu nêu")
+    customer_name: Optional[str] = Field(None, description="Tên khách/công ty nếu nêu")
+    customer_email: Optional[str] = Field(None, description="Email khách nếu nêu")
+
+
+# Các trường BẮT BUỘC để tính được báo giá — thiếu thì hỏi lại, không đoán.
+QUOTE_REQUIRED_FIELDS = {
+    "origin": "điểm lấy hàng",
+    "destination": "điểm giao hàng",
+    "vehicle_type": "loại xe (1.5T / 3T / 5T / đầu kéo)",
+}
+
+
 class ProductExtraction(BaseModel):
     # Tất cả Optional: OCR tự do thường thiếu trường -> tránh ValidationError làm rớt cả kết quả.
     sku: Optional[str] = Field(None, description="Extracted SKU")

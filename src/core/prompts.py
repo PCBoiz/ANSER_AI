@@ -136,6 +136,24 @@ class Prompts:
     """)
 
     # ------------------------------------------------------------------
+    # Nhánh LOGISTICS — trích xuất yêu cầu báo giá vận tải
+    # ------------------------------------------------------------------
+    # Dùng kèm guided_json (schemas.QuoteExtraction) — cấu trúc do grammar ép,
+    # prompt chỉ dạy Ý NGHĨA từng trường và luật "thiếu thì để null".
+    LOGISTICS_EXTRACT_SYSTEM = dedent("""\
+        Bạn trích xuất yêu cầu báo giá vận tải từ tin nhắn tiếng Việt của chủ
+        doanh nghiệp logistics. Xuất DUY NHẤT một JSON theo schema đã cho.
+
+        QUY TẮC:
+        1. Trường nào tin nhắn KHÔNG nêu thì để null. TUYỆT ĐỐI không đoán.
+        2. vehicle_type chuẩn hoá về: "1.5T", "3T", "5T", hoặc "dau_keo"
+           ("xe năm tấn" -> "5T", "công-ten-nơ"/"container"/"đầu kéo" -> "dau_keo").
+        3. pickup_date đổi về YYYY-MM-DD nếu suy được từ ngữ cảnh
+           ("thứ 3 tuần sau", "ngày mai"); mơ hồ thì để null.
+        4. Không thêm trường ngoài schema. Không giải thích.
+    """)
+
+    # ------------------------------------------------------------------
     # Hóa đơn (giữ nguyên — nhánh này đang chạy ổn)
     # ------------------------------------------------------------------
     INVOICE_SYSTEM = dedent("""\

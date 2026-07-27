@@ -73,6 +73,14 @@ def _cosine_sim(query_vec, matrix) -> np.ndarray:
 # xuất hiện ở nhiều nhánh thì để embedding quyết định.
 
 _KEYWORD_RULES = [
+    # Báo giá vận tải — nghiệp vụ logistics. Đặt TRƯỚC TECHNICAL vì "báo giá"
+    # có thể dính regex "tự động ... gửi" của nhánh đó khi câu dài.
+    ("LOGISTICS", re.compile(
+        r"báo giá|bao gia|giá cước|cước phí|cước vận"
+        r"|xe\s*\d+([.,]\d+)?\s*(tấn|t\b)|đầu kéo|dau keo|container|cont\b"
+        r"|(chuyến|chuyen)\s+(xe|hàng)|thuê xe|gọi xe.*(tải|tấn)",
+        re.IGNORECASE)),
+
     # Sinh workflow: động từ tạo lập + danh từ tự động hoá
     ("TECHNICAL", re.compile(
         r"(tạo|lập|thiết lập|setup|xây dựng|lên)\s+.{0,20}"
@@ -150,6 +158,17 @@ class SemanticRouter:
             self.embedder = self._try_load_embedder(model_name)
 
         self.routes = {
+            # Báo giá / điều xe vận tải -> luồng logistics (n8n + /tools)
+            "LOGISTICS": [
+                "báo giá xe 5 tấn từ Hữu Nghị đi Hải Phòng",
+                "cho tôi giá cước chuyến hàng lạnh đi Bắc Giang",
+                "khách hỏi giá thuê xe 3 tấn đi Bắc Ninh ngày mai",
+                "cần một đầu kéo đi Hải Phòng thứ 3 tuần sau",
+                "giá cước tuyến Hà Nội Hải Phòng giờ bao nhiêu",
+                "làm báo giá gửi anh Tuấn công ty Minh Long",
+                "chuyến 1.5 tấn nội thành hôm nay giá thế nào",
+                "gọi xe tải chở hàng đông lạnh đi Bắc Giang",
+            ],
             # Sinh workflow tự động hoá -> CoderAgent
             "TECHNICAL": [
                 "tạo quy trình tự động hóa gửi báo cáo doanh số mỗi tối",
@@ -351,6 +370,23 @@ class ManagerAgent(BaseAgent):
             return prompt
         logger.warning("Prompts.%s không tồn tại — dùng CONSULT_SYSTEM thay thế", name)
         return Prompts.CONSULT_SYSTEM
+
+    # -- nhánh LOGISTICS ---------------------------------------------------
+
+    async def extract_quote_request(self, message: str):
+        """
+        Trích xuất yêu cầu báo giá vận tải thành JSON theo schema QuoteExtraction.
+        Cấu trúc do guided_json ép; trường thiếu là null — KHÔNG đoán (P1:
+        đây là 1 trong 2 việc duy nhất LLM làm trong luồng báo giá).
+        """
+        from src.core.schemas import QuoteExtraction
+        return await self.generate_chat(
+            system=self._get_prompt("LOGISTICS_EXTRACT_SYSTEM"),
+            user=message,
+            max_new_tokens=256,
+            temperature=0.0,   # trích xuất cần xác định tuyệt đối
+            json_schema=QuoteExtraction.model_json_schema(),
+        )
 
     # -- nhánh TECHNICAL ---------------------------------------------------
 

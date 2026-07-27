@@ -1,0 +1,231 @@
+{
+  "name": "logistics_quote_request",
+  "nodes": [
+    {
+      "parameters": {
+        "path": "logistics-quote",
+        "httpMethod": "POST",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "lq-webhook",
+      "name": "Nhận yêu cầu báo giá",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [160, 300]
+    },
+    {
+      "parameters": {
+        "documentId": "={{ $env.LOGISTICS_SHEET_ID }}",
+        "sheetName": "Carriers",
+        "options": {}
+      },
+      "id": "lq-carriers",
+      "name": "Đọc Carriers",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [380, 140]
+    },
+    {
+      "parameters": {
+        "documentId": "={{ $env.LOGISTICS_SHEET_ID }}",
+        "sheetName": "CarrierQuotes",
+        "options": {}
+      },
+      "id": "lq-quotes",
+      "name": "Đọc CarrierQuotes",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [380, 300]
+    },
+    {
+      "parameters": {
+        "documentId": "={{ $env.LOGISTICS_SHEET_ID }}",
+        "sheetName": "PricingRules",
+        "options": {}
+      },
+      "id": "lq-rules",
+      "name": "Đọc PricingRules",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [380, 460]
+    },
+    {
+      "parameters": {
+        "documentId": "={{ $env.LOGISTICS_SHEET_ID }}",
+        "sheetName": "FuelIndex",
+        "options": {}
+      },
+      "id": "lq-fuel",
+      "name": "Đọc FuelIndex",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [380, 620]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Ghép dữ liệu 4 sheet + yêu cầu từ webhook thành payload cho Brain /tools.\n// Toàn bộ TÍNH TOÁN nằm ở Brain (P1) — node này chỉ chở và lọc dữ liệu.\nconst req = $('Nhận yêu cầu báo giá').first().json.body || {};\nconst need = ['origin', 'destination', 'vehicle_type'];\nfor (const k of need) {\n  if (!req[k]) throw new Error('Thiếu trường bắt buộc: ' + k);\n}\n\nconst carriers = $('Đọc Carriers').all().map(i => i.json);\nconst quotes   = $('Đọc CarrierQuotes').all().map(i => i.json);\nconst rules    = $('Đọc PricingRules').all().map(i => i.json);\nconst fuels    = $('Đọc FuelIndex').all().map(i => i.json);\n\n// Giá dầu MỚI NHẤT (AGENTS.md 3.1c — realtime: lấy tại thời điểm gọi)\nconst fuel = fuels.filter(f => f.fuel_type === 'diesel')\n  .sort((a, b) => String(b.date).localeCompare(String(a.date)))[0] || null;\n\n// Lọc giá chào còn hiệu lực cho đúng tuyến + loại xe\nconst today = new Date().toISOString().slice(0, 10);\nconst validQuotes = quotes.filter(q =>\n  q.vehicle_type === req.vehicle_type &&\n  (!q.valid_to || String(q.valid_to) >= today)\n);\n\n// Quy tắc giá: khớp cargo_type nếu có, không thì 'Mặc định'\nconst rule = rules.find(r => r.name === (req.cargo_type || '')) ||\n             rules.find(r => r.name === 'Mặc định') || rules[0];\nif (!rule) throw new Error('Chưa có PricingRules — khách cần nhập quy tắc giá trước');\n\nconst payloadSelection = {\n  carriers: carriers.map(c => ({\n    id: String(c.id), name: c.name,\n    vehicle_types: String(c.vehicle_types || '').split('|').filter(Boolean),\n    depot_lat: c.depot_lat ? Number(c.depot_lat) : null,\n    depot_lon: c.depot_lon ? Number(c.depot_lon) : null,\n    discount_pct: c.discount_pct ? Number(c.discount_pct) : null,\n    credit_days: c.credit_days ? Number(c.credit_days) : null,\n    years_partner: c.years_partner ? Number(c.years_partner) : null\n  })),\n  offers: validQuotes.map(q => ({ carrier_id: String(q.carrier_id), price: Number(q.price) })),\n  request: {\n    origin: req.origin, destination: req.destination,\n    vehicle_type: req.vehicle_type, cargo_type: req.cargo_type || null,\n    pickup_date: req.pickup_date || null\n  }\n};\n\nreturn [{ json: {\n  req, rule,\n  current_fuel_price: fuel ? Number(fuel.price) : null,\n  fuel_date: fuel ? fuel.date : null,\n  payloadSelection\n}}];"
+      },
+      "id": "lq-assemble",
+      "name": "Ghép dữ liệu",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [620, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.BRAIN_BASE_URL }}/tools/carrier-selection",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "X-API-Token", "value": "={{ $env.ANSER_API_TOKEN }}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.payloadSelection) }}",
+        "options": {}
+      },
+      "id": "lq-select",
+      "name": "Chọn hãng xe (Brain)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [860, 300],
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 2000
+    },
+    {
+      "parameters": {
+        "jsCode": "// Lấy hãng đứng đầu + dựng payload tính báo giá.\nconst ctx = $('Ghép dữ liệu').first().json;\nconst sel = $input.first().json;\nif (!sel.ranked || !sel.ranked.length) {\n  throw new Error('Không có hãng xe phù hợp: ' + JSON.stringify(sel.rejected || []));\n}\nconst top = sel.ranked[0];\nconst rule = ctx.rule;\nreturn [{ json: {\n  selection: sel,\n  top,\n  quotePayload: {\n    carrier_cost: Number(top.offer_price),\n    pricing_rule: {\n      base_margin_pct: Number(rule.base_margin_pct),\n      fuel_sensitivity: Number(rule.fuel_sensitivity || 0.35),\n      fuel_baseline_price: rule.fuel_baseline_price ? Number(rule.fuel_baseline_price) : null,\n      min_margin_amount: Number(rule.min_margin_amount || 0),\n      surcharges: rule.surcharge_name ? [{\n        name: rule.surcharge_name,\n        amount: Number(rule.surcharge_amount || 0),\n        pct: Number(rule.surcharge_pct || 0)\n      }] : []\n    },\n    current_fuel_price: ctx.current_fuel_price\n  }\n}}];"
+      },
+      "id": "lq-pick",
+      "name": "Lấy hãng đầu bảng",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1100, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.BRAIN_BASE_URL }}/tools/quote",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "X-API-Token", "value": "={{ $env.ANSER_API_TOKEN }}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.quotePayload) }}",
+        "options": {}
+      },
+      "id": "lq-quote",
+      "name": "Tính báo giá (Brain)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [1340, 300],
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 2000
+    },
+    {
+      "parameters": {
+        "jsCode": "// Dựng bản nháp + embed Discord cho CHỦ DN duyệt.\n// P2: breakdown nội bộ (internal, có biên) CHỈ đi Discord chủ DN —\n// KHÔNG BAO GIỜ vào email khách cuối (email dựng ở workflow approve, chỉ từ 'quote').\nconst ctx  = $('Ghép dữ liệu').first().json;\nconst pick = $('Lấy hãng đầu bảng').first().json;\nconst q    = $input.first().json;\nconst req  = ctx.req;\n\nconst id = 'QD-' + new Date().toISOString().slice(0,10).replace(/-/g,'') + '-' +\n           Math.random().toString(36).slice(2, 6).toUpperCase();\nconst vn = n => new Intl.NumberFormat('vi-VN').format(n);\n\nconst draftRow = {\n  id,\n  created_at: new Date().toISOString(),\n  status: 'pending',\n  customer_name: req.customer_name || '',\n  customer_email: req.customer_email || '',\n  origin: req.origin, destination: req.destination,\n  vehicle_type: req.vehicle_type, cargo_type: req.cargo_type || '',\n  pickup_date: req.pickup_date || '',\n  carrier_id: String(pick.top.carrier_id), carrier_name: pick.top.name,\n  quoted_price: q.quote.quoted_price,\n  surcharges_json: JSON.stringify(q.quote.surcharges),\n  internal_json: JSON.stringify({ internal: q.internal, warnings: q.warnings, fuel_date: ctx.fuel_date }),\n  approved_at: ''\n};\n\nconst approveUrl = ($env.N8N_PUBLIC_URL || '') + '/webhook/logistics-approve?draft_id=' + id;\nconst warn = (q.warnings || []).map(w => '⚠️ ' + w).join('\\n');\nconst closeCall = pick.selection.explain && pick.selection.explain.is_close_call\n  ? '\\n⚠️ Hai hãng đầu bảng điểm sát nhau — cân nhắc tự chọn.' : '';\n\nconst body = { embeds: [{\n  title: '📋 Nháp báo giá ' + id + ' — CHỜ DUYỆT',\n  color: 16744448,\n  description:\n    '**Tuyến:** ' + req.origin + ' → ' + req.destination + ' | ' + req.vehicle_type +\n    (req.cargo_type ? ' | ' + req.cargo_type : '') + '\\n' +\n    '**Khách:** ' + (req.customer_name || '?') + ' <' + (req.customer_email || '?') + '>\\n\\n' +\n    '**GIÁ BÁO KHÁCH: ' + vn(q.quote.quoted_price) + ' đ**\\n\\n' +\n    '_Nội bộ (không gửi khách):_\\n' +\n    '• Hãng: ' + pick.top.name + ' — giá gốc ' + vn(q.internal.carrier_cost) + ' đ\\n' +\n    '• Điều chỉnh dầu: ' + vn(q.internal.fuel_adjustment) + ' đ (giá dầu ngày ' + (ctx.fuel_date || '?') + ')\\n' +\n    '• Biên: ' + vn(q.internal.margin) + ' đ (' + q.internal.margin_pct_effective + '%)\\n' +\n    (warn ? warn + '\\n' : '') + closeCall + '\\n\\n' +\n    '✅ Duyệt & gửi email: ' + approveUrl,\n  footer: { text: 'ANSER Logistics • nháp → duyệt → gửi' },\n  timestamp: new Date().toISOString()\n}]};\n\nreturn [{ json: { draftRow, discord_body: JSON.stringify(body), draft_id: id } }];"
+      },
+      "id": "lq-draft",
+      "name": "Dựng nháp + embed",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1580, 300]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": "={{ $env.LOGISTICS_SHEET_ID }}",
+        "sheetName": "QuoteDrafts",
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": "={{ $json.draftRow }}"
+        },
+        "options": {}
+      },
+      "id": "lq-save",
+      "name": "Lưu nháp vào Sheet",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [1820, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.DISCORD_WEBHOOK_URL }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [{ "name": "Content-Type", "value": "application/json" }]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $('Dựng nháp + embed').first().json.discord_body }}",
+        "options": {}
+      },
+      "id": "lq-notify",
+      "name": "Báo chủ DN duyệt",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [2060, 300]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ ok: true, draft_id: $('Dựng nháp + embed').first().json.draft_id, status: 'pending_review' }) }}"
+      },
+      "id": "lq-respond",
+      "name": "Trả kết quả cho Brain",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [2300, 300]
+    }
+  ],
+  "connections": {
+    "Nhận yêu cầu báo giá": {
+      "main": [[{ "node": "Đọc Carriers", "type": "main", "index": 0 }]]
+    },
+    "Đọc Carriers": {
+      "main": [[{ "node": "Đọc CarrierQuotes", "type": "main", "index": 0 }]]
+    },
+    "Đọc CarrierQuotes": {
+      "main": [[{ "node": "Đọc PricingRules", "type": "main", "index": 0 }]]
+    },
+    "Đọc PricingRules": {
+      "main": [[{ "node": "Đọc FuelIndex", "type": "main", "index": 0 }]]
+    },
+    "Đọc FuelIndex": {
+      "main": [[{ "node": "Ghép dữ liệu", "type": "main", "index": 0 }]]
+    },
+    "Ghép dữ liệu": {
+      "main": [[{ "node": "Chọn hãng xe (Brain)", "type": "main", "index": 0 }]]
+    },
+    "Chọn hãng xe (Brain)": {
+      "main": [[{ "node": "Lấy hãng đầu bảng", "type": "main", "index": 0 }]]
+    },
+    "Lấy hãng đầu bảng": {
+      "main": [[{ "node": "Tính báo giá (Brain)", "type": "main", "index": 0 }]]
+    },
+    "Tính báo giá (Brain)": {
+      "main": [[{ "node": "Dựng nháp + embed", "type": "main", "index": 0 }]]
+    },
+    "Dựng nháp + embed": {
+      "main": [[{ "node": "Lưu nháp vào Sheet", "type": "main", "index": 0 }]]
+    },
+    "Lưu nháp vào Sheet": {
+      "main": [[{ "node": "Báo chủ DN duyệt", "type": "main", "index": 0 }]]
+    },
+    "Báo chủ DN duyệt": {
+      "main": [[{ "node": "Trả kết quả cho Brain", "type": "main", "index": 0 }]]
+    }
+  }
+}

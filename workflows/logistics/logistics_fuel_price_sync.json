@@ -1,0 +1,74 @@
+{
+  "name": "logistics_fuel_price_sync",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 6 * * *"
+            }
+          ]
+        }
+      },
+      "id": "fp-trigger",
+      "name": "Mỗi sáng 6h",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [180, 300]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "https://www.pvoil.com.vn/truyen-thong/tin-gia-xang-dau",
+        "options": {}
+      },
+      "id": "fp-fetch",
+      "name": "Tải trang giá PVOIL",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [420, 300],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000
+    },
+    {
+      "parameters": {
+        "jsCode": "// Bóc giá dầu DO 0,05S từ HTML PVOIL.\n// ⚠️ TODO KHI DEPLOY: selector/regex phụ thuộc cấu trúc trang tại thời điểm chạy —\n// chạy thử 1 lần, xem HTML thật rồi chỉnh regex bên dưới cho khớp.\nconst html = $input.first().json.data || '';\n// mẫu thường gặp: 'Dầu DO 0,05S ... 21.500' (đồng/lít, có thể có dấu chấm nghìn)\nconst m = html.match(/D[ầa]u\\s*DO[^0-9]{0,40}([0-9]{2}[.,][0-9]{3})/i);\nif (!m) {\n  // KHÔNG ghi giá bịa — báo lỗi để error handler bắn cảnh báo.\n  throw new Error('Không bóc được giá dầu DO từ trang PVOIL — cần chỉnh regex');\n}\nconst price = parseInt(m[1].replace(/[.,]/g, ''), 10);\nif (!price || price < 10000 || price > 60000) {\n  throw new Error('Giá bóc được bất thường: ' + price + ' — không ghi');\n}\nreturn [{ json: {\n  date: new Date().toISOString().slice(0, 10),\n  fuel_type: 'diesel',\n  price: price,\n  source: 'pvoil.com.vn'\n}}];"
+      },
+      "id": "fp-parse",
+      "name": "Bóc giá diesel",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [660, 300]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": "={{ $env.LOGISTICS_SHEET_ID }}",
+        "sheetName": "FuelIndex",
+        "columns": {
+          "mappingMode": "autoMapInputData"
+        },
+        "options": {}
+      },
+      "id": "fp-write",
+      "name": "Ghi FuelIndex",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [900, 300]
+    }
+  ],
+  "connections": {
+    "Mỗi sáng 6h": {
+      "main": [[{ "node": "Tải trang giá PVOIL", "type": "main", "index": 0 }]]
+    },
+    "Tải trang giá PVOIL": {
+      "main": [[{ "node": "Bóc giá diesel", "type": "main", "index": 0 }]]
+    },
+    "Bóc giá diesel": {
+      "main": [[{ "node": "Ghi FuelIndex", "type": "main", "index": 0 }]]
+    }
+  }
+}

@@ -1,0 +1,2 @@
+id,created_at,status,customer_name,customer_email,origin,destination,vehicle_type,cargo_type,pickup_date,carrier_id,carrier_name,quoted_price,surcharges_json,internal_json,approved_at
+QD-20260727-001,2026-07-27T09:15:00,sent,Anh Tuấn - Cty Minh Long,tuan@minhlong.vn,Hữu Nghị,Hải Phòng,5T,Hàng lạnh,2026-07-29,C001,Vận tải Hùng Phát,4550000,"[{""name"":""Phụ phí hàng lạnh"",""value"":500000}]","{""carrier_cost"":3500000}",2026-07-27T09:22:00

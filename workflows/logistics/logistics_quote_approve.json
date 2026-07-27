@@ -1,0 +1,128 @@
+{
+  "name": "logistics_quote_approve",
+  "nodes": [
+    {
+      "parameters": {
+        "path": "logistics-approve",
+        "httpMethod": "GET",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "la-webhook",
+      "name": "Nhận lệnh duyệt",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [160, 300]
+    },
+    {
+      "parameters": {
+        "documentId": "={{ $env.LOGISTICS_SHEET_ID }}",
+        "sheetName": "QuoteDrafts",
+        "options": {}
+      },
+      "id": "la-read",
+      "name": "Đọc QuoteDrafts",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [400, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Tìm nháp + kiểm tra trạng thái + DỰNG EMAIL CHỈ TỪ PHẦN CÔNG KHAI.\n// P2: internal_json (biên, giá gốc nhà xe) TUYỆT ĐỐI không đưa vào email.\nconst draftId = $('Nhận lệnh duyệt').first().json.query.draft_id;\nif (!draftId) throw new Error('Thiếu draft_id');\n\nconst rows = $input.all().map(i => i.json);\nconst d = rows.find(r => String(r.id) === String(draftId));\nif (!d) throw new Error('Không tìm thấy nháp ' + draftId);\nif (d.status !== 'pending') {\n  // Idempotent: bấm link 2 lần không gửi email 2 lần.\n  return [{ json: { already: true, status: d.status, draft_id: draftId } }];\n}\nif (!d.customer_email) throw new Error('Nháp ' + draftId + ' thiếu email khách');\n\nconst vn = n => new Intl.NumberFormat('vi-VN').format(Number(n));\nlet surchargeLines = '';\ntry {\n  const ss = JSON.parse(d.surcharges_json || '[]');\n  if (ss.length) {\n    surchargeLines = '\\nPhụ phí (đã gồm trong giá):\\n' +\n      ss.map(s => '  - ' + s.name + ': ' + vn(s.value) + ' đ').join('\\n');\n  }\n} catch (e) { /* surcharges_json hỏng thì bỏ qua phần liệt kê */ }\n\nconst emailBody =\n  'Kính gửi ' + (d.customer_name || 'Quý khách') + ',\\n\\n' +\n  'Chúng tôi xin gửi báo giá vận chuyển theo yêu cầu:\\n\\n' +\n  '  Tuyến: ' + d.origin + ' → ' + d.destination + '\\n' +\n  '  Loại xe: ' + d.vehicle_type + (d.cargo_type ? '\\n  Loại hàng: ' + d.cargo_type : '') +\n  (d.pickup_date ? '\\n  Ngày lấy hàng dự kiến: ' + d.pickup_date : '') + '\\n\\n' +\n  '  TỔNG CƯỚC: ' + vn(d.quoted_price) + ' đ (đã gồm VAT nếu có thoả thuận)\\n' +\n  surchargeLines + '\\n\\n' +\n  'Báo giá có hiệu lực trong 48 giờ do giá nhiên liệu biến động.\\n' +\n  'Quý khách xác nhận vui lòng phản hồi email này.\\n\\nTrân trọng.';\n\nreturn [{ json: {\n  already: false, draft_id: draftId,\n  to: d.customer_email,\n  subject: 'Báo giá vận chuyển ' + d.origin + ' - ' + d.destination + ' [' + draftId + ']',\n  body: emailBody,\n  row_id: d.id\n}}];"
+      },
+      "id": "la-build",
+      "name": "Dựng email từ phần công khai",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [640, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json.already }}",
+              "value2": false
+            }
+          ]
+        }
+      },
+      "id": "la-guard",
+      "name": "Chưa gửi lần nào?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [880, 300]
+    },
+    {
+      "parameters": {
+        "operation": "send",
+        "sendTo": "={{ $json.to }}",
+        "subject": "={{ $json.subject }}",
+        "emailType": "text",
+        "message": "={{ $json.body }}",
+        "options": {}
+      },
+      "id": "la-send",
+      "name": "Gửi email khách cuối",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [1120, 180]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": "={{ $env.LOGISTICS_SHEET_ID }}",
+        "sheetName": "QuoteDrafts",
+        "columns": {
+          "mappingMode": "defineBelow",
+          "matchingColumns": ["id"],
+          "value": {
+            "id": "={{ $('Dựng email từ phần công khai').first().json.row_id }}",
+            "status": "sent",
+            "approved_at": "={{ new Date().toISOString() }}"
+          }
+        },
+        "options": {}
+      },
+      "id": "la-mark",
+      "name": "Đánh dấu đã gửi",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [1360, 180]
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "={{ $('Chưa gửi lần nào?').first().json.already ? 'Nháp này đã xử lý trước đó (trạng thái: ' + $('Dựng email từ phần công khai').first().json.status + ')' : '✅ Đã gửi báo giá cho khách.' }}"
+      },
+      "id": "la-respond",
+      "name": "Trả kết quả",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1600, 300]
+    }
+  ],
+  "connections": {
+    "Nhận lệnh duyệt": {
+      "main": [[{ "node": "Đọc QuoteDrafts", "type": "main", "index": 0 }]]
+    },
+    "Đọc QuoteDrafts": {
+      "main": [[{ "node": "Dựng email từ phần công khai", "type": "main", "index": 0 }]]
+    },
+    "Dựng email từ phần công khai": {
+      "main": [[{ "node": "Chưa gửi lần nào?", "type": "main", "index": 0 }]]
+    },
+    "Chưa gửi lần nào?": {
+      "main": [
+        [{ "node": "Gửi email khách cuối", "type": "main", "index": 0 }],
+        [{ "node": "Trả kết quả", "type": "main", "index": 0 }]
+      ]
+    },
+    "Gửi email khách cuối": {
+      "main": [[{ "node": "Đánh dấu đã gửi", "type": "main", "index": 0 }]]
+    },
+    "Đánh dấu đã gửi": {
+      "main": [[{ "node": "Trả kết quả", "type": "main", "index": 0 }]]
+    }
+  }
+}
