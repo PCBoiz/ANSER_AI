@@ -39,3 +39,7 @@ src/data/*.jsonl
 offline_training/*.jsonl
 offline_training/product_catalogs.json
 *.pyc
+
+# Backup cuc bo — KHONG track trong git (moi ban backup nhan doi moi bi mat lo commit;
+# chinh _backups da nhan mat khau Neon thanh 12 ban trong su co 27/07/2026)
+/_backups/
