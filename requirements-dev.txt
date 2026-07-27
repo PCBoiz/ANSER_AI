@@ -1,5 +1,8 @@
 pytest
 pytest-cov
+# tests/test_server.py::test_chat_background_task dùng @pytest.mark.asyncio nhưng
+# thiếu plugin -> test này FAIL im lặng suốt (không phải skip, mà là fail).
+pytest-asyncio>=0.23
 ruff
 mypy
 pre-commit

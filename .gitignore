@@ -21,6 +21,11 @@ src/data/**/*.db
 *.bin
 *.safetensors
 
+# Repo Body kéo về để tham khảo — CÓ .git RIÊNG, không được commit vào Brain.
+# Git sẽ coi thư mục này là gitlink và push lên một tham chiếu rỗng, vô dụng.
+# Body là repo độc lập, xem AGENTS.md §1 (ranh giới repo).
+/ANSER/
+
 # Build and IDE
 dist/
 build/

@@ -1,249 +1,648 @@
-# ARCHITECTURE.md — Project ANSER Brain Module
+# ARCHITECTURE.md — ANSER Brain
 
-> **Audit Date:** 2026-05-08  
-> **Auditors:** @qa (Gemini 3.1 Pro), @mentor (Claude Opus 4.6)  
-> **Scope:** Every `.py` file in `src/`, `offline_training/`, `tests/`, and `launch_demo.py`
+> **Phiên bản:** 2.0
+> **Ngày:** 27/07/2026
+> **Thay thế:** v1.0 (08/05/2026) và `ANSER_AI_SPEC.md` v1.0 (23/06/2026)
+> **Phạm vi:** Repo `AI_ANSER` (module Brain). Repo Body (Flask/VPS/Neon) nằm ngoài phạm vi sửa đổi nhưng là ràng buộc tích hợp.
 
 ---
 
-## 1. Code Quality Scorecard (@qa)
+## 0. Vì sao có bản 2.0 — 5 thay đổi chiến lược
 
-| Criterion | Score | Notes |
+| # | v1.0 giả định | v2.0 chốt lại | Lý do |
+|---|---|---|---|
+| 1 | Runtime = Google Colab Pro (L4 22.5GB) | **GPU cloud thuê, hardware-neutral** | Điều khoản Colab Paid cấm *"web service offering not related to interactive compute"*. Kiến trúc FastAPI + ngrok 24/7 vi phạm trực tiếp → rủi ro khóa tài khoản giữa lúc demo |
+| 2 | Nghiệp vụ chính = bán lẻ, giai đoạn 2 = sản xuất A-B-C | **Nghiệp vụ chính = logistics/báo giá vận tải** | Khách pilot thực tế là doanh nghiệp trung gian vận tải. Bán lẻ giữ lại vì code đã có, nhưng không còn là ưu tiên 1 |
+| 3 | Ngân sách hạ tầng không nêu rõ | **≤ 5.000.000đ/tháng cho pilot miễn phí; thấp hơn càng tốt.** Khách trả phí sau → hạ tầng scale theo doanh thu khách đó | Ràng buộc cứng do chủ dự án đặt |
+| 4 | Không nêu ranh giới dữ liệu | **Toàn bộ LLM chạy local. Không có dữ liệu khách hàng nào rời hạ tầng** | Bảng giá cước + tỷ lệ biên là bí mật kinh doanh cốt lõi của khách logistics |
+| 5 | Agentic = router 1 bước + 1 lần gọi model | **Agentic = vòng lặp tool-calling trên tầng tool tất định** | Độ rộng nghiệp vụ đến từ số lượng tool, không từ kích thước model |
+
+---
+
+## 1. Năm nguyên tắc kiến trúc bất biến
+
+Mọi quyết định kỹ thuật trong repo này phải kiểm chứng được ngược lại 5 nguyên tắc sau. Nếu một đề xuất vi phạm bất kỳ nguyên tắc nào, đề xuất đó sai — không phải nguyên tắc sai.
+
+### P1 — Deterministic-first
+**LLM không bao giờ là nguồn tính toán cuối cùng.** LLM chỉ làm 2 việc: (a) chuyển ngôn ngữ tự nhiên → cấu trúc có schema, và (b) diễn giải cấu trúc → ngôn ngữ tự nhiên. Mọi phép tính số học, mọi truy vấn dữ liệu, mọi quyết định ghi DB đều nằm trong code Python thuần kiểm thử được.
+
+*Hiện thân trong code:* [`mcp_server.py`](src/core/mcp_server.py) (VAT theo NĐ 72/2024), [`tools.py`](src/core/tools.py) (safe math bằng `ast.parse`).
+
+### P2 — Chủ quyền dữ liệu tuyệt đối
+**Không một byte dữ liệu khách hàng nào được gửi tới LLM bên thứ ba.** Bao gồm: tồn kho, doanh thu, công nợ, bảng giá cước, tỷ lệ biên, danh sách khách, nội dung hóa đơn.
+
+Ngoại lệ duy nhất — các nguồn công khai **một chiều, chỉ đọc**, không kèm dữ liệu khách trong request: giá xăng dầu, thời tiết, tỷ giá, tìm kiếm web.
+
+*Hệ quả:* vòng lặp agentic nạp lại kết quả tool vào context ở mỗi bước — kết quả tool *chính là* dữ liệu khách. Vì vậy vòng lặp agentic **bắt buộc chạy local**.
+
+### P3 — Ngân sách là ràng buộc thiết kế, không phải hệ quả
+Hạ tầng phục vụ pilot miễn phí phải ≤ 5tr/tháng. Mọi lựa chọn model, context length, batch size được tính ngược từ con số này. Khi có khách trả phí, hạ tầng được phép tăng theo tỷ lệ doanh thu khách đó mang lại (xem §4.3).
+
+### P4 — Một định dạng, một nguồn sự thật
+Mỗi khái niệm chỉ được định nghĩa ở đúng một chỗ: một định dạng workflow, một lược đồ DB, một bộ prompt. Trùng lặp định nghĩa là nguồn gốc của lỗi tốn kém nhất trong repo này (xem §11).
+
+### P5 — Hardware-neutral
+Code không được giả định một GPU cụ thể. Mọi tham số phần cứng (model id, VRAM budget, context length, quantization) đọc từ biến môi trường. Chuyển từ GPU thuê sang máy tự sở hữu phải chỉ là đổi `.env`, không sửa code.
+
+---
+
+## 2. Hiện trạng đã kiểm chứng (audit 27/07/2026)
+
+> Toàn bộ mục này đọc trực tiếp từ code. **Không kế thừa mô tả từ tài liệu cũ** — v1.0 và spec v1.0 đều mô tả sai hiện trạng ở nhiều điểm.
+
+### 2.1. Những gì tài liệu cũ nói sai
+
+| Tài liệu cũ | Thực tế trong code |
+|---|---|
+| `src/server.py` monolith 470 dòng | **Không tồn tại.** Đã tách thành [`src/api/main.py`](src/api/main.py) + [`routes/`](src/api/routes/) |
+| Vision = Florence-2 | Qwen2-VL-2B-Instruct, [`engine.py:111`](src/core/engine.py#L111) |
+| Text model = `Qwen2.5-Coder-32B-AWQ` | `anser-retail-v2-awq` (7B fine-tune), [`config.py:55`](src/core/config.py#L55) |
+| Hạ tầng A100 80GB | Config tính cho L4 22.5GB |
+| Có nhánh `FINANCIAL` trong router | Đã gỡ; validate hóa đơn đi qua `/ocr` |
+| `max_model_len` = 8192 | 4096, [`config.py:80`](src/core/config.py#L80) |
+
+### 2.2. Cấu trúc thực tế
+
+```
+src/
+├── api/
+│   ├── main.py            # app factory, lifespan, CORS, middleware request-id
+│   ├── dependencies.py    # RuntimeState (lazy-load + async lock), auth, clean_output
+│   └── routes/
+│       ├── chat.py        # POST /chat  — 4 nhánh: TECHNICAL/DATA_INTERNAL/RETRIEVAL/GENERAL
+│       └── documents.py   # POST /upload, /ocr
+├── agents/
+│   ├── base.py            # proxy → ModelEngine
+│   ├── manager.py         # SemanticRouter (keyword → cosine → margin) + ManagerAgent
+│   ├── coder.py           # sinh JSON workflow
+│   ├── vision.py          # lớp mỏng trên engine.generate_vision()
+│   └── researcher.py      # DuckDuckGo + tóm tắt
+├── core/
+│   ├── engine.py          # ModelEngine singleton (vLLM + Qwen2-VL), TaskRegistry
+│   ├── config.py          # model id, vLLM params, DB url
+│   ├── knowledge.py       # Chroma + BM25Okapi + CrossEncoder + underthesea
+│   ├── mcp_server.py      # VAT NĐ 72/2024 — code thuần, không LLM
+│   ├── memory.py          # SQLAlchemy → DB của Body
+│   ├── saas_api.py        # truy vấn products/sales
+│   ├── prompts.py         # nguồn duy nhất cho system prompt
+│   ├── agent_middleware.py# danh mục node workflow đưa vào prompt CoderAgent
+│   ├── schemas.py, utils.py, context.py, integrations.py, external_data.py
+│   └── archive/           # công cụ cũ, không nằm trong luồng chạy
+└── data/
+    ├── docs/              # 43MB tài liệu luật thuế + báo cáo ngành (nguồn RAG)
+    └── blueprints/        # 6 workflow mẫu — ⚠️ định dạng Make.com, xem §11
+offline_training/          # legal_miner, distill DeepSeek-R1, merge_all, train_v2 (LoRA r=64)
+tests/                     # 4 file: server, server_basics, memory_contracts, tools
+```
+
+### 2.3. Luồng chạy hiện tại
+
+```mermaid
+flowchart LR
+    A[Body] -->|POST /chat| B[chat_endpoint]
+    B -->|trả task_id ngay| A
+    B -->|BackgroundTasks| C[process_chat]
+    C --> D[SemanticRouter]
+    D -->|TECHNICAL| E[CoderAgent → JSON]
+    D -->|DATA_INTERNAL| F[SaasAPI → SQL]
+    D -->|RETRIEVAL| G[KnowledgeBase RAG]
+    D -->|GENERAL| H[LLM văn xuôi]
+    E & F & G & H --> I[clean_output]
+    I -->|webhook| A
+    I --> J[(TASK_REGISTRY in-memory)]
+    A -->|GET /api/v1/task/id| J
+```
+
+### 2.4. Điểm mạnh giữ nguyên
+
+1. **Deterministic-first đã có nền** — `mcp_server.py` là mẫu đúng để mở rộng.
+2. **RAG tiếng Việt xử lý đúng đặc thù** — `underthesea` tokenize từ ghép + dấu, hybrid dense/lexical + rerank. Không cần sửa.
+3. **Router 3 lớp có kỷ luật** — keyword override → cosine → kiểm tra biên; biên hẹp thì hạ về GENERAL thay vì đoán bừa ([`manager.py:212-233`](src/agents/manager.py#L212-L233)). Giữ làm fast path.
+4. **Embedder dùng chung** — `SemanticRouter(embedder=kb.embedder)` tránh nạp MiniLM 2 lần lên VRAM.
+5. **Tách Brain/Body qua HTTP** — cho phép Brain đổi hạ tầng mà Body không đổi dòng nào.
+
+---
+
+## 3. Nghiệp vụ mục tiêu — Logistics / báo giá vận tải
+
+### 3.1. Mô tả từ khảo sát khách hàng
+
+Doanh nghiệp 4-5 người, hoạt động **trung gian logistics**: nhận yêu cầu vận chuyển từ khách → hỏi giá nhà xe → cộng biên → báo giá lại khách.
+
+Đặc thù ghi nhận được:
+
+- Gọi xe ngoài theo tải trọng: 1.5T, 3T, 5T, đầu kéo. Bãi xe: Lĩnh Nam, Lưu Hữu Phước.
+- Tuyến ví dụ: Hữu Nghị → Hải Phòng / Bắc Giang / Bắc Ninh.
+- **Giá cước biến động hàng ngày theo giá xăng dầu** (dẫn chứng: dầu 25.000đ → 28.000đ).
+- Không có xe nhà → gọi shipper ngoài, yêu cầu **chụp ảnh xác nhận bàn giao + số tài khoản** để thanh toán.
+- Chủ doanh nghiệp làm việc của 3-4 người: công nợ, báo giá, tồn kho, đối chiếu giá nhập xuất.
+- **Đang lái xe thì không báo giá được** — phải về văn phòng mới xử lý.
+- Có kho lạnh, xuất theo ngày, đối chiếu tồn kho theo hóa đơn thực tế.
+- Phân cấp kho: thủ kho nhập liệu → người khác đối chiếu hóa đơn chứng từ → xác nhận.
+- Đang thuê **MISA** cho kế toán/xuất hóa đơn/xuất nhập tồn. MISA không có quản lý nhân sự, và **vẫn bắt người dùng tự tính toán bên ngoài rồi nhập tay từng bước**.
+
+### 3.2. Điểm chèn AI — bám sát P1
+
+| # | Nghiệp vụ | LLM làm gì | Code tất định làm gì |
+|---|---|---|---|
+| L1 | **Lập báo giá** | Trích xuất `{origin, destination, tonnage, cargo_type, pickup_date}` từ câu tiếng Việt tự do | Tra bảng giá nhà xe → áp hệ số nhiên liệu → áp biên → dựng báo giá |
+| L2 | **Gửi báo giá** | Viết nội dung email tiếng Việt | Render template, gửi, ghi log |
+| L3 | **Công nợ** | Hiểu câu hỏi → chọn tool + tham số; diễn giải kết quả | Truy vấn `receivables`, tính quá hạn |
+| L4 | **OCR hóa đơn** | VLM trích xuất trường | `InvoiceFieldValidator` + `MCPServer` tính lại toàn bộ số học |
+| L5 | **Đối soát chênh lệch (XAI)** | Diễn giải struct chênh lệch thành tiếng Việt | Quy nguyên nhân về từng nhóm kèm bằng chứng — xem §8 |
+| L6 | **Theo dõi chuyến / thanh toán shipper** | Diễn giải trạng thái | Ghi `trips`, `shipper_payments`, đính kèm ảnh bằng chứng |
+| L7 | **Sinh workflow tự động hóa** | Sinh JSON theo schema ràng buộc | Validate schema, deploy sang n8n |
+
+**Quan sát then chốt:** ở mọi dòng, cột "LLM làm gì" đều là tác vụ **trích xuất hoặc diễn giải** — không có ô nào yêu cầu suy luận nhiều bước phức tạp. Đây là lý do một model 8B đủ dùng, và là cơ sở kỹ thuật để đáp ứng ràng buộc P3.
+
+### 3.3. Khác biệt cạnh tranh với MISA
+
+MISA mạnh về kế toán/kho nhưng bắt người dùng **tự tính toán bên ngoài rồi nhập tay**. ANSER không cạnh tranh với MISA ở sổ sách — ANSER thay thế **phần "tự tính toán bên ngoài"**: nhận yêu cầu bằng ngôn ngữ tự nhiên (kể cả khi đang lái xe), tính ra con số, và tự động hóa bước nhập liệu.
+
+---
+
+## 4. Chiến lược hạ tầng
+
+### 4.1. Nguyên tắc: thuê trước, sở hữu sau
+
+Giai đoạn hiện tại thuê GPU cloud vì chưa có vốn cố định. Khi dòng tiền ổn định → chuyển sang máy tự sở hữu. **P5 (hardware-neutral) tồn tại chính là để bước chuyển này không tốn công viết lại code.**
+
+### 4.2. Bậc hạ tầng gắn với doanh thu
+
+Tỷ giá tham chiếu: **26.000đ/USD**.
+
+| Bậc | Khi nào | Cấu hình | Chi phí/tháng | Ghi chú |
+|---|---|---|---|---|
+| **T0** | Pilot miễn phí (hiện tại) | RTX 3090 24GB, **bật theo giờ hành chính** (~10h × 22 ngày = 220h) | ~$29 ≈ **750.000đ** | Khách là DN 4-5 người làm giờ hành chính. Job đêm chạy bằng n8n thuần, không cần GPU |
+| **T1** | 1-3 khách trả phí | RTX 3090 24GB **24/7** | ~$95 ≈ **2.500.000đ** | Vẫn dưới trần 5tr |
+| **T2** | 5-10 khách trả phí | RTX 4090 24GB 24/7 hoặc 2× 3090 | ~$241 ≈ **6.300.000đ** | Doanh thu lúc này 75-150tr/tháng → hạ tầng chiếm 4-8% |
+| **T3** | Dòng tiền ổn định | **Máy tự sở hữu** RTX 3090/4090 24GB | ~15-18tr một lần + **~600.000đ điện/tháng** | Hoàn vốn ~6-7 tháng so với T1. Chủ quyền dữ liệu tuyệt đối |
+
+**Bậc T0 là mục tiêu triển khai ngay.** 750k/tháng = 15% trần cho phép — thỏa yêu cầu "thấp hơn càng tốt".
+
+### 4.3. Cảnh báo về chủ quyền dữ liệu khi thuê GPU
+
+Đây là điểm phải ghi rõ để không tự lừa mình:
+
+> **GPU thuê trên marketplace cộng đồng (Vast.ai) là máy của người lạ.** Weights và dữ liệu nằm trong VRAM/RAM/disk của họ, không có hợp đồng bảo mật. Xét thuần về chủ quyền dữ liệu, mức bảo vệ này *thấp hơn* API thương mại có điều khoản zero-retention.
+
+Vì vậy trong giai đoạn T0/T1, P2 chỉ được thỏa mãn **một phần**. Biện pháp giảm thiểu bắt buộc:
+
+1. Ưu tiên nhà cung cấp có datacenter riêng (RunPod Secure Cloud) hơn marketplace cộng đồng, nếu giá cho phép.
+2. **Không** để dữ liệu khách nằm lại trên đĩa GPU host: DB ở Neon, vector store đồng bộ từ Body, log đẩy về Body theo lô.
+3. Mã hóa toàn bộ kênh Brain ↔ Body; xoay API token định kỳ.
+4. **T3 (máy tự sở hữu) là điều kiện để tuyên bố P2 đầy đủ với khách hàng.** Không quảng cáo "dữ liệu không rời hệ thống" trước khi đạt T3.
+
+### 4.4. Loại bỏ Colab khỏi lộ trình production
+
+Điều khoản Colab Paid Services cấm *"file hosting, media serving, or other web service offering not related to interactive compute with the Paid Service"*. FastAPI + ngrok phục vụ Body liên tục rơi đúng vào định nghĩa này.
+
+Colab **chỉ** được dùng cho: fine-tune, quantize, thử nghiệm rời rạc. **Không** phục vụ traffic thật.
+
+---
+
+## 5. Chiến lược model
+
+### 5.1. Bảng chọn model
+
+Toàn bộ chạy local, không có API bên ngoài (P2).
+
+| Vai trò | Model | Định dạng | VRAM |
+|---|---|---|---|
+| **Agentic brain** — tool-calling, chat, XAI narration, sinh workflow | `Qwen3-8B-Instruct` | AWQ 4-bit | ~5,5 GB |
+| KV-cache @ ctx 32k, batch vừa | — | — | ~5,0 GB |
+| **Vision** — OCR hóa đơn | `Qwen2.5-VL-3B-Instruct` | AWQ 4-bit | ~3,0 GB |
+| **Embedding** | `paraphrase-multilingual-MiniLM-L12-v2` | FP16 | ~0,5 GB |
+| **Reranker** | `ms-marco-MiniLM-L-6-v2` | FP16 | ~0,3 GB |
+| Đệm | — | — | ~0,7 GB |
+| **TỔNG** | | | **~15,0 GB** |
+
+Vừa card 16GB, dư thoải mái trên 3090/4090 24GB.
+
+### 5.2. Vì sao 8B — và vì sao *không* to hơn
+
+**Không phải vì tiết kiệm.** Vì §3.2 cho thấy LLM chỉ làm 2 việc: trích xuất có schema và diễn giải. Với constrained decoding, đó là tác vụ mà 8B thực hiện ổn định.
+
+| Cân nhắc | Kết luận |
+|---|---|
+| `Qwen3-30B-A3B` (MoE, 3B active) | ❌ Cần ~19-21GB ở Q4 → **không còn chỗ cho vision**. OCR hóa đơn là tính năng cốt lõi, không đánh đổi được |
+| `Qwen3-14B` AWQ (~9GB) | ⚠️ Vừa 24GB nhưng không vừa 16GB → khóa chặt vào bậc T1+. Để dành khi lên T2 |
+| **`Qwen3-8B` AWQ** | ✅ Tool-calling gốc, ctx 32k, vừa mọi bậc từ T0 đến T3 |
+| `Qwen2.5-7B` (hiện tại) | Vẫn dùng được, nhưng Qwen3 mạnh hơn rõ rệt ở tool-calling — đúng năng lực ta cần nhất |
+
+### 5.3. Số phận model fine-tune `anser-retail-v2-awq`
+
+Model hiện tại là LoRA r=64 trên Qwen2.5-7B, train bằng dữ liệu distill từ DeepSeek-R1.
+
+**Rủi ro cần giải quyết trước khi dựa vào nó:** [`merge_all.py`](offline_training/merge_all.py#L23-L29) cần 5 file nguồn (`train_retail_base`, `module_a_clean`, `module_b`, `module_c`, `module_d`) — **không file nào có trong repo**. Không tái tạo được tập train ⇒ không train lại được ⇒ single point of failure.
+
+**Quyết định:** đưa 5 file này vào version control (hoặc object storage có backup) **trước** khi đầu tư thêm vào pipeline fine-tune.
+
+Ngoài ra, một phần lớn hành vi mà fine-tune đang phải sửa (JSON đúng schema) sẽ được **constrained decoding giải quyết triệt để hơn** — xem §11.3. Sau khi bật guided decoding, cần đánh giá lại xem fine-tune còn đóng góp bao nhiêu.
+
+### 5.4. Serving — sửa nút thắt lớn nhất
+
+[`engine.py:97`](src/core/engine.py#L97) dùng `vllm.LLM` — đây là **offline batch API**, không phải `AsyncLLMEngine`. [`engine.py:145`](src/core/engine.py#L145) gọi nó qua `run_in_executor(None, ...)`, tức nhiều thread cùng gọi một object không thread-safe.
+
+**Hệ quả: continuous batching của vLLM bị vô hiệu hoàn toàn.** Request xếp hàng tuần tự thay vì batch song song. Đây là nguyên nhân trực tiếp của hiện tượng "quá tải, treo".
+
+**Kiến trúc mục tiêu:** vLLM chạy **process riêng** ở chế độ OpenAI-compatible server; Brain gọi qua HTTP nội bộ.
+
+| Lợi ích | Chi tiết |
+|---|---|
+| Continuous batching thật | Throughput tăng nhiều lần ở cùng phần cứng |
+| Restart API không nạp lại model | Hiện tại restart = chờ vài phút nạp weights |
+| Guided decoding sẵn có | `guided_json`, `--enable-auto-tool-choice --tool-call-parser hermes` |
+| Tách vòng đời vision | Vision service riêng, bật/tắt độc lập |
+
+Đồng thời: `enforce_eager=True` ([`config.py:83`](src/core/config.py#L83)) tắt CUDA graphs → mất 15-25% tốc độ decode. Bug này đặc thù vLLM cũ + L4 + Colab; trên phần cứng mới với vLLM hiện hành phải **test lại và bật nếu được**.
+
+---
+
+## 6. Kiến trúc mục tiêu
+
+```mermaid
+flowchart TB
+    subgraph client["Phía khách"]
+        U1[Web/Mobile UI]
+        U2[Voice input — lái xe]
+    end
+
+    subgraph body["ANSER Body — Flask VPS"]
+        BW[Web App + Blueprints]
+        BQ[Redis + RQ]
+        BE[workflow_engine.py]
+    end
+
+    subgraph brain["ANSER Brain — GPU host"]
+        API[FastAPI :8000]
+        RT[SemanticRouter — fast path]
+        AG[Agentic Loop — tool-calling]
+
+        subgraph det["Tầng tất định — KHÔNG LLM"]
+            T1[Pricing Engine]
+            T2[MCPServer — VAT]
+            T3[InvoiceFieldValidator]
+            T4[Reconciliation — XAI]
+            T5[SaasAPI / Receivables]
+        end
+
+        subgraph inf["Inference — process riêng"]
+            VL[vLLM server<br/>Qwen3-8B AWQ<br/>guided_json + tool-choice]
+            VS[Vision<br/>Qwen2.5-VL-3B]
+        end
+
+        KB[KnowledgeBase<br/>Chroma + BM25 + Rerank]
+    end
+
+    subgraph ext["Ngoài — CÔNG KHAI, MỘT CHIỀU"]
+        E1[Giá xăng dầu]
+        E2[Thời tiết]
+        E3[DuckDuckGo]
+    end
+
+    subgraph store["Lưu trữ"]
+        DB[(Neon PostgreSQL)]
+        RD[(Redis — TaskRegistry)]
+    end
+
+    N8[n8n :5678]
+
+    U1 & U2 --> BW --> BQ -->|HTTP| API
+    API --> RT
+    RT -->|đơn giản| VL
+    RT -->|phức tạp| AG
+    AG <-->|chọn tool + điền tham số| VL
+    AG --> det
+    AG --> KB
+    AG -.->|chỉ đọc, không kèm dữ liệu khách| ext
+    det --> DB
+    API --> RD
+    AG -->|JSON workflow| BE --> N8
+    VS --> T3 --> T2
+
+    style det fill:#c8e6c9
+    style ext fill:#ffe0b2
+    style inf fill:#bbdefb
+```
+
+**Ranh giới P2 nằm ở đúng một chỗ:** mũi tên đứt nét đi ra `ext`. Chỉ các tool đọc dữ liệu công khai được phép vượt qua, và chúng không mang theo tham số nào chứa dữ liệu khách.
+
+---
+
+## 7. Tầng tool tất định — nơi độ rộng nghiệp vụ thực sự nằm
+
+> **"Agentic phải làm được rất nhiều việc" được hiện thực bằng số lượng tool, không bằng kích thước model.**
+> Mỗi tool là một hàm Python có schema đầu vào/ra rõ ràng, kiểm thử được, không gọi LLM.
+
+### 7.1. Gói Logistics (ưu tiên 1)
+
+| Tool | Chữ ký | Ghi chú |
 |---|---|---|
-| **Separation of Concerns** | 7/10 | Good layering (agents → engine → core). However, `server.py` has grown into a 470-line monolith containing routing logic, webhook dispatch, inline imports, and a 25-line comment block debating sync-vs-async semantics. The `process_chat` closure captures `request`, `req`, `user_msg`, `task_id` from enclosing scope — this works but is fragile. |
-| **Pydantic Coverage** | 4/10 | `schemas.py` defines `InvoicePayload`, `RetailChatResponse`, `ProductExtraction`, but only `InvoicePayload` is actually consumed (in the FINANCIAL route). `RetailChatResponse` and `ProductExtraction` are dead code. The `/upload`, `/ocr`, and `/health` endpoints still return raw dicts. |
-| **Asynchronous Safety** | 5/10 | `process_chat()` is a synchronous closure dispatched via `BackgroundTasks`. Inside it, `fire_webhook()` is an async function invoked via `asyncio.get_running_loop()` / `asyncio.run()`. In a BackgroundTask thread, there is *no* running loop, so it always falls to `asyncio.run()`. This is safe *only if* no other coroutine is using `HttpClientPool._client` concurrently — which is unguarded. |
-| **Error Handling** | 7/10 | Strong in `server.py` (try/except on all endpoints, explicit HTTPException re-raise). Weak in `knowledge.py` (bare `except Exception` prints to stdout instead of logging). `training.py` uses mock data and never actually calls the DeepSeek API. |
+| `lookup_carrier_price` | `(origin, destination, vehicle_type) → [{carrier, price, valid_to}]` | Tra `carrier_quotes` |
+| `get_fuel_price` | `(fuel_type, date) → {price, source, effective_date}` | **Nguồn công khai** |
+| `compute_quote` | `(carrier_cost, fuel_index, pricing_rule) → {cost, fuel_adj, margin, final}` | Thuần số học, kiểm thử được |
+| `create_quote` | `(customer, route, vehicle, cargo, date, price) → quote_id` | Ghi DB |
+| `send_quote_email` | `(quote_id, to) → {sent_at}` | Render template |
+| `list_receivables` | `(customer_id?, overdue_only?) → [...]` | Công nợ |
+| `record_trip` | `(quote_id, carrier, driver, plate) → trip_id` | |
+| `attach_delivery_proof` | `(trip_id, image_url) → ok` | Ảnh shipper chụp |
+| `create_shipper_payment` | `(trip_id, amount, bank_account) → payment_id` | **Chỉ tạo, không tự duyệt chi** |
 
-**Overall: 5.75 / 10** — Functional but carrying significant technical debt.
+### 7.2. Gói Kho & Kế toán (dùng chung, đã có một phần)
+
+| Tool | Trạng thái |
+|---|---|
+| `get_inventory` / `get_sales_report` | ✅ [`saas_api.py`](src/core/saas_api.py) |
+| `calculate_vat` / `validate_invoice_total` | ✅ [`mcp_server.py`](src/core/mcp_server.py) |
+| `ocr_invoice` | ✅ [`documents.py`](src/api/routes/documents.py) |
+| `validate_invoice_fields` | ❌ **Chưa có** — xem §11.2 |
+| `reconcile_stock` | ❌ **Chưa có** — xem §8 |
+| `search_docs` | ✅ [`knowledge.py`](src/core/knowledge.py) |
+| `create_workflow` | ⚠️ Có nhưng hỏng — xem §11.1 |
+
+### 7.3. Quy tắc thiết kế tool
+
+1. **Mỗi tool tự validate đầu vào.** Không tin tham số model điền.
+2. **Tool ghi dữ liệu không bao giờ tự động duyệt.** Mọi thứ chạm tiền hoặc sổ sách tạo bản ghi `pending_review`.
+3. **Không lộ hơn 8 tool cho model cùng lúc.** Router thu hẹp bộ tool theo nhánh — vừa tăng độ chính xác chọn tool, vừa giảm token.
+4. **Tool đọc nguồn ngoài không nhận tham số chứa dữ liệu khách** (P2).
 
 ---
 
-## 2. System Dependency Graph (@engineer)
+## 8. Tầng XAI — trả lời "vì sao chênh lệch"
+
+Yêu cầu gốc từ khách: *"giải đáp được vì sao chênh lệch"*.
+
+**Cách làm sai:** đưa hai bảng số cho LLM và hỏi "tại sao khác nhau". LLM sẽ bịa một lời giải thích trôi chảy. Model to hơn chỉ bịa trôi chảy hơn.
+
+**Cách làm đúng:** module `src/core/reconciliation.py` (chưa có) — code tất định quy chênh lệch về từng nhóm nguyên nhân **kèm bằng chứng truy vết được**:
+
+```
+Đầu vào : tồn kho lý thuyết  vs  tồn kho đếm thực tế (hoặc hóa đơn thực tế)
+Xử lý   : phân rã chênh lệch thành các nhóm
+          ├─ thiếu phiếu nhập      → có xuất, không có nhập tương ứng  [id phiếu]
+          ├─ OCR đọc sai           → lệch khớp mẫu lỗi chữ số điển hình [id dòng HĐ]
+          ├─ giá thay đổi giữa kỳ  → khớp số lượng, lệch thành tiền     [id lần đổi giá]
+          ├─ chưa đối chiếu        → thủ kho đã nhập, chưa ai xác nhận  [id bản ghi]
+          └─ hao hụt / chưa rõ     → phần dư
+Đầu ra  : struct {tổng chênh, các nhóm, bằng chứng, độ tin cậy}
+```
+
+LLM chỉ nhận struct đó và viết thành tiếng Việt cho chủ doanh nghiệp. **Mỗi câu trong lời giải thích trỏ ngược về một id bản ghi cụ thể.** Đó mới là XAI — giải thích kiểm chứng được, không phải giải thích nghe hợp lý.
+
+Nhóm "chưa đối chiếu" ánh xạ trực tiếp quy trình khách mô tả: thủ kho nhập → người khác đối chiếu hóa đơn chứng từ → xác nhận.
+
+---
+
+## 9. Vòng lặp Agentic
+
+### 9.1. Hai đường — nhanh và đầy đủ
+
+Giữ [`SemanticRouter`](src/agents/manager.py#L70) làm **fast path**. Câu hỏi đơn giản, điểm cao, biên rộng → trả lời 1 bước như hiện tại (nhanh, ít token). Chỉ câu phức tạp mới vào vòng lặp tool-calling.
+
+```mermaid
+flowchart LR
+    Q[Câu hỏi] --> R{Router}
+    R -->|score cao<br/>biên rộng| F[1 bước — 1 lần gọi model]
+    R -->|phức tạp<br/>hoặc biên hẹp| L[Vòng lặp tool-calling]
+    L --> S[Chọn bộ tool theo nhánh — tối đa 8]
+    S --> M[Model chọn tool + điền tham số<br/>constrained decoding]
+    M --> T[Thực thi tool tất định]
+    T --> C{Đủ dữ liệu?}
+    C -->|chưa, < 6 bước| M
+    C -->|rồi| N[Model diễn giải kết quả]
+    F & N --> O[clean_output]
+```
+
+### 9.2. Ràng buộc cứng
+
+| Ràng buộc | Giá trị | Lý do |
+|---|---|---|
+| Số bước tối đa | 6 | Chặn vòng lặp vô hạn |
+| Timeout toàn vòng | 60s | Trải nghiệm người dùng |
+| Số tool lộ ra mỗi lượt | ≤ 8 | Độ chính xác chọn tool + tiết kiệm token |
+| Định dạng tool call | Constrained decoding | Lỗi định dạng trở thành **bất khả thi**, không phải "hy vọng đúng rồi retry" |
+| Tool ghi dữ liệu | `pending_review` | Không tự động duyệt bất cứ thứ gì chạm tiền |
+
+### 9.3. Vì sao cần ctx 32k
+
+Vòng lặp nạp lại kết quả tool ở mỗi bước. Với `max_model_len=4096` hiện tại, context tràn sau khoảng 3 tool call có kèm RAG chunk. **32k là điều kiện cần, không phải tối ưu hóa.**
+
+---
+
+## 10. Mô hình dữ liệu Logistics (bảng mới, thuộc Body)
+
+[`db_schema.txt`](offline_training/db_schema.txt) hiện chỉ có bảng bán lẻ. Nghiệp vụ logistics cần bổ sung:
+
+```sql
+carriers(id, workspace_id, name, phone, depot, bank_account, notes, is_active)
+vehicle_types(id, code, name, capacity_tons)                    -- 1.5T, 3T, 5T, đầu kéo
+routes(id, workspace_id, origin, destination, distance_km, notes)
+carrier_quotes(id, carrier_id, route_id, vehicle_type_id, price,
+               valid_from, valid_to, source, created_at)        -- giá nhà xe báo
+fuel_index(id, fuel_type, price, effective_date, source)        -- giá dầu theo ngày
+pricing_rules(id, workspace_id, name, base_margin_pct,
+              fuel_sensitivity, min_margin, surcharges_json)    -- ⚠️ BÍ MẬT KINH DOANH
+customer_quotes(id, workspace_id, customer_id, route_id, vehicle_type_id,
+                cargo_type, pickup_date, carrier_cost, fuel_adjustment,
+                margin_amount, quoted_price, status, sent_at, created_by, created_at)
+trips(id, quote_id, carrier_id, driver_name, driver_phone, plate_number,
+      status, pickup_at, delivered_at, proof_image_url)
+shipper_payments(id, trip_id, amount, bank_account, status, paid_at, proof_url)
+receivables(id, workspace_id, customer_id, quote_id, amount,
+            due_date, paid_amount, status)
+```
+
+**`pricing_rules` là bảng nhạy cảm nhất trong toàn hệ thống** — nó chứa biên lợi nhuận, thứ quyết định khách có lãi hay không. Nội dung bảng này không bao giờ được đưa vào prompt gửi ra ngoài hạ tầng (P2), và không bao giờ hiển thị cho khách hàng cuối của họ.
+
+> **Cần Body triển khai.** Brain chỉ đọc/ghi qua `saas_api.py`-style. Xem AGENTS.md §1 về ranh giới repo.
+
+---
+
+## 11. Sổ lỗi đã biết
+
+### 11.1. ✅ ĐÃ SỬA (27/07/2026) — CoderAgent bị dạy 3 định dạng workflow mâu thuẫn
+
+> **Trạng thái:** đã sửa bằng [`src/core/workflow_schema.py`](src/core/workflow_schema.py) — nguồn sự thật duy nhất mà prompt, JSON Schema (guided decoding) và validator cùng dẫn xuất từ đó.
+> Catalog **rút ra từ workflow n8n THẬT của Body** qua `N8N_TEMPLATES_DIR`; chưa merge Body thì dùng catalog dự phòng và ghi log cảnh báo.
+> `agent_middleware.py` không còn tự định nghĩa gì; `chat.py::_validate_workflow` trỏ thẳng vào `workflow_schema.validate_workflow`.
+> Blueprint Make.com trong [`src/data/blueprints/`](src/data/blueprints/) giữ nguyên (đang chạy thật cho khách) nhưng **không còn là nguồn train**.
+> Phủ test: 13 ca trong [`tests/test_deterministic_core.py`](tests/test_deterministic_core.py), gồm ca chặn đúng định dạng `edges` của bản prompt cũ.
+
+Mô tả lỗi gốc, giữ lại làm hồ sơ:
+
+Bốn nguồn, ba định dạng không tương thích:
+
+| Nguồn | Định dạng | Dấu hiệu |
+|---|---|---|
+| Dữ liệu fine-tune [`src/data/blueprints/`](src/data/blueprints/) | **Make.com** | `gateway:CustomWebHook`, `google-sheets:getSheetContent`, `__IMTCONN__` |
+| Prompt dạy model [`prompts.py:116-128`](src/core/prompts.py#L116-L128) | **n8n** | `n8n-nodes-base.scheduleTrigger`, `position:[100,100]` |
+| Danh mục tool [`agent_middleware.py`](src/core/agent_middleware.py) | **Engine nội bộ Body** | `google_sheet_read`, dùng `params`, **không có `position`** |
+| Lớp validate [`chat.py:133-137`](src/api/routes/chat.py#L133-L137) | **n8n** | bắt buộc `position` là mảng 2 số |
+
+Model được fine-tune trên Make.com, prompt bằng ví dụ n8n, đưa danh mục node của Body, rồi validate theo luật n8n.
+
+**Đây gần như chắc chắn là nguyên nhân gốc** của `json_schema_valid_rate` thấp và vòng retry ở [`chat.py:224-235`](src/api/routes/chat.py#L224-L235). Không phải lỗi model yếu — nâng model to đến mấy cũng không sửa được.
+
+**Quyết định (P4): chốt n8n làm định dạng duy nhất.**
+
+| Ứng viên | Đánh giá |
+|---|---|
+| **n8n** | ✅ Body đã tích hợp đầy đủ (Docker :5678, `n8n_api.py`, `n8n_proxy.py`, 11 template). **Self-hosted → thỏa P2. Miễn phí → thỏa P3** |
+| Make.com | ❌ SaaS trả phí, dữ liệu chạy qua hạ tầng họ → vi phạm P2. Chi phí tăng theo từng khách → vi phạm P3 |
+| Engine nội bộ Body | ⚠️ Bộ node hẹp hơn n8n; giữ làm đích thứ cấp nếu cần |
+
+Việc phải làm: viết lại `CODER_SYSTEM` + `agent_middleware` + `_validate_workflow` cho khớp n8n; chuyển đổi hoặc loại bỏ blueprint Make.com khỏi tập train.
+
+### 11.2. 🟠 CAO — lược đồ hóa đơn quá hẹp so với chính lỗi VLM mà dự án đã nhận diện
+
+> **Đính chính:** spec v1.0 §8.2 mục 3 ghi *"`/ocr` không gọi `MCPServer` để validate"*. **Điều này không còn đúng.** Code hiện tại đã áp dụng deterministic-first đầy đủ cho phần nó nhìn thấy được:
+> [`documents.py:99`](src/api/routes/documents.py#L99) ép schema `InvoicePayload`, [`documents.py:110`](src/api/routes/documents.py#L110) gọi `MCPServer.validate_invoice_total()` tính lại từng dòng, trả cờ `needs_manual_review`. Dung sai `rel_tol=0.1%` + `abs_tol=10đ` ([`mcp_server.py:42-43`](src/core/mcp_server.py#L42-L43)) đủ bắt lỗi đọc nhầm chữ số.
+
+Vấn đề thật nằm ở chỗ khác: **VLM chỉ được yêu cầu trích xuất 3 trường, nên lớp validate không có dữ liệu để bắt các lỗi mà chính dự án đã liệt kê.**
+
+| Lỗi VLM mà [`INVOICE_SYSTEM`](src/core/prompts.py#L142-L146) liệt kê | Bắt được không? | Vì sao |
+|---|---|---|
+| Đọc nhầm chữ số (7↔1, 3↔8) | ✅ | Lệch tổng vượt dung sai |
+| **Lệch cột** — `unit_price` ↔ `amount` hoán đổi | ❌ | Schema không có trường `amount` từng dòng để đối chiếu |
+| **Thiếu dòng** — tổng item < `subtotal` | ❌ | Schema không có `subtotal` |
+| **`confidence` < 0.60 → cần người kiểm** | ❌ | Schema không có `confidence` |
+| Sai `vat_rate` ghi trên hóa đơn | ❌ | Schema không có `vat_rate`/`vat_amount` |
+
+Nguyên nhân gốc là **vi phạm P4 — prompt hóa đơn tồn tại ở hai nơi, hai nội dung khác nhau**:
+
+- [`prompts.py::INVOICE_SYSTEM`](src/core/prompts.py#L134) mô tả lược đồ đầy đủ + quy trình kiểm tra 4 bước + quy tắc an toàn (`status` luôn `pending_review`). Nhưng nó là **code chết** — chỉ được tham chiếu trong `apply_v2_fixes.py` (script migration ở gốc repo), **không có trong luồng chạy**.
+- [`vision.py:28-35`](src/agents/vision.py#L28-L35) tự định nghĩa prompt inline, lược đồ chỉ `{items:[{name, price, qty}], total}`. **Đây mới là prompt thực sự chạy.**
+
+Hệ quả kéo theo: ca kiểm thử T4 trong [`benchmark_integration.py:92-100`](offline_training/benchmark_integration.py#L92-L100) nạp payload có `supplier_name`, `items[].amount`, `subtotal`, `vat_rate`, `vat_amount` — **`InvoicePayload` sẽ loại bỏ toàn bộ các trường này**. Benchmark và schema đang mô tả hai hệ thống khác nhau.
+
+**Việc phải làm:** mở rộng `InvoicePayload` + prompt trích xuất theo đúng lược đồ `INVOICE_SYSTEM` đã thiết kế, gộp prompt về [`prompts.py`](src/core/prompts.py) (P4), rồi bổ sung `InvoiceFieldValidator` kiểm tra lệch cột / thiếu dòng / ngưỡng confidence — những thứ `validate_invoice_total()` về bản chất không thể bắt.
+
+### 11.3. ✅ ĐÃ SỬA (27/07/2026) — chưa bật constrained decoding
+
+> **Trạng thái:** `ModelEngine.generate_chat()` nhận `json_schema` và dựng `GuidedDecodingParams`; thiếu hỗ trợ ở bản vLLM cũ thì tự lùi về đường validate+retry, không raise.
+> `CoderAgent` truyền `workflow_schema.build_workflow_schema()` vào.
+> **Bẫy đã tránh:** khi bật grammar, `repetition_penalty=1.25` và `no_repeat_ngram_size=6` được hạ về 1.0/0 — JSON *bắt buộc* lặp token (`"typeVersion"`, `"position"`, dấu ngoặc) giữa các node, giữ nguyên hai tham số đó sẽ cấm chính các token mà grammar yêu cầu và dồn model vào ngõ cụt.
+
+Mô tả gốc:
+
+Bật `guided_json` trong vLLM khiến JSON sai schema trở thành **bất khả thi về mặt cấu trúc**. Khi đó xoá được:
+
+- [`_extract_json_block`](src/api/routes/chat.py#L57) — 50 dòng đếm ngoặc
+- [`_validate_workflow`](src/api/routes/chat.py#L109) + vòng retry
+- `json_repair`
+- Các ràng buộc mớm tay trong prompt kiểu *"position là mảng 2 số — KHÔNG phải [100, 100]]"*
+
+Riêng việc bỏ lần retry 1200 token cắt được phần lớn độ trễ nhánh TECHNICAL.
+
+### 11.4. 🟠 CAO — serving tuần tự
+
+`vllm.LLM` + `run_in_executor` — xem §5.4.
+
+### 11.5. 🟡 TRUNG BÌNH
+
+| # | Vấn đề | Vị trí |
+|---|---|---|
+| 1 | `sales.amount` vs `sales.total_amount` — hai nguồn mâu thuẫn, một cái sai. Benchmark T2 cũng kiểm tra `total_amount` | [`saas_api.py:29`](src/core/saas_api.py#L29) vs [`prompts.py:28`](src/core/prompts.py#L28) |
+| 2 | `TASK_REGISTRY` in-memory → mất task khi restart, không dùng được nhiều worker | [`engine.py:41`](src/core/engine.py#L41) |
+| 3 | Không có hàng đợi giới hạn / backpressure → nguồn gốc "quá tải, treo" | [`chat.py:343`](src/api/routes/chat.py#L343) |
+| 4 | 5 file nguồn tập train không có trong repo → không train lại được | [`merge_all.py:23-29`](offline_training/merge_all.py#L23-L29) |
+| 5 | ngrok là điểm public duy nhất — SPOF. Thay bằng Cloudflare Tunnel | `launch_demo.py` |
+| 6 | Chưa có `ai_metrics_log` → không đo được cải tiến nào có tác dụng | — |
+
+### 11.6. ✅ ĐÃ SỬA (27/07/2026) — `no_repeat_ngram_size` sập MỌI lần gọi /chat trên GPU
+
+`SamplingParams` của vLLM **chưa bao giờ có** field `no_repeat_ngram_size` — đó là tham số của HF `transformers.generate()`. Cả `generate_text` lẫn `generate_chat` đều truyền nó → `TypeError` trên mọi request GPU. "Fix lặp 12 lần" của Ngày 7 chưa từng chạy; nó chỉ làm sập engine một cách im lặng.
+
+Phát hiện và sửa đầu tiên bởi teammate (commit `fdec1d2`, nhánh `anser-ai` repo `wikiepeidia/ANSER`); đã áp dụng vào cả hai đường sinh, kể cả đường guided decoding mới.
+
+**Ghi chú đồng bộ repo:** đã đối chiếu — nhánh `anser-ai` = đúng baseline v8 của repo này + duy nhất fix trên. Không có phân kỳ song song nào khác phải hấp thụ.
+
+### 11.7. 📌 GHI NHẬN (27/07/2026) — trạng thái thật của Body nằm ở các NHÁNH, không phải main
+
+Khảo sát `wikiepeidia/ANSER` (bản clone tham khảo tại `D:\ANSER`, đã ignore khỏi repo này):
+
+| Nhánh | Nội dung | Liên quan |
+|---|---|---|
+| `main` | **Không có n8n** — chỉ engine workflow nội bộ + `make_integration.py`. Lỗi thời | Đừng tham khảo main |
+| `anser-ban-le` | +328 commit — nhánh bán lẻ trưởng thành nhất (báo cáo theo lịch, dashboard) | Nguồn tham khảo nghiệp vụ bán lẻ |
+| `anser-san-xuat` | +59 commit — BOM, `material_batches`, `qc_results`, chi phí sản xuất | Giai đoạn sản xuất |
+| `dev` | **32 workflow n8n thật** (retail 19, manuf 7, shared 6) + hạ tầng n8n (nginx, script import) + pilot Trà Ngọc Duy | **Nguồn của `N8N_TEMPLATES_DIR`** |
+| `anser-ai` | Bản sao Brain + fix `no_repeat_ngram_size` | Đã hấp thụ (§11.6) |
+
+32 workflow đã trích về [`data/n8n_templates/`](data/n8n_templates/) (kèm README ghi nguồn). Đo được: 262 node, `httpRequest` v4.4 chiếm 84, **`code` chiếm 69 (26%)** — chủ yếu format Discord embed. Mẫu tích hợp chủ đạo: mọi thao tác dữ liệu qua `httpRequest` gọi service nội bộ — khớp đúng kế hoạch tool layer "MCP bọc REST" (§7).
+
+Hệ quả thiết kế đã áp dụng vào `workflow_schema.py`:
+- Catalog = **hợp nhất** mặc định + template thật, template thắng khi trùng (typeVersion thật: `httpRequest` 4.4, `if` 1 — khác số ước đoán ban đầu).
+- Few-shot rút từ workflow thật nhưng **khử về đúng hình dạng schema sinh** (bỏ `id`, `retryOnFail`…) — dạy model field mà grammar cấm là tự phá chất lượng sinh.
+- Node `code` trong ví dụ được thay bằng `noOp` giữ nguyên luồng: AI sinh workflow **không được dùng `code`** (JS tuỳ ý vượt mọi luật an toàn), người viết tay thì được.
+
+### 11.8. ✅ ĐÃ SỬA (27/07/2026) — `ENV=LOCAL` không chạy được nếu thiếu torch
+
+Phát hiện khi chạy test sau khi sửa §11.1. `manager.py` import `torch` + `sentence_transformers` ở đầu file, nên **chỉ riêng việc khởi tạo router đã đòi ~2.5GB phụ thuộc GPU** — phá đúng mục đích tồn tại của `ENV=LOCAL` (AGENTS.md §3.1: chạy và test toàn bộ tầng logic không cần GPU).
+
+Đã sửa:
+- torch + `sentence_transformers` chuyển sang **import lười**, chỉ nạp khi thực sự cần dựng embedder.
+- `sklearn.metrics.pairwise.cosine_similarity` bị bỏ — nó kéo theo scipy chỉ để dùng một công thức 3 dòng. Thay bằng `_cosine_sim` dựng trên numpy, đã đối chiếu cho kết quả trùng khớp.
+- Thiếu embedder thì router **lùi về lớp 1 (luật từ khoá)** thay vì sập, và tự khai báo qua `method="keyword_only_degraded"` + thuộc tính `is_degraded` cho `/health`.
+
+Kèm theo: `pytest-asyncio` bị thiếu trong `requirements-dev.txt` khiến `test_chat_background_task` **fail âm thầm** (fail chứ không phải skip) từ trước tới nay. Đã bổ sung. Toàn bộ suite hiện **53 passed, 0 failed**.
+
+---
+
+## 12. Lộ trình
 
 ```mermaid
 flowchart TD
-    subgraph "Client Layer"
-        A["HTTP Client / Body Module"]
-    end
+    S0["S0 — Tài liệu chiến lược<br/>ARCHITECTURE.md + AGENTS.md"] --> S1
+    S1["S1 — Chốt một định dạng workflow<br/>n8n + guided_json, xoá vòng retry"] --> S2
+    S2["S2 — Hạ tầng<br/>vLLM server riêng, Qwen3-8B, ctx 32k,<br/>Redis, Cloudflare Tunnel, T0"] --> S3
+    S2 --> S4
+    S3["S3 — Tầng tool + vòng lặp agentic<br/>tool registry, gói Logistics"] --> S5
+    S4["S4 — Metrics<br/>ai_metrics_log, đo trước/sau"] --> S5
+    S3 --> S6
+    S5["S5 — XAI<br/>reconciliation.py + InvoiceFieldValidator"]
+    S6["S6 — Lược đồ Logistics bên Body<br/>(cần phối hợp repo Body)"]
 
-    subgraph "API Gateway: src/server.py"
-        B["FastAPI App + Lifespan"]
-        B1["Middleware: Request ID"]
-        B2["Auth: require_api_token"]
-        B3["POST /chat"]
-        B4["POST /upload"]
-        B5["POST /ocr"]
-        B6["GET /health"]
-        B7["GET /api/v1/task/{task_id}"]
-    end
-
-    subgraph "Validation Layer"
-        C1["schemas.py: InvoicePayload"]
-        C2["json_repair: repair_json"]
-    end
-
-    subgraph "Agent Layer: src/agents/"
-        D1["ManagerAgent: SemanticRouter + Consult"]
-        D2["CoderAgent: JSON Workflow Gen"]
-        D3["VisionAgent: Florence-2 OCR"]
-        D4["ResearcherAgent: DuckDuckGo"]
-        D5["BaseAgent: generate proxy"]
-    end
-
-    subgraph "Core Engine: src/core/"
-        E1["ModelEngine: vLLM / LOCAL Mock"]
-        E2["TaskRegistry: bounded, thread-safe"]
-        E3["background_worker"]
-    end
-
-    subgraph "Deterministic Tools"
-        F1["MCPServer.calculate_vat"]
-        F2["MCPServer.validate_invoice_total"]
-    end
-
-    subgraph "Knowledge and RAG: src/core/knowledge.py"
-        G1["ChromaDB Dense Retrieval"]
-        G2["BM25Okapi Lexical Search"]
-        G3["CrossEncoder Reranker"]
-        G4["underthesea word_tokenize"]
-    end
-
-    subgraph "IO and Infra"
-        H1["HttpClientPool: httpx.AsyncClient singleton"]
-        H2["Webhook Dispatcher"]
-        H3["MemoryManager: SQLAlchemy + Neon DB"]
-        H4["Config: Model IDs, DB URL, vLLM params"]
-    end
-
-    subgraph "Offline Pipeline: offline_training/"
-        I1["legal_miner.py: Firecrawl scraper"]
-        I2["training.py: DeepSeek-R1 distillation"]
-    end
-
-    subgraph "Monitoring"
-        J1["launch_demo.py: VRAM daemon thread"]
-        J2["ngrok tunnel"]
-    end
-
-    A -->|"POST /chat"| B3
-    A -->|"POST /upload"| B4
-    A -->|"POST /ocr"| B5
-    A -->|"GET /health"| B6
-    A -->|"GET /task/id"| B7
-
-    B3 --> B1 --> B2
-    B3 -->|"BackgroundTasks.add_task"| E3
-    E3 -->|"handler_func=process_chat"| D1
-    D1 -->|"route=TECHNICAL"| D2
-    D1 -->|"route=RETRIEVAL"| G1
-    D1 -->|"route=FINANCIAL"| C1
-    C1 -->|"Pydantic validated"| F2
-    F2 --> F1
-    C1 -->|"validation failed"| C2
-    D1 -->|"route=GENERAL"| E1
-
-    G1 --> G3
-    G2 --> G3
-    G4 --> G1
-    G4 --> G2
-
-    E3 -->|"on completion"| H2
-    H2 --> H1
-    H1 -->|"POST to BODY_CALLBACK_URL"| A
-
-    B4 --> D3
-    B5 --> D3
-    D5 --> E1
-
-    E1 -->|"ENV=LOCAL"| E1
-    E1 -->|"ENV=COLAB"| H4
-
-    B7 --> E2
-
-    I1 --> H1
-    I2 --> H1
-
-    J1 -->|"torch.cuda.memory_allocated"| J1
+    style S0 fill:#c8e6c9
+    style S1 fill:#ffcdd2
+    style S2 fill:#ffcdd2
 ```
 
----
-
-## 3. File Manifest (@devops)
-
-### `src/server.py` — FastAPI application entry point
-- **Purpose:** Defines all HTTP endpoints, CORS, auth middleware, RuntimeState lazy-loading, and the `process_chat` background task closure.
-- **Inputs:** HTTP requests (JSON body, file uploads, headers).
-- **Outputs:** JSON responses, background task IDs, webhook POSTs.
-
-### `src/core/engine.py` — Model Engine
-- **Purpose:** Singleton `ModelEngine` with ENV-aware initialization. Hosts `TaskRegistry` and `background_worker`.
-- **Inputs:** `os.getenv("ENV")`, prompts from agents.
-- **Outputs:** Generated text (mock JSON or vLLM output), task status updates.
-
-### `src/core/schemas.py` — Pydantic Schemas
-- **Purpose:** Pydantic V2 models for strict payload validation.
-- **Inputs:** Raw dicts from `json_repair`.
-- **Outputs:** Validated `InvoicePayload`, `RetailChatResponse`, `ProductExtraction` objects.
-
-### `src/core/mcp_server.py` — Deterministic Tax Calculator
-- **Purpose:** Vietnamese tax calculation per Decree 72/2024. Zero LLM involvement.
-- **Inputs:** `base_price`, `items[]`, `stated_total`.
-- **Outputs:** VAT breakdown dicts with `is_valid` flags.
-
-### `src/core/knowledge.py` — Hybrid RAG Engine
-- **Purpose:** ChromaDB for dense vectors, BM25 for lexical exact-match, CrossEncoder for reranking. Uses `underthesea` for Vietnamese tokenization.
-- **Inputs:** Query strings, document files (PDF, DOCX, TXT).
-- **Outputs:** Top-K reranked document chunks as a formatted string.
-
-### `src/core/utils.py` — HTTP Client Pool
-- **Purpose:** `HttpClientPool` singleton for connection reuse.
-- **Inputs:** None (class-level singleton).
-- **Outputs:** A shared `httpx.AsyncClient` instance.
-
-### `src/core/config.py` — Configuration
-- **Purpose:** Centralized configuration. Model IDs, DB URL parsing, vLLM memory allocation params.
-- **Inputs:** `os.getenv("DATABASE_URL")`.
-- **Outputs:** Config object consumed by `ModelEngine` and `MemoryManager`.
-
-### `src/core/memory.py` — Persistence Layer
-- **Purpose:** SQLAlchemy-backed persistence. Chat sessions, messages, attachments, workflows.
-- **Inputs:** `user_id`, `store_id`, SQL queries.
-- **Outputs:** Context strings, store details, workflow IDs.
-
-### `src/core/prompts.py` — Prompt Templates
-- **Purpose:** System prompt templates for the Qwen chat format.
-- **Inputs:** None (static strings).
-- **Outputs:** Prompt templates consumed by agents.
-
-### `src/core/tools.py` — Retail Utilities
-- **Purpose:** Safe math evaluator (`ast.parse`), strategic weather+market forecasts.
-- **Inputs:** Math expressions, store GPS coordinates.
-- **Outputs:** Calculation results, forecast reports.
-
-### `src/core/external_data.py` — External APIs
-- **Purpose:** Open-Meteo weather, DuckDuckGo price checks.
-- **Inputs:** Lat/lon coordinates, product names.
-- **Outputs:** Weather summaries, competitor price snippets.
-
-### `src/core/integrations.py` — Workflow Deployer
-- **Purpose:** Validates/repairs JSON blueprints and saves to DB + filesystem.
-- **Inputs:** Blueprint JSON, store ID, workflow name.
-- **Outputs:** Workflow ID, saved `.json` file path.
-
-### `src/core/agent_middleware.py` — Tool Definitions
-- **Purpose:** Provides available workflow tool definitions to CoderAgent.
-- **Inputs:** None.
-- **Outputs:** Hardcoded tool description string.
-
-### `src/core/context.py` — Login Resolver
-- **Purpose:** Maps `user_id` → active store context.
-- **Inputs:** `user_id`, `MemoryManager`.
-- **Outputs:** Status (`READY`/`AMBIGUOUS`/`EMPTY`) + context string.
-
-### `src/core/saas_api.py` — Database Queries
-- **Purpose:** Product lookup, sales reports, and price updates.
-- **Inputs:** Product names, workspace IDs.
-- **Outputs:** Product lists, revenue summaries.
-
-### `src/agents/base.py` — Agent Base Class
-- **Purpose:** Maps agent `.generate()` calls to `ModelEngine.generate_text()`.
-
-### `src/agents/manager.py` — Manager Agent
-- **Purpose:** Semantic router (cosine similarity) + planning/consulting prompts.
-
-### `src/agents/coder.py` — Coder Agent
-- **Purpose:** Generates JSON workflow blueprints from plans.
-
-### `src/agents/vision.py` — Vision Agent
-- **Purpose:** Florence-2 image analysis (captioning + OCR).
-
-### `src/agents/researcher.py` — Researcher Agent
-- **Purpose:** DuckDuckGo search + LLM summarization.
-
-### `src/evaluate_system.py` — Batch Evaluation Suite
-- **Purpose:** Runs test cases through the full pipeline and grades via DeepSeek API.
-
-### `launch_demo.py` — Entry Point
-- **Purpose:** Sets up PYTHONPATH, ngrok, VRAM monitor, and launches Uvicorn.
-
-### `offline_training/legal_miner.py` — Legal Scraper
-- **Purpose:** Async paginated scraper for Vietnamese legal documents.
-
-### `offline_training/training.py` — Distillation Script
-- **Purpose:** Captures DeepSeek-R1 reasoning chains for fine-tuning.
-
-### Tests: `test_server.py`, `test_server_basics.py`, `test_memory_contracts.py`, `test_tools.py`
-- **Purpose:** Integration and unit tests covering endpoints, auth, memory contracts, and safe math.
+**S1 trước S2** vì S1 sửa đúng nguyên nhân gốc và không cần đổi phần cứng — làm được ngay hôm nay. S4 (metrics) phải sớm, nếu không sẽ không chứng minh được S1-S3 có tác dụng thật.
 
 ---
 
-## 4. Vulnerability Register
+## 13. Chỉ số theo dõi
 
-| ID | Severity | Location | Description | Status |
-|---|---|---|---|---|
-| V-001 | RESOLVED | `engine.py` | `TASK_REGISTRY` hardened with `threading.Lock`, max_size=1000, TTL eviction. | ✅ Fixed |
-| V-002 | RESOLVED | `server.py` | FINANCIAL route default `resp` initialized to error message. | ✅ Fixed |
-| V-003 | RESOLVED | `launch_demo.py` | Duplicate imports removed. | ✅ Fixed |
-| V-004 | RESOLVED | `training.py` | Dead `HttpClientPool` client reference removed. | ✅ Fixed |
-| V-005 | RESOLVED | `server.py` | `asynccontextmanager` import moved to file top. | ✅ Fixed |
+Ghi log từ request đầu tiên. Không có số đo thì mọi tranh luận về "model đủ tốt chưa" đều là cảm tính.
+
+| Nhóm | Chỉ số | Ngưỡng |
+|---|---|---|
+| **Hạ tầng** | `inference_latency_p95` | ≤ 5.000ms |
+| | `vram_utilization_pct` | > 90% cảnh báo |
+| | `gpu_hours_per_month` | ≤ ngân sách bậc hiện tại |
+| | `oom_incident_count` | 0 |
+| **Chất lượng** | `json_schema_valid_rate` (lần đầu, không retry) | ≥ 98% sau S1 |
+| | `route_classification_accuracy` | mẫu 50 câu/tuần |
+| | `tool_selection_accuracy` | ≥ 90% |
+| | `ocr_field_accuracy_pct` | đối chiếu `validate_invoice_total()` |
+| **Nghiệp vụ** | `quote_turnaround_time` | từ yêu cầu → báo giá gửi đi |
+| | `manual_correction_rate` | % bản ghi AI xử lý phải sửa tay |
+| | `automation_adoption_rate` | % workflow AI sinh được giữ lại dùng |
+
+Log **không được** chỉ nằm trên GPU host (ephemeral) — đẩy về bảng `ai_metrics_log` bên Body theo lô.
+
+---
+
+## 14. Tham chiếu
+
+- Nghị định 72/2024/NĐ-CP — cơ sở tính VAT trong [`mcp_server.py`](src/core/mcp_server.py) (8% giảm / 10% chuẩn)
+- `ANSER_AI_SPEC.md` v1.0 (23/06/2026) — vẫn đúng ở: §5.4 luồng OCR deterministic-first, §7.3 nguyên tắc điểm chèn AI, §9 khung metrics. Đã lỗi thời ở: §3 ràng buộc Colab, §4 lựa chọn model, §8.3 quadrant chi phí
+- Khảo sát khách hàng logistics (bản ghi âm) — nguồn chính cho §3
+- Điều khoản Colab Paid Services — cơ sở cho §4.4
+
+---
+
+*Tài liệu này là nguồn sự thật về kiến trúc. Khi code và tài liệu mâu thuẫn, cập nhật tài liệu trong cùng PR — bản v1.0 lệch khỏi code nhiều tháng và đã gây ra quyết định sai.*

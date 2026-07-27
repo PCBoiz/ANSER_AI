@@ -31,14 +31,39 @@ import logging
 import re
 
 import numpy as np
-import torch
-from sentence_transformers import SentenceTransformer
-from sklearn.metrics.pairwise import cosine_similarity
 
 from src.agents.base import BaseAgent
 from src.core.prompts import Prompts
 
 logger = logging.getLogger("projecta.agents.manager")
+
+
+# torch và sentence_transformers được import LƯỜI, ngay trước lúc thực sự cần.
+#
+# Bản cũ import cả hai ở đầu file. Hệ quả: ENV=LOCAL — chế độ được thiết kế để
+# chạy và test toàn bộ tầng logic mà KHÔNG cần GPU — vẫn gãy ngay khi import nếu
+# máy dev chưa cài torch (~2.5GB). Điều đó phá đúng mục đích tồn tại của LOCAL
+# (AGENTS.md §3.1) và làm test tích hợp fail trên máy Windows dev.
+#
+# sklearn.metrics.pairwise.cosine_similarity cũng bị bỏ: nó kéo theo scipy chỉ để
+# dùng một công thức 3 dòng. Hàm _cosine_sim bên dưới cho kết quả giống hệt.
+
+
+def _cosine_sim(query_vec, matrix) -> np.ndarray:
+    """
+    Cosine similarity giữa 1 vector truy vấn và ma trận (n, d). Trả mảng (n,).
+
+    Thay cho sklearn.metrics.pairwise.cosine_similarity(query, matrix)[0] —
+    cùng công thức, không kéo thêm phụ thuộc.
+    """
+    q = np.asarray(query_vec, dtype=float).reshape(-1)
+    m = np.asarray(matrix, dtype=float)
+    if m.ndim == 1:
+        m = m.reshape(1, -1)
+
+    denom = np.linalg.norm(q) * np.linalg.norm(m, axis=1)
+    denom = np.where(denom == 0, 1e-12, denom)   # vector rỗng -> tránh chia 0
+    return (m @ q) / denom
 
 
 # ---------------------------------------------------------------------------
@@ -83,6 +108,35 @@ class SemanticRouter:
     # Biên tối thiểu giữa nhánh nhất và nhánh nhì
     DEFAULT_MARGIN = 0.05
 
+    @staticmethod
+    def _try_load_embedder(model_name: str):
+        """
+        Nạp embedder; trả None nếu môi trường không có (thay vì làm sập cả router).
+
+        VÌ SAO ĐƯỢC PHÉP TRẢ None: ENV=LOCAL tồn tại để chạy và test toàn bộ tầng
+        logic mà không cần GPU (AGENTS.md §3.1). Bản cũ import torch ở đầu file nên
+        chỉ riêng việc KHỞI TẠO router đã đòi ~2.5GB phụ thuộc — LOCAL gãy ngay từ
+        import, đúng thứ nó sinh ra để tránh.
+
+        Không có embedder thì router lùi về LỚP 1 (luật từ khoá) — vẫn tất định,
+        vẫn test được, và tự nhận là mình đang chạy hạn chế qua `method`.
+        """
+        try:
+            import torch
+            from sentence_transformers import SentenceTransformer
+        except ImportError as exc:
+            logger.warning(
+                "Không nạp được embedder (%s) — SemanticRouter chạy CHẾ ĐỘ TỪ KHOÁ. "
+                "Câu không khớp từ khoá nào sẽ về GENERAL. "
+                "Chấp nhận được ở ENV=LOCAL; KHÔNG chấp nhận được ở production.",
+                exc,
+            )
+            return None
+
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+        logger.info("SemanticRouter tự nạp embedder (device=%s)", device)
+        return SentenceTransformer(model_name, device=device)
+
     def __init__(
         self,
         model_name="sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2",
@@ -93,9 +147,7 @@ class SemanticRouter:
             self.embedder = embedder
             logger.info("SemanticRouter dùng chung embedder có sẵn")
         else:
-            device = "cuda" if torch.cuda.is_available() else "cpu"
-            self.embedder = SentenceTransformer(model_name, device=device)
-            logger.info("SemanticRouter tự nạp embedder (device=%s)", device)
+            self.embedder = self._try_load_embedder(model_name)
 
         self.routes = {
             # Sinh workflow tự động hoá -> CoderAgent
@@ -151,16 +203,26 @@ class SemanticRouter:
             ],
         }
 
-        # Precompute embeddings cho tất cả ví dụ
-        self.route_embeddings = {
-            route: self.embedder.encode(examples)
-            for route, examples in self.routes.items()
-        }
+        # Precompute embeddings cho tất cả ví dụ (bỏ qua khi chạy chế độ từ khoá)
+        self.route_embeddings = (
+            {
+                route: self.embedder.encode(examples)
+                for route, examples in self.routes.items()
+            }
+            if self.embedder is not None
+            else {}
+        )
         logger.info(
-            "SemanticRouter sẵn sàng: %d nhánh, %d ví dụ",
+            "SemanticRouter sẵn sàng: %d nhánh, %d ví dụ, chế độ=%s",
             len(self.routes),
             sum(len(v) for v in self.routes.values()),
+            "đầy đủ" if self.embedder is not None else "chỉ từ khoá",
         )
+
+    @property
+    def is_degraded(self) -> bool:
+        """True = đang chạy chế độ từ khoá, không có embedding. Cho /health biết."""
+        return self.embedder is None
 
     # -- lớp 1: từ khoá ----------------------------------------------------
 
@@ -196,11 +258,20 @@ class SemanticRouter:
             logger.info("Router: %s (từ khoá)", kw)
             return {"route": kw, "score": 1.0, "margin": 1.0, "method": "keyword"}
 
+        # Không có embedder -> dừng ở lớp 1. GENERAL an toàn hơn đoán bừa vì nó
+        # chỉ trả văn xuôi, không sinh JSON hay truy vấn DB sai.
+        if self.embedder is None:
+            logger.info("Router: GENERAL (chế độ từ khoá, không khớp luật nào)")
+            return {
+                "route": "GENERAL", "score": 0.0,
+                "margin": 0.0, "method": "keyword_only_degraded",
+            }
+
         # Lớp 2 — cosine similarity
         query_vec = self.embedder.encode([q])
         scores = {}
         for route, embeddings in self.route_embeddings.items():
-            sims = cosine_similarity(query_vec, embeddings)[0]
+            sims = _cosine_sim(query_vec, embeddings)
             scores[route] = float(np.max(sims))
 
         ranked = sorted(scores.items(), key=lambda kv: kv[1], reverse=True)

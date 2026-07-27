@@ -96,36 +96,43 @@ class Prompts:
         Không xuất JSON ở bước này.
     """)
 
+    # ------------------------------------------------------------------
+    # Nhánh TECHNICAL — sinh workflow n8n
+    # ------------------------------------------------------------------
+    # Bản 27/07/2026 — viết lại theo workflow_schema.py.
+    #
+    # Bản cũ dạy "edges":[{from,to}] — KHÔNG PHẢI n8n. n8n định tuyến theo
+    # "connections" khoá bằng TÊN node. Workflow sinh ra theo bản cũ không import
+    # vào n8n được.
+    #
+    # Bản cũ cũng phải mớm tay các lỗi cú pháp ("position là mảng 2 số — KHÔNG
+    # phải [100,100]]"). Nay guided_json ép cấu trúc ở tầng sampling nên prompt
+    # chỉ còn cần dạy Ý NGHĨA, không cần dạy dấu ngoặc. Ngắn hơn = ít token,
+    # ít chỗ cho model lạc.
+    #
+    # {tools} và {example} do agent_middleware.py bơm vào, dẫn xuất từ
+    # workflow_schema.NODE_CATALOG — sửa một chỗ, cả ba nơi đổi theo.
     CODER_SYSTEM = dedent("""\
-        Bạn sinh workflow n8n cho ANSER. Đầu ra là MỘT object JSON duy nhất.
+        Bạn sinh workflow tự động hoá n8n cho ANSER. Đầu ra là MỘT object JSON duy nhất.
 
-        CÔNG CỤ CÓ SẴN:
+        NODE ĐƯỢC PHÉP DÙNG (không được bịa node khác):
         {tools}
 
-        RÀNG BUỘC BẮT BUỘC:
-        1. Chỉ xuất JSON. Không markdown, không giải thích, không câu dẫn.
-        2. Bắt đầu bằng {{"action": "create_workflow" và kết thúc bằng }}.
-        3. position là mảng 2 số: [100, 100] — KHÔNG phải [100, 100]].
-        4. Biểu thức n8n viết đúng dạng {{{{$json.field}}}} — không thừa dấu ).
-        5. Node postgres chỉ dùng SELECT. Cấm DELETE, DROP, TRUNCATE, ALTER.
-        6. Ghi dữ liệu phải qua node httpRequest gọi API của ANSER Body.
-        7. Gửi Discord dùng node httpRequest POST tới webhook — KHÔNG dùng node
-           code với require('http').
-        8. Mỗi node xuất hiện đúng một lần trong edges.
+        QUY TẮC NGHIỆP VỤ:
+        1. Đúng MỘT node trigger cho mỗi workflow.
+        2. "connections" khoá bằng TÊN node, không phải id. Mọi node phải nằm trong luồng.
+        3. Node postgres CHỈ được SELECT. Muốn ghi dữ liệu thì dùng httpRequest
+           gọi API của ANSER Body.
+        4. Gửi Discord: httpRequest POST tới {{$env.DISCORD_WEBHOOK_URL}}.
+        5. Biến môi trường tham chiếu dạng ={{$env.TEN_BIEN}};
+           dữ liệu node trước dạng ={{$json.ten_truong}}.
+        6. Đặt tên node bằng tiếng Việt, ngắn, mô tả đúng việc node đó làm.
+        7. position giãn đều theo trục x, mỗi node cách nhau 220.
 
-        MẪU ĐÚNG:
-        {{"action":"create_workflow","name":"Cảnh báo tồn kho","payload":{{
-        "nodes":[
-        {{"id":"n1","type":"n8n-nodes-base.scheduleTrigger","position":[100,100],
-        "parameters":{{"rule":{{"interval":[{{"field":"hours","hoursInterval":4}}]}}}}}},
-        {{"id":"n2","type":"n8n-nodes-base.httpRequest","position":[300,100],
-        "parameters":{{"url":"{{{{$env.ANSER_API}}}}/api/n8n/low-stock","method":"GET"}}}},
-        {{"id":"n3","type":"n8n-nodes-base.httpRequest","position":[500,100],
-        "parameters":{{"url":"{{{{$env.DISCORD_WEBHOOK_URL}}}}","method":"POST",
-        "sendBody":true,"bodyParameters":{{"parameters":[
-        {{"name":"content","value":"Cảnh báo tồn kho thấp"}}]}}}}}}
-        ],
-        "edges":[{{"from":"n1","to":"n2"}},{{"from":"n2","to":"n3"}}]}}}}
+        VÍ DỤ ĐÚNG:
+        {example}
+
+        Chỉ xuất JSON. Không markdown, không giải thích.
     """)
 
     # ------------------------------------------------------------------

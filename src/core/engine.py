@@ -130,11 +130,13 @@ class ModelEngine:
         from vllm import SamplingParams
 
         loop = asyncio.get_running_loop()
+        # KHÔNG thêm no_repeat_ngram_size: đó là tham số của HF transformers,
+        # vLLM SamplingParams chưa bao giờ có field này -> TypeError sập MỌI lần
+        # gọi /chat trên GPU (fix fdec1d2 nhánh anser-ai, wikiepeidia/ANSER).
         params = SamplingParams(
             temperature=temperature,
             max_tokens=max_tokens,
             repetition_penalty=1.25,     # Ngày 7: 1.15 chưa đủ, model vẫn lặp nguyên câu
-            no_repeat_ngram_size=6,      # chặn cứng lặp cụm 6 token — fix lỗi lặp 12 lần
         )
 
         def _blocking_generate():
@@ -144,11 +146,45 @@ class ModelEngine:
         # vLLM generate là blocking -> đẩy ra thread pool để không nghẽn event loop
         return await loop.run_in_executor(None, _blocking_generate)
 
-    async def generate_chat(self, system: str, user: str, max_tokens=1024, temperature=0.1):
+    @staticmethod
+    def _build_guided_decoding(json_schema: dict):
+        """
+        Dựng GuidedDecodingParams cho vLLM. Trả None nếu bản vLLM không hỗ trợ.
+
+        Guided decoding ép output khớp JSON Schema ngay ở tầng SAMPLING — token nào
+        làm JSON sai schema thì bị loại khỏi phân phối. JSON hỏng trở thành BẤT KHẢ
+        THI về cấu trúc, thay vì "hy vọng model làm đúng rồi retry".
+
+        Không raise khi thiếu: bản vLLM cũ vẫn chạy được, chỉ là quay về đường
+        validate + retry cũ.
+        """
+        if not json_schema:
+            return None
+        try:
+            from vllm.sampling_params import GuidedDecodingParams
+        except ImportError:
+            logger.warning(
+                "vLLM không có GuidedDecodingParams — bỏ qua guided decoding, "
+                "dùng lại đường validate+retry. Cân nhắc nâng cấp vLLM."
+            )
+            return None
+        return GuidedDecodingParams(json=json_schema)
+
+    async def generate_chat(
+        self,
+        system: str,
+        user: str,
+        max_tokens=1024,
+        temperature=0.1,
+        json_schema: dict | None = None,
+    ):
         """
         Sinh text theo ĐÚNG định dạng chat của Qwen.
         Tự dựng messages [system, user] rồi để tokenizer.apply_chat_template chèn
         token ChatML chuẩn — KHÔNG nhúng tay <|im_start|> trong prompt nữa.
+
+        `json_schema`: bật guided decoding, ép output khớp schema. Dùng cho nhánh
+        sinh workflow và trích xuất hoá đơn.
         """
         if self.env == "LOCAL":
             await asyncio.sleep(0.05)
@@ -157,12 +193,25 @@ class ModelEngine:
         from vllm import SamplingParams
 
         loop = asyncio.get_running_loop()
-        params = SamplingParams(
+
+        # KHÔNG thêm no_repeat_ngram_size: đó là tham số của HF transformers,
+        # vLLM SamplingParams chưa bao giờ có field này -> TypeError sập MỌI lần
+        # gọi /chat trên GPU (fix fdec1d2 nhánh anser-ai, wikiepeidia/ANSER).
+        sampling_kwargs = dict(
             temperature=temperature,
             max_tokens=max_tokens,
             repetition_penalty=1.25,     # Ngày 7: 1.15 chưa đủ, model vẫn lặp nguyên câu
-            no_repeat_ngram_size=6,      # chặn cứng lặp cụm 6 token — fix lỗi lặp 12 lần
         )
+
+        guided = self._build_guided_decoding(json_schema) if json_schema else None
+        if guided is not None:
+            sampling_kwargs["guided_decoding"] = guided
+            # Grammar đã ép cấu trúc. Giữ repetition_penalty cao sẽ PHẠT các token
+            # lặp hợp lệ mà JSON bắt buộc ("typeVersion", "position", dấu ngoặc
+            # giữa các node) -> model bị dồn vào nhánh grammar kém hơn. Nới về 1.0.
+            sampling_kwargs["repetition_penalty"] = 1.0
+
+        params = SamplingParams(**sampling_kwargs)
         messages = [
             {"role": "system", "content": system},
             {"role": "user", "content": user},

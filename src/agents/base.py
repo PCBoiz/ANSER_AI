@@ -14,7 +14,17 @@ class BaseAgent(ABC):
         return await self.engine.generate_text(prompt, max_tokens, temperature)
 
     async def generate_chat(self, system: str, user: str, **kwargs):
-        """Chat đúng chuẩn Qwen — để tokenizer.apply_chat_template lo định dạng ChatML."""
+        """
+        Chat đúng chuẩn Qwen — để tokenizer.apply_chat_template lo định dạng ChatML.
+
+        `json_schema` (tuỳ chọn): bật guided decoding, ép output khớp JSON Schema.
+        """
         max_tokens = kwargs.get('max_new_tokens', 1024)
         temperature = kwargs.get('temperature', 0.1)
-        return await self.engine.generate_chat(system, user, max_tokens, temperature)
+        return await self.engine.generate_chat(
+            system,
+            user,
+            max_tokens,
+            temperature,
+            json_schema=kwargs.get('json_schema'),
+        )

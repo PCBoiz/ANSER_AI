@@ -30,6 +30,7 @@ from src.api.dependencies import (
 )
 from src.core.engine import TASK_REGISTRY
 from src.core.schemas import RetailChatResponse
+from src.core.workflow_schema import validate_workflow
 
 logger = logging.getLogger("projecta.api.chat")
 
@@ -106,53 +107,13 @@ def _extract_json_block(text: str):
     return None, "unbalanced braces (thiếu dấu })"
 
 
-def _validate_workflow(obj: dict):
-    """Kiểm tra workflow tối thiểu. Trả về (ok: bool, lý_do: str)."""
-    if not isinstance(obj, dict):
-        return False, "output không phải object"
-    if obj.get("action") != "create_workflow":
-        return False, 'thiếu "action":"create_workflow"'
-
-    payload = obj.get("payload")
-    if not isinstance(payload, dict):
-        return False, "thiếu payload"
-
-    nodes = payload.get("nodes")
-    if not isinstance(nodes, list) or not nodes:
-        return False, "payload.nodes rỗng hoặc không phải mảng"
-
-    node_ids = set()
-    for idx, node in enumerate(nodes):
-        if not isinstance(node, dict):
-            return False, f"node[{idx}] không phải object"
-        nid = node.get("id")
-        if not nid:
-            return False, f"node[{idx}] thiếu id"
-        node_ids.add(nid)
-        if not node.get("type"):
-            return False, f"node {nid} thiếu type"
-        pos = node.get("position")
-        if pos is not None and (not isinstance(pos, list) or len(pos) != 2):
-            return False, f"node {nid} có position sai định dạng (phải là [x, y])"
-
-    edges = payload.get("edges", [])
-    if not isinstance(edges, list):
-        return False, "payload.edges không phải mảng"
-    for edge in edges:
-        if not isinstance(edge, dict):
-            return False, "edge không phải object"
-        for side in ("from", "to"):
-            ref = edge.get(side)
-            if ref and ref not in node_ids:
-                return False, f'edge trỏ tới node không tồn tại: "{ref}"'
-
-    # Chặn SQL ghi dữ liệu
-    blob = json.dumps(obj, ensure_ascii=False).upper()
-    for danger in ("DROP TABLE", "TRUNCATE", "DELETE FROM", "ALTER TABLE"):
-        if danger in blob:
-            return False, f"workflow chứa lệnh nguy hiểm: {danger}"
-
-    return True, ""
+# Validate workflow nay nằm ở src/core/workflow_schema.py — NGUỒN SỰ THẬT DUY NHẤT
+# dùng chung với prompt CoderAgent và JSON Schema của guided decoding.
+#
+# Bản cũ định nghĩa lại luật ngay tại đây và kiểm theo "edges" + "id", trong khi
+# prompt dạy n8n và dữ liệu train lại là Make.com — ba định dạng mâu thuẫn
+# (ARCHITECTURE.md §11.1). Xoá bản sao ở đây là một phần của việc sửa lỗi đó.
+_validate_workflow = validate_workflow
 
 
 @router.get("/api/v1/task/{task_id}")
