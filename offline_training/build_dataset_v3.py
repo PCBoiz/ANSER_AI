@@ -98,11 +98,20 @@ def scan_secrets(text: str) -> list[str]:
 
 
 def strip_think(text: str) -> str:
-    """Bỏ khối <think> (dùng thẻ đóng CUỐI CÙNG — model hay lồng thẻ)."""
+    """
+    Bỏ khối <think>, giữ phần trả lời. Cùng luật với `clean_output` lúc runtime.
+
+    Thẻ mở KHÔNG ĐÓNG nghĩa là model hết token budget giữa lúc suy luận — phần
+    còn lại là mảnh suy luận cụt, KHÔNG phải câu trả lời. Bản trước chỉ xoá thẻ
+    và giữ nguyên mảnh đó làm nhãn, tức dạy model lảm nhảm rồi dừng giữa câu.
+    Trả rỗng để caller loại mẫu (`empty_after_strip`).
+    """
     last = text.rfind("</think>")
-    if last == -1:
-        return text.replace("<think>", "").strip()
-    return text[last + len("</think>"):].strip()
+    if last != -1:
+        return text[last + len("</think>"):].strip()
+    if "<think>" in text:
+        return text.split("<think>", 1)[0].strip()
+    return text.strip()
 
 
 def _coder_system() -> str:
@@ -162,7 +171,7 @@ def convert_v2_entry(obj: dict):
     Chuyển một mẫu v2 về chuẩn v3. Trả (entry | None, lý_do).
 
     lý_do thuộc: ok / make_com / sql_action / workflow_invalid / workflow_ok /
-    too_long / malformed
+    too_long / empty_after_strip / malformed
     """
     msgs = obj.get("messages")
     if not isinstance(msgs, list) or len(msgs) < 2:
@@ -180,6 +189,15 @@ def convert_v2_entry(obj: dict):
         return None, "malformed"
 
     answer = strip_think(assistant)
+
+    # Kiểm tra rỗng SAU khi cắt <think>, không phải trước.
+    #
+    # Một số mẫu v2 có phần assistant TOÀN BỘ là khối <think> — hoặc không đóng
+    # thẻ (bị cắt vì hết token budget), hoặc đóng ở cuối mà không còn gì phía
+    # sau. Kiểm rỗng trước khi cắt thì chúng lọt qua và thành mẫu "câu hỏi ->
+    # trả lời rỗng": dạy model im lặng, đúng thứ tệ nhất có thể dạy.
+    if not answer.strip():
+        return None, "empty_after_strip"
 
     # Phân loại theo NỘI DUNG bóc được, không theo chuỗi con trong text.
     # (Bản trước bắt '"nodes"' xuất hiện ở đâu đó -> bài tư vấn kiến trúc có

@@ -295,6 +295,27 @@ def test_long_consult_goes_to_report_branch():
     assert "không có số liệu" in entry["messages"][0]["content"]
 
 
+@pytest.mark.parametrize("assistant", [
+    # think không đóng thẻ (bị cắt vì hết token budget)
+    "<think>\nTôi cần phân tích yêu cầu này rất kỹ vì nó liên quan tới",
+    # think đóng thẻ nhưng không còn gì phía sau
+    "<think>\nlập luận dài\n</think>",
+    "<think>lập luận</think>   \n  ",
+])
+def test_answer_empty_after_stripping_think_is_dropped(assistant):
+    """
+    Mẫu v2 mà phần assistant TOÀN BỘ là khối <think> -> sau khi cắt còn rỗng.
+    Giữ lại là dạy model trả lời rỗng — thứ tệ nhất có thể dạy.
+    """
+    obj = {"messages": [
+        {"role": "system", "content": "You are Project A."},
+        {"role": "user", "content": "Phân tích giúp tôi"},
+        {"role": "assistant", "content": assistant},
+    ]}
+    entry, reason = convert_v2_entry(obj)
+    assert entry is None and reason == "empty_after_strip"
+
+
 def test_absurdly_long_still_dropped():
     obj = {"messages": [
         {"role": "system", "content": "You are Project A."},
@@ -343,6 +364,16 @@ def test_customer_leak_catches_margin_words():
 def test_strip_think_keeps_answer_only():
     text = "<think>suy nghĩ dài</think>\nCâu trả lời thật."
     assert strip_think(text) == "Câu trả lời thật."
+
+
+def test_strip_think_drops_unterminated_reasoning():
+    """
+    Thẻ mở không đóng = model hết token budget giữa lúc suy luận. Phần còn lại
+    là mảnh suy luận cụt, không phải câu trả lời — cùng luật với clean_output.
+    """
+    assert strip_think("<think>\nTôi cần phân tích rất kỹ vì nó liên quan") == ""
+    assert strip_think("Trả lời trước.\n<think>rồi nghĩ tiếp") == "Trả lời trước."
+    assert strip_think("Không có thẻ nào.") == "Không có thẻ nào."
 
 
 def test_convert_v2_drops_make_com():

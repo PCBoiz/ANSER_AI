@@ -1,12 +1,12 @@
 {
-  "built_at": "2026-07-29T22:20:21",
+  "built_at": "2026-07-29T23:11:25",
   "n_train": 50,
   "n_eval": 5,
   "by_source": {
-    "v2_n8n": 8,
     "n8n": 25,
-    "v2_report": 15,
-    "v2_consult": 7
+    "v2_consult": 2,
+    "v2_report": 24,
+    "v2_n8n": 4
   },
   "catalog_fingerprint": "96479906e62cf9fb",
   "prompt_fingerprints": {
