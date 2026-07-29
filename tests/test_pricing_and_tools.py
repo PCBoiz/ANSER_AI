@@ -128,7 +128,8 @@ def test_manifest_lists_all_tools_with_schemas():
     assert resp.status_code == 200
     body = resp.json()
     names = {t["name"] for t in body["tools"]}
-    assert names == {"quote", "carrier_selection", "forecast_reorder", "vat", "report"}
+    assert names == {"quote", "carrier_selection", "forecast_reorder", "vat",
+                     "report", "inventory_audit"}
     for t in body["tools"]:
         assert t["input_schema"].get("properties"), f"tool {t['name']} thiếu schema"
 

@@ -29,6 +29,7 @@ from pydantic import BaseModel, Field
 from src.api.dependencies import require_api_token
 from src.core import carrier_selection as cs
 from src.core import forecasting as fc
+from src.core import inventory as inv
 from src.core import reporting as rp
 from src.core.mcp_server import MCPServer
 from src.core.pricing import PricingRule, Surcharge, compute_quote
@@ -145,6 +146,29 @@ class ReportRequestIn(BaseModel):
     expenses: list[ExpenseLineIn] = []
 
 
+class InventoryLineIn(BaseModel):
+    """Một dòng bảng TỔNG HỢP TỒN KHO (bản xuất MISA/Fast/Bravo)."""
+    code: str
+    name: str = ""
+    unit: str = ""
+    opening_qty: float = 0.0
+    opening_value: Optional[float] = Field(None, description="Bỏ trống = CHƯA BIẾT, không phải 0")
+    in_qty: float = 0.0
+    in_value: Optional[float] = None
+    out_qty: float = 0.0
+    out_value: Optional[float] = Field(None, description="Giá trị xuất kho = giá vốn hàng bán")
+    closing_qty: float = 0.0
+    closing_value: Optional[float] = None
+
+
+class InventoryAuditRequest(BaseModel):
+    """POST /tools/inventory-audit — soi lỗi sổ sách trên bảng tổng hợp tồn kho."""
+    lines: list[InventoryLineIn]
+    warehouse: str = ""
+    period_start: Optional[str] = Field(None, description="YYYY-MM-DD")
+    period_end: Optional[str] = Field(None, description="YYYY-MM-DD")
+
+
 # ===========================================================================
 # Endpoints
 # ===========================================================================
@@ -257,6 +281,30 @@ async def tool_report(req: ReportRequestIn, x_api_token: Optional[str] = Header(
         raise HTTPException(status_code=422, detail=str(exc))
 
 
+@router.post("/inventory-audit")
+async def tool_inventory_audit(
+    req: InventoryAuditRequest, x_api_token: Optional[str] = Header(None)
+):
+    """
+    Soi lỗi sổ sách trên bảng TỔNG HỢP TỒN KHO.
+
+    Bảng kế toán xuất ra LUÔN cân đối về cộng trừ — phần mềm tự tính. Cân đối
+    không có nghĩa là đúng: tồn âm, đơn giá tồn cuối vượt mọi giá đầu vào, và
+    hai phương pháp tính giá vốn chạy song song đều nằm dưới lớp cân đối đó.
+    Mỗi phát hiện ở đây là một bất đẳng thức số học kèm bằng chứng, không suy đoán.
+    """
+    require_api_token(x_api_token)
+    try:
+        return inv.audit_inventory(
+            [inv.InventoryLine(**ln.model_dump()) for ln in req.lines],
+            warehouse=req.warehouse,
+            period_start=req.period_start,
+            period_end=req.period_end,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+
+
 # ===========================================================================
 # Manifest — nguồn cho agentic tool-calling và lớp MCP sau này
 # ===========================================================================
@@ -311,6 +359,18 @@ _TOOL_DEFS: list[dict[str, Any]] = [
         ),
         "input_schema": ReportRequestIn.model_json_schema(),
     },
+    {
+        "name": "inventory_audit",
+        "method": "POST",
+        "path": "/tools/inventory-audit",
+        "description": (
+            "Soi lỗi sổ sách trên bảng tổng hợp tồn kho: tồn âm, đơn giá tồn cuối "
+            "vượt mọi giá đầu vào, hai phương pháp tính giá vốn chạy song song, "
+            "hàng chết, hàng bán chậm, giá nhập nhảy vọt, hàng không ghi nhận giá trị. "
+            "Mỗi phát hiện kèm bằng chứng số và ước lượng tiền bị ghi sai chỗ."
+        ),
+        "input_schema": InventoryAuditRequest.model_json_schema(),
+    },
 ]
 
 
@@ -334,6 +394,7 @@ _TOOL_IMPL: dict[str, tuple[type[BaseModel], Any]] = {
     "forecast_reorder": (ForecastRequest, tool_forecast_reorder),
     "vat": (VatRequest, tool_vat),
     "report": (ReportRequestIn, tool_report),
+    "inventory_audit": (InventoryAuditRequest, tool_inventory_audit),
 }
 
 
