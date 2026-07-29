@@ -41,7 +41,11 @@ from transformers import (
 )
 
 ROOT = Path(__file__).resolve().parent.parent if "__file__" in globals() else Path.cwd()
-DATA_DIR = ROOT / "offline_training" / "generated"
+# ANSER_GENERATED_DIR cho phép trỏ thẳng vào Drive — xem dgen_common.GENERATED_DIR
+DATA_DIR = Path(
+    os.getenv("ANSER_GENERATED_DIR", "").strip()
+    or (ROOT / "offline_training" / "generated")
+)
 
 MODEL_ID = os.getenv("BASE_MODEL_ID", "Qwen/Qwen3-8B")
 MAX_LEN = int(os.getenv("MAX_SEQ_LEN", "8192"))

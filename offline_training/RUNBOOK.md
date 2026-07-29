@@ -10,9 +10,31 @@ Notebook để **chạy**; file này để **tra khi có sự cố** và để *
 | Việc | Ai làm | Ghi chú |
 |---|---|---|
 | Thêm `DEEPSEEK_API_KEY` vào Colab Secrets | Bạn | 🔑 bên trái Colab → *Add new secret* → bật *Notebook access*. **Không dán vào notebook** (R2b) |
-| Thêm `GITHUB_TOKEN` (chỉ nếu repo private) | Bạn | Personal Access Token quyền `repo` |
-| Dọn Drive còn ≥ 8GB trống | Bạn | Cell 1.4 in ra dung lượng từng thư mục; `anser-qwen-lora` (646MB) và `anser-qwen-distill-awq` là model **v1** đã bị v2 thay thế |
+| Dọn Drive còn ≥ 8GB trống | Bạn | Cell 1.4 in dung lượng từng thư mục; xoá được: `_backups` (234MB), `anser-qwen-lora`, `anser-qwen-distill-awq` (model **v1**) |
 | Chọn runtime **L4 GPU** | Bạn | *Runtime → Change runtime type* |
+
+Không cần token GitHub: notebook lấy mã **thẳng từ Drive**.
+
+### Sơ đồ thư mục trên Drive
+
+```
+MyDrive/
+├─ ANSER_AI_Logistics/          ← thư mục bạn đã đẩy lên
+│  ├─ AI_ANSER/                 ← mã nguồn (notebook đọc từ đây)
+│  ├─ generated/                ← dữ liệu sinh (notebook TỰ TẠO, giữ qua các phiên)
+│  ├─ anser-v3-lora/            ← LoRA sau khi train
+│  ├─ anser-v3-awq/             ← model cuối, trỏ TEXT_MODEL_ID vào đây
+│  └─ *_report.txt              ← báo cáo benchmark
+└─ ANSER_data/                  ← có sẵn từ trước (model v1/v2)
+```
+
+**Mã nguồn được chép sang `/content` để chạy**, không chạy thẳng trên Drive:
+Drive gắn qua FUSE, mỗi thao tác file mất hàng chục ms — import vài trăm file và
+ghi checkpoint sẽ chậm tới mức không dùng được. Mọi thứ **cần giữ** (dữ liệu
+sinh, model, báo cáo) vẫn ghi thẳng ra Drive.
+
+**Sửa mã nguồn thì làm ở máy bạn rồi đẩy lại lên Drive**, chạy lại cell 1.2 là
+bản mới được chép sang. Sửa trực tiếp trong `/content` sẽ mất khi hết phiên.
 
 Chi phí: DeepSeek **< 1 USD** cho toàn bộ bước sinh dữ liệu. Colab Pro tính theo
 giờ GPU — cả quy trình khoảng **3–4 giờ**.
@@ -91,8 +113,10 @@ Luôn đọc kèm baseline. Ví dụ:
 | Preflight báo `Chỉ N mẫu train` với N nhỏ | Chưa chạy 1.6b/1.6c (thiếu API key) | Kiểm tra cell 1.5 in ra `✓ Đã nạp DEEPSEEK_API_KEY` |
 | Preflight báo `Catalog node ĐÃ ĐỔI` | `N8N_TEMPLATES_DIR` khác lúc dựng dataset | Chạy lại `build_dataset_v3.py`. **Không bỏ qua**: `CODER_SYSTEM` dựng từ catalog, lệch là model học prompt không tồn tại lúc serve |
 | Preflight báo có secret | Dữ liệu nguồn dính credential | **Dừng.** Không train, không đẩy lên Drive. Gỡ secret khỏi nguồn rồi dựng lại |
-| Mất phiên Colab giữa chừng | Colab ngắt do idle | LoRA đã sao lưu ở cell 2.2 → chạy lại từ 2.3. Nếu mất trước 2.2 thì phải train lại |
+| Mất phiên Colab giữa chừng | Colab ngắt do idle | Dữ liệu sinh nằm trên Drive nên **không mất tiền API**. LoRA đã sao lưu ở cell 2.2 → chạy lại từ 2.3. Nếu mất trước 2.2 thì phải train lại |
 | Benchmark thoát mã 1 | Dưới ngưỡng | Xem mục 4 |
+| `Không tìm thấy repo trong Drive` | Thư mục đẩy lên thiếu `offline_training/` hoặc `src/` | Kiểm tra trên Drive có đủ hai thư mục đó không. Cell tự quét theo file mốc nên đổi tên thư mục vẫn chạy |
+| Sửa code mà Colab vẫn chạy bản cũ | Đang chạy bản chép ở `/content` | Đẩy bản mới lên Drive → chạy lại cell 1.2 |
 
 ---
 

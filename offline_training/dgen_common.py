@@ -17,8 +17,15 @@ import re
 import unicodedata
 from pathlib import Path
 
-# Mọi file sinh ra đều nằm đây — tách khỏi src/data (dữ liệu runtime)
-GENERATED_DIR = Path(__file__).parent / "generated"
+# Mọi file sinh ra đều nằm đây — tách khỏi src/data (dữ liệu runtime).
+#
+# Đổi được bằng env (P5: đường dẫn không đóng cứng trong code). Trên Colab nên
+# trỏ thẳng vào Google Drive: dữ liệu sinh ra TỐN TIỀN API và ~20 phút, để ở
+# /content là mất sạch khi hết phiên.
+#   export ANSER_GENERATED_DIR=/content/drive/MyDrive/ANSER_AI_Logistics/generated
+GENERATED_DIR = Path(
+    os.getenv("ANSER_GENERATED_DIR", "").strip() or (Path(__file__).parent / "generated")
+)
 
 
 # ---------------------------------------------------------------------------

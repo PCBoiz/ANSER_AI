@@ -27,7 +27,11 @@ import random
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-DATA_FILE = ROOT / "offline_training" / "generated" / "train_v3.jsonl"
+# ANSER_GENERATED_DIR cho phép trỏ thẳng vào Drive — xem dgen_common.GENERATED_DIR
+DATA_FILE = Path(
+    os.getenv("ANSER_GENERATED_DIR", "").strip()
+    or (ROOT / "offline_training" / "generated")
+) / "train_v3.jsonl"
 
 MODEL_ID = os.getenv("BASE_MODEL_ID", "Qwen/Qwen3-8B")
 LORA_DIR = os.getenv("LORA_DIR", "/content/checkpoints/anser-v3-lora")
