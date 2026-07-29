@@ -51,7 +51,23 @@ flowchart TD
 
 ## Giai đoạn 0 — Đối chiếu dữ liệu thật (tuần 1) 🔴 CHẶN MỌI THỨ
 
-**Không viết code. Không cần GPU.** Ngồi với khách và lấy số thật.
+**Không cần GPU.** Ngồi với khách và lấy số thật.
+
+> ✅ **Công cụ đã sẵn sàng (30/07/2026).** Bộ câu hỏi mang đi gặp khách nằm ở
+> [GD0_LAM_VIEC_VOI_KHACH.md](GD0_LAM_VIEC_VOI_KHACH.md); engine đối chiếu ở
+> [src/core/calibration.py](src/core/calibration.py), chạy qua CLI:
+>
+> ```bash
+> python -m offline_training.calibrate template --what quotes --out bao_gia_lich_su.csv
+> python -m offline_training.calibrate pricing  --csv bao_gia_lich_su.csv --margin 10 --fuel-sens 0.35 --fuel-baseline 25000
+> python -m offline_training.calibrate carriers --carriers nha_xe.csv --choices lua_chon.csv
+> ```
+>
+> Công cụ gọi **đúng** `compute_quote` / `select_carrier` của production (P4), và
+> tự từ chối những kết luận mà dữ liệu không đỡ nổi: không ước lượng
+> `fuel_sensitivity` khi giá dầu trong dữ liệu đứng yên, báo kèm kiểm chéo bỏ-một
+> cho trọng số, và vạch ra **"ĐẠT GIẢ"** khi quy tắc cũ lọt cổng 5% nhưng tham số
+> vẫn sai.
 
 | Việc | Đầu ra | Vì sao |
 |---|---|---|
