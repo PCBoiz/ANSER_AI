@@ -644,29 +644,60 @@ của tập fine-tune v3 giữ nguyên; tồn kho là chiều **bổ sung**, kh�
 
 ### 11c.1. Bản xuất luôn cân đối, và điều đó không có nghĩa là đúng
 
-22/22 mã cân đối tuyệt đối (ĐK + Nhập − Xuất = CK, cả lượng lẫn tiền) — phần mềm
-tự tính nên không thể lệch. Ba lỗi nằm **dưới** lớp cân đối đó:
+Quy mô thật (đọc từ `.xlsx` gốc, **119 mã** — bản PDF khách gửi lúc đầu chỉ là
+trích một phần 22 mã):
 
-| Lỗi | Bằng chứng | Tiền ghi sai chỗ |
+| | |
+|---|---|
+| Nhập trong kỳ | 8.809.963.650 đ |
+| **Giá vốn xuất kho** | **7.103.297.370 đ** |
+| Tồn cuối kỳ | 3.446.437.083 đ |
+| Vòng quay / số ngày tồn | 2,74 lần / 74 ngày |
+| Mua đứt bán đoạn | 40/119 mã, 627.884.549 đ |
+
+119/119 mã cân đối tuyệt đối, và cả 8 cột tổng khớp chính xác với dòng "Tổng cộng"
+của chính file. Những gì nằm **dưới** lớp cân đối đó:
+
+| Phát hiện | Bằng chứng | Mức |
 |---|---|---|
-| Tồn kho âm | `VT00059`: 87 + 4.400 − 4.508 = **−21 lít** | 1.218.356 đ |
-| Đơn giá tồn cuối vượt **mọi** giá đầu vào | `VT00023`: tồn cuối 60.595,69 đ/lít, giá vào cao nhất 57.342 đ/lít | 1.132.284 đ — **lãi kỳ này bị thổi lên** đúng bằng đó |
-| Hai phương pháp giá vốn song song | `VT00025` FIFO, còn `VT00008/39/59` bình quân di động (VAS 02 buộc nhất quán) | 1.635.531 đ |
+| Tồn kho âm | `VT00059`: 87 + 4.400 − 4.508 = **−21 lít** (−1.218.356 đ); `KM00034` −115,2 lít | Cao |
+| Hai phương pháp giá vốn song song | Bình quân `VT00008/15/22/29` (xuất = tồn = BQ *chính xác*, biên giá 6-11%) vs FIFO `VT00013/25` (xuất = đúng giá lô đầu kỳ, biên 10-26%). VAS 02 buộc nhất quán | Cao |
+| Kho khuyến mại giá trị = 0 tuyệt đối | 9.196 đơn vị nhập, 8.568 tồn, **không một đồng** | Cao |
+| Hàng chết / bán quá chậm | `VT00013` tồn đủ bán **7,6 năm** (96,9 triệu); `VT00009` không xuất đơn vị nào trong 204 ngày (45,4 triệu) | TB |
+| Giá vốn hàng tồn cao hơn hàng đã bán | `VT00002` +12,0% (52,4 triệu), `VT00007` +8,2% (41,9 triệu) → **biên kỳ sau hẹp lại** nếu giá bán không đổi | TB |
 
-Lỗi thứ hai là bất đẳng thức chắc chắn: giá trị còn lại luôn là trung bình có
-trọng số của một tập con các lô đã nhập, nên **không bao giờ** ra ngoài khoảng
-[min, max] của các giá đã vào. Vượt ra = có chi phí phát sinh ngoài sổ hoặc phân
-bổ sai giữa "giá vốn" và "tồn kho".
+### 11c.1b. ⚠️ Một kiểm tra đã bị gỡ vì nó SAI (30/07/2026)
 
-Thêm: 6 mã hàng chết (7,0 triệu đọng, 0 doanh thu trong 204 ngày), `VT00025` tồn
-đủ bán ~1,9 năm trong khi giá nhập vừa **+31,7%**, và **kho khuyến mại ghi giá trị
-bằng 0 tuyệt đối** — 8.568 đơn vị dầu nhớt thật không có đồng giá vốn nào, tức chi
-phí khuyến mại đang vô hình và lãi gộp bị thổi lên lần thứ hai.
+Bản đầu có kiểm tra *"đơn giá tồn cuối cao hơn mọi giá đầu vào ⇒ sổ ghi sai giá
+vốn ⇒ lãi bị thổi lên"*, kèm lập luận nghe rất chắc: giá trị còn lại là trung bình
+có trọng số của một tập con các lô, nên không thể ra ngoài [min, max] các giá đã vào.
+
+**Lập luận đúng, nhưng dữ liệu đầu vào của nó thì không.** `in_value / in_qty` là
+giá nhập *bình quân cả kỳ*, không phải giá từng lô. Với FIFO và giá tăng dần, hàng
+bán ra là lô cũ rẻ còn hàng nằm lại là lô mới đắt — nên đơn giá tồn cuối vượt giá
+nhập **bình quân** là kết quả hoàn toàn đúng.
+
+Chạy trên 119 mã thật: kiểm tra này gắn cờ **18 mã, cả 18 đều vô tội**. Bằng chứng
+quyết định là 5 mã **không có tồn đầu kỳ** — toàn bộ giá vốn đến từ hàng nhập bình
+quân 50.278 đ, mà xuất 48.214 và tồn 57.500. Bình quân thì cả ba phải bằng nhau;
+FIFO giá tăng thì đúng như quan sát.
+
+Hai thay đổi rút ra:
+
+- Thay bằng `rising_cost_basis` / `falling_cost_basis` — **không phải lỗi**, mà là
+  cảnh báo biên lợi nhuận **kỳ sau**: hàng còn trong kho đắt hơn hàng vừa bán.
+- `_costing_method` siết lại: bình quân đòi **cả ba** (xuất = tồn = BQ) trùng nhau,
+  cộng ngưỡng biên giá tối thiểu 1% — dưới ngưỡng đó mọi phương pháp cho cùng con
+  số nên kết luận chỉ là nhiễu (`VT00016` lệch 5 đ, `VT00036` lệch 209 đ).
+
+**Nguyên tắc:** bảng tổng hợp không cho thấy giá từng lô, nên mọi kết luận về
+*cách tính* giá vốn nằm ngoài tầm chứng minh của nó. Và khi một quy tắc bắn trên
+hàng chục mã cùng lúc thì **nghi quy tắc trước, đừng nghi sổ sách**.
 
 ### 11c.2. Cột "Xuất kho / Giá trị" chính là COGS mà `reporting.py` đang thiếu
 
 `build_report` phải tự thú *"chỉ 62% doanh thu có giá vốn"* vì không ai nhập giá
-vốn theo từng dòng bán. Bảng này có giá vốn ở mức **từng mã hàng**: 868.497.372 đ
+vốn theo từng dòng bán. Bảng này có giá vốn ở mức **từng mã hàng**: 7.103.297.370 đ
 cho kỳ. `inventory.unit_cost_table` + `fill_missing_cogs` bắc cầu sang `SaleLine`.
 
 Giá vốn điền theo đường này được **đánh dấu rõ trong `notes`** — nó là ước tính từ
@@ -701,6 +732,15 @@ liệu — lệch thì báo, để người quyết định:
 
 Ô rỗng trả `None` chứ không trả `0.0`: nhầm "chưa biết" với "bằng không" là cách
 nhanh nhất để bịa ra một con số tài chính.
+
+**Lần chạy thật đầu tiên đã bắt được đúng loại lỗi này ở chính parser.** MISA đặt
+nhóm cột (`Đầu kỳ`/`Nhập kho`/…) **cùng dòng** với `Mã hàng`, còn tên cột con
+(`Số lượng`/`Giá trị`) ở **dòng kế tiếp** — ngược với giả định ban đầu. Hậu quả:
+đọc đúng tên kho, kỳ, mã hàng, tên hàng, nhưng **không map được cột số nào**, ra
+119 dòng với mọi con số bằng 0. Và `ok` vẫn trả `True`, vì `mismatches` rỗng —
+mà `mismatches` rỗng chính *vì* không có cột nào để đối chiếu. Im lặng đúng lúc
+cần hét to nhất. Đã sửa cả hai: `_find_header` nhận cả hai cách bố trí, và `ok`
+tính thêm `missing_columns`.
 
 **Chủ quyền dữ liệu (P2):** giá vốn thật của khách **không** được commit. Fixture
 test là số tổng hợp tái tạo đúng các quan hệ số học, làm tròn cho dễ đọc.

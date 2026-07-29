@@ -9,17 +9,31 @@ Fast / Bravo) xuất ra bảng "TỔNG HỢP TỒN KHO" theo cùng một hình d
     Mã hàng | Tên hàng | ĐVT | Đầu kỳ (SL, GT, ĐGBQ) | Nhập kho (…) | Xuất kho (…) | Cuối kỳ (…)
 
 Bảng đó *luôn* cân đối về cộng trừ — phần mềm tự tính. Nhưng cân đối KHÔNG có
-nghĩa là đúng. Ba loại sai nằm dưới lớp cân đối và không ai nhìn ra khi đọc mắt
-thường: tồn âm, đơn giá tồn cao hơn mọi giá đầu vào, và hai phương pháp tính
-giá vốn chạy song song trong cùng một sổ.
+nghĩa là đúng: tồn âm, số lượng và giá trị ngược dấu, hàng có số lượng mà không
+có giá trị — tất cả đều nằm dưới lớp cân đối và không ai nhìn ra bằng mắt.
 
 VÌ SAO LÀ CODE, KHÔNG PHẢI LLM
 ------------------------------
 Cùng lý do đã chốt cho reporting.py (27/07/2026): con số tài chính sai mà *nghe
 có vẻ đúng* là loại lỗi tệ nhất. Ở đây còn nặng hơn — output là lời buộc tội sổ
 sách. Một phát hiện sai làm chủ DN mất niềm tin ngay lập tức, một phát hiện bỏ
-sót thì vô hại. Nên mọi kiểm tra ở đây là bất đẳng thức số học có thể chứng
-minh, kèm bằng chứng để đối chiếu tay. LLM chỉ diễn giải (nhánh REPORT).
+sót thì vô hại. Nên mọi kiểm tra ở đây phải chứng minh được, kèm bằng chứng để
+đối chiếu tay. LLM chỉ diễn giải (nhánh REPORT).
+
+BÀI HỌC 30/07/2026 — GIỚI HẠN CỦA BẢNG TỔNG HỢP
+------------------------------------------------
+Bản đầu của module này có một kiểm tra sai: nó coi "đơn giá tồn cuối cao hơn
+mọi giá đầu vào" là bằng chứng sổ ghi sai. Chạy trên bản xuất thật 119 mã thì
+nó gắn cờ 18 mã — và cả 18 đều VÔ TỘI.
+
+`in_value / in_qty` là giá nhập *bình quân cả kỳ*, không phải giá từng lô. Với
+FIFO và giá tăng dần, hàng bán ra là lô cũ rẻ, hàng nằm lại là lô mới đắt, nên
+đơn giá tồn cuối vượt giá nhập bình quân là kết quả ĐÚNG. Cả 18 mã đều mang
+đúng chữ ký đó: xuất < bình quân < tồn cuối.
+
+Nguyên tắc rút ra: bảng tổng hợp không cho thấy giá từng lô, nên mọi kết luận
+về *cách tính* giá vốn đều nằm ngoài tầm chứng minh của nó. Một quy tắc bắn
+trên hàng chục mã cùng lúc thì nghi quy tắc trước, đừng nghi sổ sách.
 
 VÌ SAO ĐÂY LÀ MẢNH GHÉP CÒN THIẾU CỦA BÁO CÁO LÃI LỖ
 ----------------------------------------------------
@@ -43,6 +57,8 @@ _UNIT_TOL = 1.0             # đồng/ĐVT — dùng khi so đơn giá
 
 # --- Ngưỡng nghiệp vụ (đổi được, có lý do) --------------------------------
 _PRICE_JUMP_PCT = 10.0      # giá nhập lệch >=10% so với giá tồn đầu kỳ
+_COST_DRIFT_PCT = 5.0       # giá vốn hàng tồn lệch >=5% so với hàng đã bán
+_METHOD_MIN_SPREAD_PCT = 1.0  # biên giá tối thiểu để phân biệt FIFO / bình quân
 _DEAD_MIN_DAYS = 90         # kỳ ngắn hơn 90 ngày thì "chưa xuất" là bình thường
 _SLOW_DAYS_OF_SUPPLY = 365  # tồn đủ bán trên 1 năm = vốn chôn
 
@@ -171,86 +187,124 @@ def _check_negative(line: InventoryLine) -> list[dict[str, Any]]:
     )]
 
 
-def _check_cost_bounds(line: InventoryLine) -> list[dict[str, Any]]:
+def _check_value_sign(line: InventoryLine) -> list[dict[str, Any]]:
     """
-    Đơn giá xuất và đơn giá tồn cuối phải nằm trong [min, max] các đơn giá ĐÃ VÀO.
-
-    Vì sao đây là bất đẳng thức chắc chắn: dù dùng bình quân, bình quân di động
-    hay FIFO, giá trị còn lại luôn là trung bình có trọng số của một tập con các
-    lô đã nhập. Trung bình có trọng số không bao giờ vượt ra ngoài khoảng
-    [nhỏ nhất, lớn nhất] của tập đó. Vượt ra = có chi phí phát sinh ngoài sổ,
-    hoặc phân bổ sai giữa "giá vốn" và "tồn kho".
-
-    Hệ quả tiền: đơn giá tồn cuối CAO hơn trần nghĩa là chi phí bị giữ lại trong
-    kho thay vì đẩy vào giá vốn → lãi kỳ này bị thổi lên đúng bằng phần chênh.
+    Số lượng và giá trị phải cùng dấu. Đây là mâu thuẫn thật sự không thể có:
+    còn hàng trong kho mà giá trị âm, hoặc hết hàng mà vẫn còn giá trị.
     """
-    units = line.input_units()
-    if not units:
-        return []
-    lo, hi = min(units), max(units)
     out: list[dict[str, Any]] = []
-
-    ck = line.closing_unit()
-    if ck is not None and ck > hi + _UNIT_TOL:
-        out.append(_finding(
-            "impossible_closing_cost", "cao", line,
-            "Đơn giá tồn cuối cao hơn mọi giá đầu vào",
-            {"đơn_giá_tồn_cuối": round(ck, 2), "giá_vào_cao_nhất": round(hi, 2),
-             "giá_vào_thấp_nhất": round(lo, 2), "số_lượng_tồn": line.closing_qty},
-            "Chi phí đang nằm lại trong tồn kho thay vì vào giá vốn → LÃI KỲ NÀY "
-            "BỊ THỔI LÊN tương ứng. Đối chiếu sổ chi tiết xem có bút toán điều "
-            "chỉnh không hiện trên báo cáo tổng hợp.",
-            money_impact=(ck - hi) * line.closing_qty,
-        ))
-    if ck is not None and ck < lo - _UNIT_TOL:
-        out.append(_finding(
-            "impossible_closing_cost", "trung bình", line,
-            "Đơn giá tồn cuối thấp hơn mọi giá đầu vào",
-            {"đơn_giá_tồn_cuối": round(ck, 2), "giá_vào_thấp_nhất": round(lo, 2),
-             "số_lượng_tồn": line.closing_qty},
-            "Giá vốn có thể đã ghi thừa → lãi kỳ này bị ghi thiếu. Đối chiếu sổ chi tiết.",
-            money_impact=(lo - ck) * line.closing_qty,
-        ))
-
-    xu = line.out_unit()
-    if xu is not None and (xu > hi + _UNIT_TOL or xu < lo - _UNIT_TOL):
-        out.append(_finding(
-            "impossible_out_cost", "cao", line,
-            "Đơn giá xuất nằm ngoài khoảng giá đầu vào",
-            {"đơn_giá_xuất": round(xu, 2), "giá_vào_thấp_nhất": round(lo, 2),
-             "giá_vào_cao_nhất": round(hi, 2), "số_lượng_xuất": line.out_qty},
-            "Giá vốn của mã này không truy được về lô nhập nào. Kiểm tra bút toán "
-            "điều chỉnh hoặc phiếu xuất nhập sai giá.",
-        ))
+    for stage, label in (("closing", "cuối kỳ"), ("opening", "đầu kỳ")):
+        qty = getattr(line, f"{stage}_qty")
+        val = getattr(line, f"{stage}_value")
+        if val is None:
+            continue
+        if qty > _QTY_TOL and val < -_VALUE_TOL:
+            out.append(_finding(
+                "value_sign_conflict", "cao", line,
+                f"Tồn {label} có số lượng dương nhưng giá trị âm",
+                {"số_lượng": qty, "giá_trị": val},
+                "Giá vốn ghi âm cho hàng đang có thật. Đối chiếu sổ chi tiết.",
+                money_impact=abs(val),
+            ))
+        elif abs(qty) <= _QTY_TOL and abs(val) > _VALUE_TOL:
+            out.append(_finding(
+                "value_sign_conflict", "cao", line,
+                f"Tồn {label} hết hàng nhưng vẫn còn giá trị",
+                {"số_lượng": qty, "giá_trị": val},
+                "Giá trị treo lại trên mã đã hết hàng — thường do phiếu xuất "
+                "thiếu giá vốn. Đối chiếu sổ chi tiết.",
+                money_impact=abs(val),
+            ))
     return out
+
+
+def _check_cost_drift(line: InventoryLine) -> list[dict[str, Any]]:
+    """
+    So giá vốn hàng CÒN TRONG KHO với giá vốn hàng ĐÃ BÁN trong kỳ.
+
+    ĐÂY KHÔNG PHẢI KIỂM TRA LỖI — và một phiên bản trước của hàm này đã sai vì
+    tưởng là (30/07/2026, phát hiện khi chạy trên bản xuất thật 119 mã).
+
+    Sai ở đâu: `in_value / in_qty` là giá nhập BÌNH QUÂN CẢ KỲ, không phải giá
+    từng lô. Với FIFO và giá tăng dần, hàng bán ra là lô cũ rẻ còn hàng nằm lại
+    là lô mới đắt — nên đơn giá tồn cuối VƯỢT giá nhập bình quân là chuyện hoàn
+    toàn bình thường, không phải bằng chứng sổ sai. Bảng tổng hợp không cho thấy
+    giá từng lô nên không thể kết luận ngược lại. 18/18 mã bị gắn cờ oan đều có
+    đúng chữ ký FIFO: xuất < bình quân < tồn cuối.
+
+    Cái ĐÚNG mà con số này nói lên là chuyện của kỳ SAU: hàng còn trong kho đắt
+    hơn hàng vừa bán, nên nếu giá bán không đổi thì biên lợi nhuận kỳ tới hẹp
+    lại. Đó mới là thứ chủ DN cần biết.
+    """
+    out_u, ck_u = line.out_unit(), line.closing_unit()
+    if out_u is None or ck_u is None or out_u <= 0 or line.closing_qty <= _QTY_TOL:
+        return []
+
+    drift = (ck_u - out_u) / out_u * 100
+    if abs(drift) < _COST_DRIFT_PCT:
+        return []
+
+    extra = (ck_u - out_u) * line.closing_qty
+    if drift > 0:
+        return [_finding(
+            "rising_cost_basis", "trung bình", line,
+            f"Giá vốn hàng tồn cao hơn hàng đã bán {drift:.1f}%",
+            {"đơn_giá_đã_bán": round(out_u, 2), "đơn_giá_còn_tồn": round(ck_u, 2),
+             "số_lượng_tồn": line.closing_qty, "chênh_lệch_pct": round(drift, 1)},
+            "Bán hết chỗ tồn này ở giá bán hiện tại thì biên lợi nhuận kỳ sau sẽ "
+            "hẹp hơn kỳ này. Cân nhắc điều chỉnh bảng giá bán trước khi xả hàng.",
+            money_impact=extra,
+        )]
+    return [_finding(
+        "falling_cost_basis", "thấp", line,
+        f"Giá vốn hàng tồn thấp hơn hàng đã bán {abs(drift):.1f}%",
+        {"đơn_giá_đã_bán": round(out_u, 2), "đơn_giá_còn_tồn": round(ck_u, 2),
+         "số_lượng_tồn": line.closing_qty, "chênh_lệch_pct": round(drift, 1)},
+        "Giá vốn đang giảm: giữ nguyên giá bán thì biên kỳ sau rộng hơn, hoặc "
+        "hạ giá để giành đơn mà vẫn đủ biên.",
+        money_impact=extra,
+    )]
 
 
 def _costing_method(line: InventoryLine) -> Optional[str]:
     """
-    Đoán phương pháp tính giá vốn từ đơn giá xuất.
+    Đoán phương pháp tính giá vốn — CỰC KỲ dè dặt, thà không biết còn hơn đoán sai.
 
-    Chỉ kết luận khi có ĐỦ bằng chứng phân biệt: phải có tồn đầu kỳ, có nhập
-    trong kỳ, có xuất, và hai giá phải khác nhau đủ xa. Thiếu một trong số đó
-    thì FIFO và bình quân cho cùng kết quả → trả None, không đoán bừa.
+    Đã siết lại sau khi bản đầu nhận nhầm FIFO thành bình quân trên dữ liệu thật
+    (30/07/2026): chỉ so đơn giá xuất với bình quân là không đủ, vì khi giá nhập
+    ít biến động thì FIFO và bình quân cho gần như cùng một con số.
+
+    Dấu hiệu phân biệt thật nằm ở chỗ khác:
+
+      - BÌNH QUÂN (di động): hàng xuất và hàng còn lại mang CÙNG một đơn giá,
+        và đơn giá đó xấp xỉ bình quân cả kỳ. Cả ba phải trùng nhau.
+      - FIFO: xuất đúng bằng giá lô đầu kỳ, và không xuất quá số lượng lô đó.
+
+    Không thoả cả hai -> None. Bảng tổng hợp không cho thấy giá từng lô, nên
+    nhiều trường hợp vốn dĩ không thể kết luận, và nói "không biết" mới là câu
+    trả lời đúng.
     """
     o_u, i_u, x_u = line.opening_unit(), line.in_unit(), line.out_unit()
+    ck_u = line.closing_unit()
     if o_u is None or i_u is None or x_u is None:
         return None
     if line.opening_value is None or line.in_value is None:
         return None
-    if abs(o_u - i_u) <= _UNIT_TOL:
-        return None  # hai giá trùng nhau — không phân biệt được phương pháp
-
     wavg = (line.opening_value + line.in_value) / (line.opening_qty + line.in_qty)
-    # Sai số cho phép khi so với bình quân: bình quân DI ĐỘNG tính lại sau mỗi
-    # giao dịch nên lệch nhẹ so với bình quân cả kỳ. Lấy 1% khoảng giá làm biên.
+    # Biên giá đầu kỳ vs giá nhập phải đủ rộng thì hai phương pháp mới tách ra
+    # được. Giá gần như nhau (VT00016 lệch 5đ, VT00036 lệch 209đ trên bản xuất
+    # thật) thì FIFO và bình quân cho cùng một con số — kết luận lúc đó là nhiễu.
+    if wavg <= 0 or abs(o_u - i_u) / wavg * 100 < _METHOD_MIN_SPREAD_PCT:
+        return None
+
     band = max(_UNIT_TOL, abs(o_u - i_u) * 0.05)
 
     if abs(x_u - o_u) <= _UNIT_TOL and line.out_qty <= line.opening_qty + _QTY_TOL:
         return "fifo"
-    if abs(x_u - wavg) <= band:
+    # Bình quân: đòi CẢ hàng xuất lẫn hàng tồn cùng mang đơn giá bình quân.
+    if ck_u is not None and abs(x_u - wavg) <= band and abs(ck_u - wavg) <= band:
         return "bình quân"
-    return "không xác định"
+    return None
 
 
 def _check_dead_and_slow(line: InventoryLine, period_days: int) -> list[dict[str, Any]]:
@@ -353,13 +407,13 @@ def audit_inventory(
     for line in lines:
         findings += _check_balance(line)
         findings += _check_negative(line)
-        findings += _check_cost_bounds(line)
+        findings += _check_value_sign(line)
+        findings += _check_cost_drift(line)
         findings += _check_dead_and_slow(line, period_days)
         findings += _check_price_jump(line)
         findings += _check_zero_value(line)
 
-        m = _costing_method(line)
-        if m and m != "không xác định":
+        if (m := _costing_method(line)):
             methods.setdefault(m, []).append(line.code)
 
     findings += _check_method_consistency(lines, methods)
@@ -384,15 +438,21 @@ def audit_inventory(
             "confidence": "cao" if not high else "trung bình",
             "checks_run": [
                 "cân đối số lượng & giá trị", "tồn kho âm",
-                "đơn giá ngoài khoảng giá đầu vào", "phương pháp tính giá vốn",
-                "hàng chết & bán chậm", "biến động giá nhập",
-                "hàng không ghi nhận giá trị",
+                "số lượng và giá trị ngược dấu", "trôi giá vốn tồn so với đã bán",
+                "phương pháp tính giá vốn", "hàng chết & bán chậm",
+                "biến động giá nhập", "hàng không ghi nhận giá trị",
             ],
             "costing_methods_detected": {k: sorted(v) for k, v in methods.items()},
             "note": (
-                "Mọi phát hiện đều là bất đẳng thức số học trên chính bảng này, "
-                "không suy đoán. Trường money_impact là ước lượng phần tiền bị "
-                "ghi sai chỗ, không phải tiền mất."
+                "Mọi phát hiện đều dựa trên chính bảng này, không suy đoán. "
+                "money_impact là ước lượng quy mô tiền liên quan, không phải "
+                "tiền mất."
+            ),
+            "limits": (
+                "Bảng tổng hợp KHÔNG cho thấy giá từng lô nhập, nên không thể "
+                "kết luận sổ ghi sai chỉ vì đơn giá tồn cuối cao hơn giá nhập "
+                "bình quân — với FIFO và giá tăng trong kỳ, đó là kết quả đúng. "
+                "Muốn kết luận về giá vốn phải đối chiếu sổ chi tiết theo lô."
             ),
         },
         "warnings": warnings,

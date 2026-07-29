@@ -107,60 +107,116 @@ class ParseResult:
 
     @property
     def ok(self) -> bool:
-        """Đọc sạch: có dòng, và không lớp tự kiểm nào báo lệch."""
-        return bool(self.lines) and not self.checks.get("mismatches")
+        """
+        Đọc sạch: có dòng, không lớp tự kiểm nào báo lệch, VÀ không thiếu cột
+        thiết yếu.
+
+        Vế cuối học được từ lần chạy thật đầu tiên (30/07/2026): parser đọc đúng
+        tên kho, kỳ, mã hàng, tên hàng nhưng KHÔNG map được cột số nào, rồi vẫn
+        trả ok=True vì `mismatches` rỗng — mà `mismatches` rỗng chính là *vì*
+        không có cột nào để đối chiếu. Im lặng đúng lúc cần hét to nhất.
+        """
+        return (
+            bool(self.lines)
+            and not self.checks.get("mismatches")
+            and not self.checks.get("missing_columns")
+        )
 
 
-def _find_header(rows: list[list[Any]]) -> Optional[int]:
+def _is_code_label(text: str) -> bool:
+    return text.startswith("ma hang") or text in {"ma vt", "ma sp", "ma hh"}
+
+
+def _row_has(row: list[Any], names: tuple[str, ...]) -> bool:
+    return any(any(_norm(c).startswith(n) for n in names) for c in row)
+
+
+@dataclass
+class _Header:
+    label_i: int      # dòng chứa "Mã hàng" / "Tên hàng" / "ĐVT"
+    group_i: int      # dòng chứa "Đầu kỳ" / "Nhập kho" / "Xuất kho" / "Cuối kỳ"
+    sub_i: int        # dòng chứa "Số lượng" / "Giá trị" / "Đơn giá BQ"
+
+    @property
+    def data_start(self) -> int:
+        return max(self.label_i, self.group_i, self.sub_i) + 1
+
+
+def _find_header(rows: list[list[Any]]) -> Optional[_Header]:
+    """
+    Định vị header, chấp nhận cả hai cách bố trí đã gặp ngoài đời.
+
+    MISA xuất kiểu A — nhóm nằm CÙNG dòng với "Mã hàng", cột con ở dòng KẾ TIẾP:
+
+        [7] Tên kho | Mã hàng | Tên hàng | ĐVT | Đầu kỳ  |         |
+        [8]         |         |          |     | Số lượng| Giá trị | Đơn giá BQ
+
+    Kiểu B — nhóm ở dòng TRÊN, cột con cùng dòng với "Mã hàng":
+
+        [5]         |         |          |     | Đầu kỳ  |         |
+        [6] Tên kho | Mã hàng | Tên hàng | ĐVT | Số lượng| Giá trị | Đơn giá BQ
+
+    Đoán sai một dòng là mất sạch cột số mà vẫn đọc được mã hàng — tức là ra
+    một bảng trông bình thường với mọi con số bằng 0.
+    """
+    groups = tuple(_GROUPS)
+    subs = tuple(_SUBS)
+
     for i, row in enumerate(rows):
-        cells = {_norm(c) for c in row}
-        if any(c.startswith("ma hang") or c in {"ma vt", "ma sp", "ma hh"} for c in cells):
-            return i
+        if not any(_is_code_label(_norm(c)) for c in row):
+            continue
+        below = rows[i + 1] if i + 1 < len(rows) else []
+        above = rows[i - 1] if i > 0 else []
+
+        sub_i = i if _row_has(row, subs) else (i + 1 if _row_has(below, subs) else i)
+        group_i = i if _row_has(row, groups) else (i - 1 if _row_has(above, groups) else i)
+        return _Header(label_i=i, group_i=group_i, sub_i=sub_i)
     return None
 
 
-def _build_columns(rows: list[list[Any]], header_i: int) -> dict[str, int]:
+def _build_columns(rows: list[list[Any]], hdr: _Header) -> dict[str, int]:
     """
     Ánh xạ tên trường -> chỉ số cột.
 
-    Header hai tầng: tầng trên là nhóm ("Đầu kỳ"/"Nhập kho"/...), tầng dưới là
-    cột con ("Số lượng"/"Giá trị"/"Đơn giá BQ"). Ô gộp (merge) để lại ô trống ở
-    các cột sau nên nhóm phải được kéo sang phải (forward-fill).
+    Ô gộp (merge) để lại ô trống ở các cột sau, nên tên nhóm phải được kéo sang
+    phải (forward-fill) cho tới khi gặp nhóm mới.
     """
-    header = rows[header_i]
-    group_row = rows[header_i - 1] if header_i > 0 else []
-    # Nhóm có thể nằm ngay trên, hoặc nằm cùng hàng với "Mã hàng" (một tầng).
-    if not any(_norm(c) in _GROUPS or _norm(c).startswith(("dau ky", "nhap", "xuat", "cuoi ky"))
-               for c in group_row):
-        group_row = header
+    label_row = rows[hdr.label_i]
+    group_row = rows[hdr.group_i]
+    sub_row = rows[hdr.sub_i]
+    width = max(len(label_row), len(group_row), len(sub_row))
 
     cols: dict[str, int] = {}
     current = ""
-    for idx in range(max(len(header), len(group_row))):
+    for idx in range(width):
         raw_group = _norm(group_row[idx]) if idx < len(group_row) else ""
-        for key in _GROUPS:
+        for key, short in _GROUPS.items():
             if raw_group.startswith(key):
-                current = _GROUPS[key]
+                current = short
                 break
         else:
             # Ô có chữ nhưng không phải tên nhóm. Nếu là tên cột con thì vẫn
-            # thuộc nhóm đang mở (trường hợp header một tầng); ngược lại đã ra
-            # khỏi vùng nhóm nên đóng lại, đừng kéo nhầm sang cột kế bên.
+            # thuộc nhóm đang mở (header một tầng); ngược lại đã ra khỏi vùng
+            # nhóm nên đóng lại, đừng kéo nhầm sang cột kế bên.
             if raw_group and not any(raw_group.startswith(s) for s in _SUBS):
                 current = ""
 
-        sub = _norm(header[idx]) if idx < len(header) else ""
-        if sub.startswith("ma hang") or sub in {"ma vt", "ma sp", "ma hh"}:
-            cols["code"] = idx
-        elif sub.startswith("ten hang"):
-            cols["name"] = idx
-        elif sub in {"dvt", "don vi tinh"}:
-            cols["unit"] = idx
-        elif sub.startswith("ten kho"):
-            cols["warehouse"] = idx
-        else:
+        # Nhãn cột lấy từ dòng nhãn; một số bản xuất để nhãn ở dòng cột con.
+        for candidate in (label_row, sub_row):
+            label = _norm(candidate[idx]) if idx < len(candidate) else ""
+            if _is_code_label(label):
+                cols.setdefault("code", idx)
+            elif label.startswith("ten hang"):
+                cols.setdefault("name", idx)
+            elif label in {"dvt", "don vi tinh"}:
+                cols.setdefault("unit", idx)
+            elif label.startswith("ten kho"):
+                cols.setdefault("warehouse", idx)
+
+        sub = _norm(sub_row[idx]) if idx < len(sub_row) else ""
+        if current:
             for key, short in _SUBS.items():
-                if sub.startswith(key) and current:
+                if sub.startswith(key):
                     cols.setdefault(f"{current}_{short}", idx)
                     break
     return cols
@@ -197,14 +253,16 @@ def parse_inventory_table(rows: list[list[Any]]) -> ParseResult:
             "ngày (hàng chết, hàng bán chậm) sẽ bị bỏ qua."
         )
 
-    header_i = _find_header(rows)
-    if header_i is None:
+    hdr = _find_header(rows)
+    if hdr is None:
         res.warnings.append("Không tìm thấy dòng tiêu đề có cột 'Mã hàng'. Bảng sai định dạng?")
+        res.checks = {"missing_columns": ["header"], "mismatches": []}
         return res
 
-    cols = _build_columns(rows, header_i)
+    cols = _build_columns(rows, hdr)
     if "code" not in cols:
         res.warnings.append("Không xác định được cột 'Mã hàng'.")
+        res.checks = {"missing_columns": ["code"], "mismatches": []}
         return res
 
     missing = [k for k in ("opening_qty", "in_qty", "out_qty", "closing_qty")
@@ -219,7 +277,7 @@ def parse_inventory_table(rows: list[list[Any]]) -> ParseResult:
     totals_row: Optional[list[Any]] = None
     unit_mismatches: list[dict[str, Any]] = []
 
-    for row in rows[header_i + 1:]:
+    for row in rows[hdr.data_start:]:
         code = _cell(row, cols.get("code"))
         code_text = "" if code is None else str(code).strip()
         first = _norm(row[0] if row else "")
@@ -255,9 +313,11 @@ def parse_inventory_table(rows: list[list[Any]]) -> ParseResult:
 
     if not res.lines:
         res.warnings.append("Không đọc được dòng hàng nào sau tiêu đề.")
+        res.checks = {"missing_columns": [], "mismatches": []}
         return res
 
     res.checks = _verify(res, totals_row, cols, unit_mismatches)
+    res.checks["missing_columns"] = missing
     if res.checks["mismatches"]:
         res.warnings.append(
             f"{len(res.checks['mismatches'])} điểm không khớp khi tự kiểm — nhiều "

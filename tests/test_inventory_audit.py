@@ -110,47 +110,84 @@ def test_ton_am_bi_bat():
     assert f["money_impact"] == 1_200_000     # trị tuyệt đối, không âm
 
 
-# --- C. đơn giá ngoài khoảng giá đầu vào -----------------------------------
+# --- C. trôi giá vốn + mâu thuẫn dấu ---------------------------------------
+#
+# Nhóm test này canh một hồi quy CỤ THỂ: bản đầu của engine coi "đơn giá tồn
+# cuối cao hơn mọi giá đầu vào" là bằng chứng sổ ghi sai, và gắn cờ oan 18/18
+# mã trên bản xuất thật. Với FIFO + giá tăng trong kỳ, đó là kết quả ĐÚNG.
 
-def test_don_gia_ton_cuoi_cao_hon_moi_gia_vao():
+def test_fifo_gia_tang_KHONG_bi_coi_la_loi():
     """
-    Vào 50.000 và 60.000, tồn cuối ghi 70.000/lít.
-    Bất khả thi với mọi phương pháp -> 100 lít × 10.000 = 1.000.000đ chi phí
-    bị giữ lại trong kho thay vì vào giá vốn.
+    Hồi quy 30/07/2026. Chữ ký FIFO giá tăng: xuất < bình quân < tồn cuối.
+    Không có giá từng lô thì không thể kết luận sổ sai — và không được kết luận.
     """
     ln = InventoryLine(
         code="VT00023", unit="Lít",
         opening_qty=100, opening_value=5_000_000,     # 50.000
-        in_qty=900, in_value=54_000_000,              # 60.000
-        out_qty=900, out_value=52_000_000,
-        closing_qty=100, closing_value=7_000_000,     # 70.000  <-- vượt trần
+        in_qty=900, in_value=54_000_000,              # 60.000 bình quân cả kỳ
+        out_qty=900, out_value=52_000_000,            # 57.777 — bán lô cũ rẻ
+        closing_qty=100, closing_value=7_000_000,     # 70.000 — còn lô mới đắt
     )
-    f = one(audit_inventory([ln], **PERIOD), "impossible_closing_cost")
-    assert f["severity"] == "cao"
-    assert f["evidence"]["giá_vào_cao_nhất"] == 60_000
-    assert f["money_impact"] == 1_000_000
-    assert "THỔI LÊN" in f["suggestion"]
+    ks = kinds(audit_inventory([ln], **PERIOD))
+    assert "impossible_closing_cost" not in ks
+    assert "impossible_out_cost" not in ks
 
 
-def test_don_gia_ton_cuoi_thap_hon_moi_gia_vao():
+def test_gia_von_ton_cao_hon_da_ban_thi_canh_bao_bien_ky_sau():
+    """Con số đó nói chuyện của kỳ SAU, không phải lỗi của kỳ này."""
+    ln = InventoryLine(
+        code="VT00023", unit="Lít",
+        opening_qty=100, opening_value=5_000_000,
+        in_qty=900, in_value=54_000_000,
+        out_qty=900, out_value=52_000_000,            # 57.777,78/lít
+        closing_qty=100, closing_value=7_000_000,     # 70.000/lít
+    )
+    f = one(audit_inventory([ln], **PERIOD), "rising_cost_basis")
+    assert f["severity"] == "trung bình"
+    assert f["evidence"]["chênh_lệch_pct"] == pytest.approx(21.2, abs=0.3)
+    assert f["money_impact"] == pytest.approx(1_222_222, abs=2)
+    assert "biên lợi nhuận kỳ sau" in f["suggestion"]
+
+
+def test_gia_von_ton_thap_hon_da_ban_la_co_hoi_khong_phai_loi():
+    ln = InventoryLine(
+        code="Y", opening_qty=100, opening_value=7_000_000,
+        in_qty=100, in_value=5_000_000,
+        out_qty=100, out_value=7_000_000,             # 70.000
+        closing_qty=100, closing_value=5_000_000,     # 50.000
+    )
+    f = one(audit_inventory([ln], **PERIOD), "falling_cost_basis")
+    assert f["severity"] == "thấp"
+
+
+def test_troi_gia_von_nho_thi_im_lang():
     ln = InventoryLine(
         code="Y", opening_qty=100, opening_value=5_000_000,
-        in_qty=100, in_value=6_000_000,
-        out_qty=100, out_value=7_000_000,
-        closing_qty=100, closing_value=4_000_000,     # 40.000 < 50.000
+        in_qty=100, in_value=5_100_000,
+        out_qty=100, out_value=5_000_000,             # 50.000
+        closing_qty=100, closing_value=5_100_000,     # 51.000 -> +2%
     )
-    f = one(audit_inventory([ln], **PERIOD), "impossible_closing_cost")
+    ks = kinds(audit_inventory([ln], **PERIOD))
+    assert "rising_cost_basis" not in ks
+
+
+def test_con_hang_ma_gia_tri_am_la_mau_thuan_that():
+    ln = InventoryLine(code="Z", opening_qty=0, opening_value=0,
+                       in_qty=100, in_value=1_000_000,
+                       out_qty=40, out_value=2_000_000,
+                       closing_qty=60, closing_value=-1_000_000)
+    f = one(audit_inventory([ln], **PERIOD), "value_sign_conflict")
+    assert f["severity"] == "cao"
     assert f["money_impact"] == 1_000_000
 
 
-def test_don_gia_xuat_ngoai_khoang_bi_bat():
-    ln = InventoryLine(
-        code="Z", opening_qty=100, opening_value=5_000_000,
-        in_qty=100, in_value=6_000_000,
-        out_qty=100, out_value=9_000_000,             # 90.000 > 60.000
-        closing_qty=100, closing_value=2_000_000,
-    )
-    assert "impossible_out_cost" in kinds(audit_inventory([ln], **PERIOD))
+def test_het_hang_ma_con_gia_tri_treo_lai():
+    ln = InventoryLine(code="Z", opening_qty=100, opening_value=5_000_000,
+                       in_qty=0, in_value=0,
+                       out_qty=100, out_value=3_000_000,
+                       closing_qty=0, closing_value=2_000_000)
+    f = one(audit_inventory([ln], **PERIOD), "value_sign_conflict")
+    assert "treo lại" in f["suggestion"]
 
 
 # --- D. phương pháp tính giá vốn -------------------------------------------
@@ -194,6 +231,38 @@ def test_khong_doan_phuong_phap_khi_thieu_bang_chung():
     )
     r = audit_inventory([ln], **PERIOD)
     assert r["explain"]["costing_methods_detected"] == {}
+
+
+def test_bien_gia_qua_hep_thi_khong_ket_luan_phuong_phap():
+    """
+    Hồi quy 30/07/2026: trên bản xuất thật, VT00016 lệch 5đ và VT00036 lệch
+    209đ giữa giá đầu kỳ và giá nhập. Ở biên đó FIFO và bình quân cho cùng con
+    số, nên mọi kết luận về phương pháp đều là nhiễu.
+    """
+    ln = InventoryLine(
+        code="VT00016", opening_qty=252, opening_value=252 * 59_395,
+        in_qty=1000, in_value=1000 * 59_400,
+        out_qty=1000, out_value=1000 * 59_399,
+        closing_qty=252, closing_value=252 * 59_399,
+    )
+    assert audit_inventory([ln], **PERIOD)["explain"]["costing_methods_detected"] == {}
+
+
+def test_binh_quan_doi_ca_hang_xuat_lan_hang_ton_cung_don_gia():
+    """
+    Chữ ký bình quân là CẢ BA trùng nhau (xuất = tồn = bình quân). Chỉ so đơn
+    giá xuất với bình quân là không đủ — đó là lỗi của bản đầu, khiến FIFO giá
+    tăng bị nhận nhầm thành bình quân trên dữ liệu thật.
+    """
+    fifo_gia_tang = InventoryLine(
+        code="VT00013", opening_qty=432, opening_value=432 * 64_889,
+        in_qty=200, in_value=200 * 72_199,
+        out_qty=101, out_value=101 * 64_889,        # đúng giá lô đầu kỳ
+        closing_qty=531,
+        closing_value=432 * 64_889 + 200 * 72_199 - 101 * 64_889,
+    )
+    detected = audit_inventory([fifo_gia_tang], **PERIOD)["explain"]["costing_methods_detected"]
+    assert list(detected) == ["fifo"]
 
 
 # --- E. hàng chết / bán chậm -----------------------------------------------
@@ -384,7 +453,7 @@ def test_endpoint_inventory_audit():
     body = resp.json()
     assert body["warehouse"] == "KHO HÀNG HÓA"
     assert body["period"]["days"] == 204
-    assert "impossible_closing_cost" in {f["kind"] for f in body["findings"]}
+    assert "rising_cost_basis" in {f["kind"] for f in body["findings"]}
 
 
 @pytest.mark.asyncio
