@@ -635,6 +635,10 @@ Kèm theo: `pytest-asyncio` bị thiếu trong `requirements-dev.txt` khiến `t
 
 ## 12. Lộ trình
 
+> **Lộ trình thực thi chi tiết (mốc 2-3 tháng, có cổng ra từng giai đoạn) nằm ở
+> [ROADMAP.md](ROADMAP.md).** Sơ đồ dưới đây là thứ tự phụ thuộc kỹ thuật giữa
+> các khối; ROADMAP mới là kế hoạch theo thời gian.
+
 ```mermaid
 flowchart TD
     S0["S0 — Tài liệu chiến lược<br/>ARCHITECTURE.md + AGENTS.md"] --> S1
