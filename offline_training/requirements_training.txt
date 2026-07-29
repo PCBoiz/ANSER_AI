@@ -10,14 +10,20 @@ transformers==4.51.3     # Qwen3 cần >= 4.51
 peft==0.15.2
 datasets==3.5.0
 accelerate==1.6.0
-bitsandbytes==0.45.5
+# >=0.46.1: liger-kernel keo theo ban transformers moi hon, va ban do TU CHOI
+# chay 4-bit voi bitsandbytes cu ("requires bitsandbytes>=0.46.1"). Ghim 0.45.5
+# lam gay buoc nap model.
+bitsandbytes>=0.46.1
 openai==1.75.0           # client DeepSeek (base_url api.deepseek.com)
 
-# BẮT BUỘC cho Qwen3: tu vung 151.936 token -> ham loss cua transformers lam
+# BAT BUOC cho Qwen3: tu vung 151.936 token -> ham loss cua transformers lam
 # logits.float() tao tensor (seq x 151936) roi NHAN DOI len fp32 -> OOM giua
 # chung khi gap mau dai. Liger gop lm_head + cross-entropy thanh mot kernel,
 # khong bao gio dung nguyen tensor logits.
-liger-kernel==0.5.9
+#
+# KHONG ghim cung: liger bam sat transformers, ghim lech ban la gay. Cai chung
+# mot lenh voi bitsandbytes de pip giai quyet phu thuoc mot lan.
+liger-kernel
 
 # CÀI RIÊNG khi cần (không để chung vì nặng / dễ xung đột):
 #   Bước quantize : pip install autoawq==0.2.9
