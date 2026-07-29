@@ -294,7 +294,8 @@ def main() -> None:
     reload_catalog()
 
     # ---- 1. Nguồn v3 (đã đúng format, chỉ quét secret + gom) ---------------
-    for name in ["train_extraction.jsonl", "train_narration.jsonl", "train_n8n.jsonl"]:
+    for name in ["train_extraction.jsonl", "train_narration.jsonl",
+                 "train_n8n.jsonl", "train_agent.jsonl"]:
         path = GENERATED_DIR / name
         rows = load_jsonl(path)
         if not rows:

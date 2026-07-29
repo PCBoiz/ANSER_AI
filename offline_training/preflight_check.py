@@ -79,7 +79,8 @@ def check_files() -> tuple[list[dict], list[dict]]:
             "(cần DEEPSEEK_API_KEY)."
         )
 
-    for name in ("eval_extraction.jsonl", "eval_n8n.jsonl", "eval_narration.jsonl"):
+    for name in ("eval_extraction.jsonl", "eval_n8n.jsonl", "eval_narration.jsonl",
+                 "eval_agent.jsonl"):
         rows = load_jsonl(GENERATED_DIR / name)
         if rows:
             ok(f"{name}: {len(rows)} ca benchmark")
@@ -153,6 +154,20 @@ def check_shape(train: list[dict]) -> None:
         ok(f"{len(multiturn)} mẫu đa lượt (dạy kế thừa ngữ cảnh)")
     else:
         warn("Không có mẫu đa lượt — hội thoại nhiều lượt sẽ không được dạy")
+
+    # Nhánh nào có mẫu, nhánh nào TRỐNG. Nhánh trống nghĩa là model chạy zero-shot
+    # ở đó — chạy được không có nghĩa là chạy đúng.
+    by_branch: dict[str, int] = {}
+    for row in train:
+        by_branch[_guess_branch(row.get("messages", []))] = (
+            by_branch.get(_guess_branch(row.get("messages", [])), 0) + 1
+        )
+    print("     phân bố nhánh:")
+    for name, count in sorted(by_branch.items(), key=lambda kv: -kv[1]):
+        print(f"       {name:26s} {count:5d}")
+    for required in ("AGENT_SYSTEM", "EXPLAIN_SYSTEM", "REPORT_SYSTEM"):
+        if not by_branch.get(required):
+            warn(f"Nhánh {required} KHÔNG có mẫu train nào — sẽ chạy zero-shot")
 
 
 # ---------------------------------------------------------------------------

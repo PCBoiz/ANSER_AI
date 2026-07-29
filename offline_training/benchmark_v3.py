@@ -108,18 +108,73 @@ def score_extraction(rows: list[dict], outputs: list[str]) -> dict:
     }
 
 
+def score_agent(rows: list[dict], outputs: list[str]) -> dict:
+    """
+    Đo hai việc DUY NHẤT model được làm trong vòng agentic:
+      1. chọn ĐÚNG tool cho câu hỏi có đủ dữ kiện
+      2. biết HỎI LẠI khi thiếu dữ kiện, thay vì gọi tool với giá trị bịa
+
+    Tách riêng hai tỷ lệ: model chọn tool giỏi mà không biết hỏi lại là nguy
+    hiểm hơn — nó tạo kết quả sai trong im lặng.
+    """
+    n_tool = n_tool_ok = n_ask = n_ask_ok = 0
+    failures = []
+
+    for row, raw in zip(rows, outputs):
+        try:
+            decision = json.loads(raw)
+        except Exception:
+            decision = {}
+        chose = decision.get("tool")
+        answered = bool(decision.get("answer"))
+
+        if row.get("ask_back"):
+            n_ask += 1
+            if answered and not chose:
+                n_ask_ok += 1
+            else:
+                failures.append((row["_id"], f"thiếu dữ kiện mà vẫn gọi tool {chose!r}"))
+        else:
+            n_tool += 1
+            if chose == row["expected_tool"]:
+                n_tool_ok += 1
+            else:
+                failures.append(
+                    (row["_id"], f"chọn {chose!r}, đúng phải là {row['expected_tool']!r}")
+                )
+
+    return {
+        "n": len(rows),
+        "tool_choice_rate": n_tool_ok / n_tool if n_tool else None,
+        "ask_back_rate": n_ask_ok / n_ask if n_ask else None,
+        "failures": failures,
+    }
+
+
 def score_narration(rows: list[dict], outputs: list[str]) -> dict:
+    """Không bịa số + không lộ biên. Tách điểm theo nhánh (quote/explain/report...)."""
     n_pass, failures = 0, []
+    by_kind: dict[str, list[bool]] = {}
+
     for row, answer in zip(rows, outputs):
+        kind = row.get("kind", "quote")
         ok, bad = narration_numbers_ok(answer, row["context"])
+        passed = True
         if not ok:
-            failures.append((row["_id"], f"bịa số {bad}"))
-            continue
-        if row["kind"] == "customer" and (leaks := customer_leak(answer)):
-            failures.append((row["_id"], f"lộ nội bộ: {leaks}"))
-            continue
-        n_pass += 1
-    return {"n": len(rows), "pass_rate": n_pass / max(len(rows), 1), "failures": failures}
+            failures.append((row["_id"], f"[{kind}] bịa số {bad}"))
+            passed = False
+        elif kind == "customer" and (leaks := customer_leak(answer)):
+            failures.append((row["_id"], f"[{kind}] lộ nội bộ: {leaks}"))
+            passed = False
+        n_pass += passed
+        by_kind.setdefault(kind, []).append(passed)
+
+    return {
+        "n": len(rows),
+        "pass_rate": n_pass / max(len(rows), 1),
+        "by_kind": {k: sum(v) / len(v) for k, v in by_kind.items()},
+        "failures": failures,
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -195,7 +250,7 @@ def main() -> None:
     parser.add_argument("--no-gate", action="store_true",
                         help="chỉ đo, không exit 1 (dùng cho baseline)")
     parser.add_argument("--skip", nargs="*", default=[],
-                        choices=["extraction", "n8n", "narration"])
+                        choices=["extraction", "n8n", "narration", "agent"])
     args = parser.parse_args()
 
     _stage_catalog_dir()          # catalog node cho validate_workflow
@@ -287,15 +342,22 @@ def main() -> None:
     if "narration" not in args.skip:
         rows = cap(load_jsonl(GENERATED_DIR / "eval_narration.jsonl"))
         if rows:
-            chats = [
-                [{"role": "system",
-                  "content": Prompts.DATA_SYSTEM.format(context=r["context"])},
-                 {"role": "user", "content": r["question"]}]
-                for r in rows
-            ]
-            outputs = generate(llm, chats, None, max_tokens=400, temperature=0.2)
+            # Mỗi nhánh dùng system prompt riêng — lấy từ CÙNG bảng ánh xạ mà
+            # bộ sinh dữ liệu dùng (P4), không viết lại ở đây.
+            from offline_training.make_narration_pairs import _SYSTEM_BY_KIND
+            chats = []
+            for r in rows:
+                name = _SYSTEM_BY_KIND.get(r.get("kind", "quote"), "DATA_SYSTEM")
+                chats.append([
+                    {"role": "system",
+                     "content": getattr(Prompts, name).format(context=r["context"])},
+                    {"role": "user", "content": r["question"]},
+                ])
+            outputs = generate(llm, chats, None, max_tokens=1100, temperature=0.2)
             result = score_narration(rows, outputs)
             print(f"\n[narration] đạt {result['pass_rate'] * 100:.0f}% (n={result['n']})")
+            for kind, rate in sorted(result["by_kind"].items()):
+                print(f"    {kind:10s} {rate * 100:5.1f}%")
             for _id, reason in result["failures"][:10]:
                 print(f"  ✗ {_id}: {reason}")
             narr_min = float(os.getenv("NARR_MIN", "0.90"))
@@ -303,6 +365,47 @@ def main() -> None:
                 gate_fail.append(f"narration pass_rate {result['pass_rate']:.2f} < {narr_min}")
         else:
             print("\n[narration] ⚠ thiếu eval_narration.jsonl — bỏ qua")
+
+    # ---- 4. agentic --------------------------------------------------------
+    if "agent" not in args.skip:
+        rows = cap(load_jsonl(GENERATED_DIR / "eval_agent.jsonl"))
+        if rows:
+            from src.agents.agentic import build_decision_schema, render_tools
+            from src.api.routes.tools import get_tool_defs
+
+            tool_defs = get_tool_defs()
+            system = Prompts.AGENT_SYSTEM.format(tools=render_tools(tool_defs))
+            chats = [
+                [{"role": "system", "content": system},
+                 {"role": "user", "content": r["question"]}]
+                for r in rows
+            ]
+            outputs = generate(
+                llm, chats,
+                build_decision_schema([t["name"] for t in tool_defs]),
+                max_tokens=700, temperature=0.0,
+            )
+            result = score_agent(rows, outputs)
+            print(f"\n[agentic] n={result['n']}")
+            if result["tool_choice_rate"] is not None:
+                print(f"  chọn đúng tool  {result['tool_choice_rate'] * 100:5.1f}%")
+            if result["ask_back_rate"] is not None:
+                print(f"  biết hỏi lại    {result['ask_back_rate'] * 100:5.1f}%"
+                      "  (thiếu dữ kiện thì KHÔNG được gọi tool)")
+            for _id, reason in result["failures"][:10]:
+                print(f"  ✗ {_id}: {reason}")
+
+            tool_min = float(os.getenv("AGENT_TOOL_MIN", "0.85"))
+            ask_min = float(os.getenv("AGENT_ASKBACK_MIN", "0.75"))
+            if result["tool_choice_rate"] is not None and result["tool_choice_rate"] < tool_min:
+                gate_fail.append(
+                    f"agentic tool_choice {result['tool_choice_rate']:.2f} < {tool_min}")
+            if result["ask_back_rate"] is not None and result["ask_back_rate"] < ask_min:
+                gate_fail.append(
+                    f"agentic ask_back {result['ask_back_rate']:.2f} < {ask_min} "
+                    "(goi tool voi tham so bia)")
+        else:
+            print("\n[agentic] ⚠ thiếu eval_agent.jsonl — bỏ qua")
 
     # ---- Cổng chặn ---------------------------------------------------------
     print(f"\n{'=' * 60}")

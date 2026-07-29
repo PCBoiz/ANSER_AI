@@ -36,6 +36,7 @@ from offline_training.dgen_common import (
     get_async_client,
     narration_numbers_ok,
 )
+from src.core import reporting as rp
 from src.core.carrier_selection import Carrier, QuoteOffer, RouteRequest, select_carrier
 from src.core.pricing import PricingRule, Surcharge, compute_quote
 from src.core.prompts import Prompts
@@ -44,12 +45,31 @@ MODEL = "deepseek-chat"
 CONCURRENT = 5
 EVAL_RATIO = 0.15
 
-TEACHER_SYSTEM = (
+_TEACHER_BASE = (
     "Bạn là ANSER Brain — trợ lý cho chủ doanh nghiệp vận tải Việt Nam. "
-    "Trả lời CHỈ dựa trên DỮ LIỆU JSON được đưa, bằng tiếng Việt, văn xuôi, "
-    "tối đa 5 câu. Mọi con số phải lấy nguyên văn từ dữ liệu — không tự tính, "
-    "không làm tròn khác đi, không bịa. Không xuất JSON."
+    "Trả lời CHỈ dựa trên DỮ LIỆU JSON được đưa, bằng tiếng Việt. Mọi con số "
+    "phải lấy nguyên văn từ dữ liệu — không tự tính, không làm tròn khác đi, "
+    "không bịa. Không xuất JSON."
 )
+
+# Mỗi nhánh có hợp đồng độ dài + nội dung riêng, KHỚP prompt runtime tương ứng.
+# Dùng chung một chỉ thị "tối đa 5 câu" cho cả báo cáo là dạy model viết báo cáo
+# cụt — đúng lý do phải tách nhánh REPORT ngay từ đầu.
+_TEACHER_BY_KIND = {
+    "explain": _TEACHER_BASE + (
+        " Giải thích VÌ SAO ra kết quả, tối đa 6 câu, văn xuôi dễ hiểu. Bắt buộc: "
+        "nêu yếu tố đóng góp nhiều nhất kèm con số; nếu is_close_call=true hoặc "
+        "runner_up_gap nhỏ thì nói rõ lựa chọn SÁT NÚT; nếu có trường 'missing' "
+        "thì nói thiếu dữ liệu gì và bổ sung gì thì chắc chắn hơn."
+    ),
+    "report": _TEACHER_BASE + (
+        " Viết BÁO CÁO có tiêu đề mục: (1) kết luận 2-3 câu trả lời thẳng câu hỏi, "
+        "(2) số liệu chính kèm so sánh kỳ trước nếu có, (3) điều cần lưu ý và việc "
+        "nên làm. Trường 'warnings' PHẢI được nhắc lại bằng lời. Trường nào null "
+        "nghĩa là chưa tính được — nói rõ là chưa có, không suy đoán."
+    ),
+}
+TEACHER_SYSTEM = _TEACHER_BASE + " Văn xuôi, tối đa 5 câu."
 
 _SURCHARGE_POOL = [
     Surcharge("Phụ phí hàng lạnh", amount=250_000),
@@ -80,6 +100,22 @@ QUESTIONS_CARRIER = [
 QUESTIONS_CUSTOMER = [
     "Soạn tin nhắn báo giá ngắn gọn để gửi khách.",
     "Viết nội dung email báo giá lịch sự cho khách từ dữ liệu này.",
+]
+# Câu hỏi lý do — luôn NỐI TIẾP một kết quả đã đưa ra (nhánh EXPLAIN)
+QUESTIONS_EXPLAIN = [
+    "Vì sao lại ra kết quả này?",
+    "Tại sao chọn hãng đó mà không phải hãng rẻ hơn?",
+    "Giải thích giúp tôi yếu tố nào ảnh hưởng nhiều nhất.",
+    "Dựa vào đâu mà kết luận như vậy?",
+    "Kết quả này chắc chắn tới đâu?",
+    "Có gì tôi cần lưu ý trước khi chốt không?",
+]
+QUESTIONS_REPORT = [
+    "Báo cáo tình hình kinh doanh kỳ này giúp tôi.",
+    "Kỳ vừa rồi lãi hay lỗ, so với kỳ trước thế nào?",
+    "Tuyến nào đang lãi nhất, tuyến nào nên xem lại?",
+    "Phân tích lợi nhuận và cho tôi biết nên làm gì tiếp.",
+    "Tổng kết doanh thu, chi phí, lợi nhuận theo kỳ.",
 ]
 
 
@@ -127,12 +163,56 @@ def _make_carrier_scenario(rng: random.Random) -> dict:
     return {"request": request.__dict__, "result": result}
 
 
+def _make_report_scenario(rng: random.Random) -> dict:
+    """
+    Báo cáo lãi lỗ theo TUYẾN — đúng hình dạng nghiệp vụ của khách logistics:
+    doanh thu = giá báo khách, giá vốn = giá trả nhà xe, "mặt hàng" = tuyến đường.
+    """
+    granularity = rng.choice(["quarter", "half", "year"])
+    sales = []
+    for _ in range(rng.randrange(6, 14)):
+        origin, destination = rng.choice(_ROUTES)
+        revenue = rng.randrange(15, 90) * 1_000_000
+        # Một phần dòng CỐ TÌNH thiếu giá vốn -> engine hạ độ tin cậy và cảnh báo;
+        # model phải học nói ra giới hạn đó thay vì lờ đi.
+        cogs = (int(revenue * rng.uniform(0.68, 0.90))
+                if rng.random() < 0.85 else None)
+        month = rng.randrange(1, 13)
+        day = rng.randrange(1, 28)
+        sales.append(rp.SaleLine(
+            date=f"2026-{month:02d}-{day:02d}", revenue=revenue, cogs=cogs,
+            product=f"{origin} → {destination}", quantity=rng.randrange(1, 6),
+        ))
+    expenses = [
+        rp.ExpenseLine(date=f"2026-{rng.randrange(1, 13):02d}-10",
+                       amount=rng.randrange(20, 90) * 1_000_000,
+                       category=rng.choice(["lương", "thuê kho", "nhiên liệu đội xe"]))
+        for _ in range(rng.randrange(0, 4))
+    ]
+    result = rp.build_report(rp.ReportRequest(
+        granularity=granularity, periods_back=rng.randrange(2, 5),
+        sales=sales, expenses=expenses,
+    ))
+    return {"granularity": granularity, "result": result}
+
+
 def make_scenarios(n: int, seed: int) -> list[dict]:
-    """Sinh kịch bản tất định theo seed. kind: quote/carrier (chủ DN) + customer."""
+    """
+    Sinh kịch bản tất định theo seed.
+
+    kind: quote / carrier  -> DATA_SYSTEM  (diễn giải số cho chủ DN)
+          customer         -> DATA_SYSTEM  (soạn nội dung gửi khách cuối, P2)
+          explain          -> EXPLAIN_SYSTEM (xAI: vì sao ra kết quả này)
+          report           -> REPORT_SYSTEM  (báo cáo văn dài TỪ SỐ ENGINE THẬT)
+    """
     rng = random.Random(seed)
     rows = []
     for i in range(n):
-        kind = rng.choices(["quote", "carrier", "customer"], weights=[40, 35, 25])[0]
+        kind = rng.choices(
+            ["quote", "carrier", "customer", "explain", "report"],
+            weights=[22, 18, 15, 25, 20],
+        )[0]
+
         if kind == "quote":
             scenario = _make_quote_scenario(rng)
             context = {"route": scenario["route"], **scenario["result"]}
@@ -141,11 +221,25 @@ def make_scenarios(n: int, seed: int) -> list[dict]:
             scenario = _make_carrier_scenario(rng)
             context = scenario["result"]
             question = rng.choice(QUESTIONS_CARRIER)
-        else:
+        elif kind == "customer":
             scenario = _make_quote_scenario(rng)
             # KHÁCH CUỐI: chỉ phần quote — biên không thể lộ theo cấu trúc (P2)
             context = {"route": scenario["route"], "quote": scenario["result"]["quote"]}
             question = rng.choice(QUESTIONS_CUSTOMER)
+        elif kind == "explain":
+            # xAI luôn giải thích một kết quả ĐÃ CÓ -> context là khối engine trả về
+            if rng.random() < 0.5:
+                scenario = _make_carrier_scenario(rng)
+                context = scenario["result"]
+            else:
+                scenario = _make_quote_scenario(rng)
+                context = {"route": scenario["route"], **scenario["result"]}
+            question = rng.choice(QUESTIONS_EXPLAIN)
+        else:
+            scenario = _make_report_scenario(rng)
+            context = scenario["result"]
+            question = rng.choice(QUESTIONS_REPORT)
+
         rows.append({
             "_id": f"NA{i:04d}",
             "kind": kind,
@@ -155,9 +249,20 @@ def make_scenarios(n: int, seed: int) -> list[dict]:
     return rows
 
 
+# Nhánh nào dùng system prompt nào — phải KHỚP router + chat.py lúc serve (P4).
+_SYSTEM_BY_KIND = {
+    "quote": "DATA_SYSTEM", "carrier": "DATA_SYSTEM", "customer": "DATA_SYSTEM",
+    "explain": "EXPLAIN_SYSTEM", "report": "REPORT_SYSTEM",
+}
+# Báo cáo là văn dài; các nhánh còn lại giữ ngắn theo hợp đồng prompt.
+_MAX_CHARS = {"report": 3000}
+_MAX_TOKENS = {"report": 1100}
+
+
 def verify_answer(answer: str, row: dict) -> str | None:
-    if not answer or len(answer) > 1200:
-        return "rỗng hoặc quá dài"
+    limit = _MAX_CHARS.get(row["kind"], 1200)
+    if not answer or len(answer) > limit:
+        return f"rỗng hoặc quá dài (>{limit})"
     ok, bad = narration_numbers_ok(answer, row["context"])
     if not ok:
         return f"chứa số không có trong dữ liệu: {bad}"
@@ -165,15 +270,25 @@ def verify_answer(answer: str, row: dict) -> str | None:
         leaks = customer_leak(answer)
         if leaks:
             return f"lộ thông tin nội bộ: {', '.join(leaks)}"
+    if row["kind"] == "report":
+        # Engine báo giới hạn (thiếu giá vốn, chưa có chi phí...) thì báo cáo
+        # PHẢI nhắc lại — giấu cảnh báo là biến số chưa chắc thành số chắc.
+        context = json.loads(row["context"])
+        if context.get("warnings") and not any(
+            kw in answer.lower() for kw in ("giá vốn", "chi phí", "lưu ý", "chưa có")
+        ):
+            return "có warnings trong dữ liệu nhưng báo cáo không nhắc tới"
     return None
 
 
 def to_train_entry(row: dict, answer: str) -> dict:
+    prompt_name = _SYSTEM_BY_KIND[row["kind"]]
+    system = getattr(Prompts, prompt_name).format(context=row["context"])
     return {
         "_id": row["_id"],
-        "_source": "narration",
+        "_source": f"narration_{row['kind']}",
         "messages": [
-            {"role": "system", "content": Prompts.DATA_SYSTEM.format(context=row["context"])},
+            {"role": "system", "content": system},
             {"role": "user", "content": row["question"]},
             {"role": "assistant", "content": answer},
         ],
@@ -188,13 +303,14 @@ async def process_row(client, semaphore, row: dict, out_path: Path, stats: dict)
                 resp = await client.chat.completions.create(
                     model=MODEL,
                     messages=[
-                        {"role": "system", "content": TEACHER_SYSTEM},
+                        {"role": "system",
+                         "content": _TEACHER_BY_KIND.get(row["kind"], TEACHER_SYSTEM)},
                         {"role": "user",
                          "content": f"DỮ LIỆU:\n{row['context']}\n\n"
                                     f"CÂU HỎI: {row['question']}{feedback}"},
                     ],
                     temperature=0.7,
-                    max_tokens=400,
+                    max_tokens=_MAX_TOKENS.get(row["kind"], 400),
                 )
             except Exception as exc:
                 print(f"  ✗ {row['_id']} lỗi API: {exc}")
