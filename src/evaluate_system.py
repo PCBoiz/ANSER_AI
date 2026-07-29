@@ -1,21 +1,22 @@
-import sys
-import os
 import json
+import os
+import sys
 import time
+
 from json_repair import repair_json
 from openai import OpenAI
 
 # --- PATH FIXER (CRITICAL FOR COLAB) ---
-current_dir = os.path.dirname(os.path.abspath(__file__)) 
-project_root = os.path.dirname(current_dir)              
+current_dir = os.path.dirname(os.path.abspath(__file__))
+project_root = os.path.dirname(current_dir)
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
 # ---------------------------------------
 
+from src.agents.coder import CoderAgent
+from src.agents.manager import ManagerAgent
 from src.core.engine import ModelEngine
 from src.core.memory import MemoryManager
-from src.agents.manager import ManagerAgent
-from src.agents.coder import CoderAgent
 
 # --- CONFIGURATION ---
 DATASET_PATH = os.path.join(project_root, "src", "data", "training_dataset.jsonl")
@@ -65,7 +66,7 @@ AI GENERATED WORKFLOW:
                 response_format={'type': 'json_object'},
                 temperature=0.0
             )
-            
+
             result = json.loads(response.choices[0].message.content)
             return result
         except Exception as e:
@@ -95,7 +96,7 @@ def load_test_data(filepath: str, limit: int):
 
 def evaluate_pipeline():
     print("🎓 Booting Production Evaluation Suite...\n" + "="*60)
-    
+
     # 1. Initialize Components
     try:
         engine = ModelEngine()
@@ -129,22 +130,22 @@ def evaluate_pipeline():
     for i, test in enumerate(test_cases, 1):
         print(f"\n▶️ Test {i}/{len(test_cases)}")
         print(f"   Prompt: '{test['prompt'][:80]}...'")
-        
+
         # --- TIMED EXECUTION ---
         start_time = time.time()
-        
+
         # Routing & Planning
         decision = manager.analyze_task(test['prompt'])
         plan = manager.plan_or_ask(test['prompt'])
-        
+
         # Generation
         raw_code = coder.write_code(test['prompt'], plan)
-        
+
         latency = time.time() - start_time
         # Rough token approximation for Vietnamese/Code (1 token ~= 3.5 chars)
-        approx_tokens = len(raw_code) / 3.5 
+        approx_tokens = len(raw_code) / 3.5
         tps = approx_tokens / latency
-        
+
         # --- JSON VALIDATION ---
         is_valid = False
         final_json_str = raw_code
@@ -161,7 +162,7 @@ def evaluate_pipeline():
                 pass
 
         # --- DEEPSEEK JUDGE ---
-        print(f"   ⚖️  Calling DeepSeek Judge...")
+        print("   ⚖️  Calling DeepSeek Judge...")
         evaluation = judge.grade_workflow(test['prompt'], test['expected'], final_json_str)
         score = evaluation.get("score", 0)
         rationale = evaluation.get("rationale", "No rationale provided.")
@@ -182,22 +183,22 @@ def evaluate_pipeline():
     print("\n" + "="*60)
     print("📊 FINAL EVALUATION REPORT")
     print("="*60)
-    
+
     avg_latency = metrics["total_latency_sec"] / metrics["total_runs"]
     avg_tps = metrics["total_approx_tokens"] / metrics["total_latency_sec"]
     validity_rate = (metrics["valid_json_count"] / metrics["total_runs"]) * 100
     avg_score = metrics["total_business_score"] / metrics["total_runs"]
 
-    print(f"⚡ Hardware Efficiency (A100):")
+    print("⚡ Hardware Efficiency (A100):")
     print(f"   - Average Latency per Task: {avg_latency:.2f} seconds")
     print(f"   - Average Throughput:       {avg_tps:.1f} Tokens/Second")
-    
-    print(f"\n🧩 Software Reliability:")
+
+    print("\n🧩 Software Reliability:")
     print(f"   - JSON Validity Rate:       {validity_rate:.1f}%")
-    
-    print(f"\n🧠 Business Accuracy (DeepSeek Judge):")
+
+    print("\n🧠 Business Accuracy (DeepSeek Judge):")
     print(f"   - Average Score:            {avg_score:.1f} / 5.0")
-    
+
     if avg_score >= 4.0:
         print("\n🟢 STATUS: PRODUCTION READY. The model understands retail logic.")
     elif avg_score >= 3.0:

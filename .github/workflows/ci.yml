@@ -22,10 +22,23 @@ jobs:
           pip install -r requirements-dev.txt
           pip install fastapi httpx pydantic numpy json_repair sqlalchemy requests ddgs
       - name: Ruff
-        run: ruff check src/core/tools.py src/core/memory.py src/core/context.py tests
+        run: |
+          ruff check src/core/tools.py src/core/memory.py src/core/context.py tests
+          ruff check src/core/reporting.py src/core/metrics.py src/agents/agentic.py
       - name: Mypy
         run: mypy src/core/tools.py src/core/memory.py src/core/context.py
       - name: Pytest
         env:
           ENV: LOCAL
         run: pytest -q
+      # Dựng lại dataset từ nguồn trong repo rồi chạy preflight. Bắt sớm việc
+      # đổi prompt/schema/catalog mà quên sinh lại dữ liệu train (P4) — đúng
+      # loại lỗi chỉ lộ ra sau 2 tiếng train trên Colab.
+      - name: Dataset preflight
+        env:
+          ENV: LOCAL
+        run: |
+          python offline_training/make_extraction_seeds.py --n 60 --n-eval 10
+          python offline_training/make_n8n_pairs.py
+          python offline_training/build_dataset_v3.py
+          python offline_training/preflight_check.py

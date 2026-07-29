@@ -230,10 +230,15 @@ async def _handle_logistics_quote(
     câu "thế xe 3 tấn thì sao?" phải giữ lại tuyến từ lượt trước.
     """
     from src.api.dependencies import runtime
+    from src.core.prompts import Prompts
     from src.core.schemas import QUOTE_REQUIRED_FIELDS, QuoteExtraction
 
     # 1) Trích xuất (LLM, guided_json)
-    raw = await runtime.manager.extract_quote_request(user_msg, history=history)
+    #    Lịch sử phải được bọc y hệt lúc train (P4) — xem
+    #    Prompts.format_extraction_history.
+    raw = await runtime.manager.extract_quote_request(
+        user_msg, history=Prompts.format_extraction_history(history)
+    )
     obj, err = _extract_json_block(raw)
     if obj is None:
         logger.warning(
@@ -293,16 +298,10 @@ async def _handle_logistics_quote(
             "(lỗi kết nối n8n). Thử lại sau ít phút hoặc báo quản trị viên."
         )
 
-    summary = (
-        f"{data['origin']} → {data['destination']}, xe {data['vehicle_type']}"
-        + (f", {data['cargo_type']}" if data.get("cargo_type") else "")
-        + (f", lấy hàng {data['pickup_date']}" if data.get("pickup_date") else "")
-    )
-    return (
-        f"Đã tạo nháp báo giá {draft_id} cho chuyến {summary}. "
-        "Bản nháp kèm phân tích giá đã gửi về kênh duyệt — bạn xác nhận là email "
-        "báo giá sẽ được gửi cho khách."
-    )
+    # Câu xác nhận dựng bằng hàm DÙNG CHUNG với dữ liệu train đa lượt (P4):
+    # lượt assistant trong data chính là câu này, nên lịch sử lúc serve có đúng
+    # hình dạng mà model đã học.
+    return Prompts.format_quote_confirmation(data, draft_id)
 
 
 @router.get("/api/v1/task/{task_id}")

@@ -261,6 +261,60 @@ class Prompts:
         weekday = Prompts._VN_WEEKDAYS[d.weekday()]
         return f"Hôm nay là {weekday}, ngày {d.isoformat()}.\nTin nhắn: {message}"
 
+    @staticmethod
+    def format_quote_summary(data: dict) -> str:
+        """Một dòng tóm tắt chuyến — dùng lại trong câu xác nhận và trong data train."""
+        parts = [
+            f"{data.get('origin')} → {data.get('destination')}",
+            f"xe {data.get('vehicle_type')}",
+        ]
+        if data.get("cargo_type"):
+            parts.append(str(data["cargo_type"]))
+        if data.get("pickup_date"):
+            parts.append(f"lấy hàng {data['pickup_date']}")
+        return ", ".join(parts)
+
+    @staticmethod
+    def format_quote_confirmation(data: dict, draft_id: str = "?") -> str:
+        """
+        Câu xác nhận sau khi tạo nháp báo giá.
+
+        NGUỒN DUY NHẤT (P4): `chat.py` trả câu này cho người dùng, và dữ liệu
+        fine-tune đa lượt dùng ĐÚNG câu này làm lượt assistant của lượt 1.
+        Nếu hai bên khác nhau, model được train trên một hình dạng lịch sử mà
+        lúc chạy thật không bao giờ xuất hiện — sửa ở đây là phải sinh lại
+        dataset đa lượt.
+        """
+        return (
+            f"Đã tạo nháp báo giá {draft_id} cho chuyến "
+            f"{Prompts.format_quote_summary(data)}. "
+            "Bản nháp kèm phân tích giá đã gửi về kênh duyệt — bạn xác nhận là "
+            "email báo giá sẽ được gửi cho khách."
+        )
+
+    @staticmethod
+    def format_extraction_history(history: list | None, today=None) -> list:
+        """
+        Chuyển lịch sử CHAT thô thành lịch sử cho lượt TRÍCH XUẤT.
+
+        Lượt user phải được bọc y hệt lúc train (`format_extraction_user`);
+        lượt assistant giữ nguyên vì nó vốn là câu xác nhận do
+        `format_quote_confirmation` sinh ra. Không làm bước này thì model thấy
+        tin nhắn thô trong lịch sử nhưng thấy tin nhắn đã bọc ở lượt hiện tại —
+        train một đằng, serve một nẻo.
+        """
+        out = []
+        for item in history or []:
+            if not isinstance(item, dict):
+                continue
+            role, content = item.get("role"), item.get("content")
+            if role == "user" and isinstance(content, str):
+                out.append({"role": "user",
+                            "content": Prompts.format_extraction_user(content, today)})
+            elif role == "assistant" and isinstance(content, str):
+                out.append({"role": "assistant", "content": content})
+        return out
+
     # ------------------------------------------------------------------
     # Hóa đơn (giữ nguyên — nhánh này đang chạy ổn)
     # ------------------------------------------------------------------

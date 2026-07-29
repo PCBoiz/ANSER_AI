@@ -212,8 +212,13 @@ def to_train_entry(seed: dict, message) -> dict:
                 system,
                 {"role": "user",
                  "content": Prompts.format_extraction_user(turn1, today)},
+                # Lượt assistant = CÂU XÁC NHẬN, không phải JSON trích xuất.
+                # Lúc serve, lịch sử lấy từ DB chứa đúng câu này (chat.py trả nó
+                # cho người dùng) — nếu train bằng JSON thì model học một hình
+                # dạng lịch sử không bao giờ xuất hiện thật (P4).
                 {"role": "assistant",
-                 "content": json.dumps(seed["ground_truth"], ensure_ascii=False)},
+                 "content": Prompts.format_quote_confirmation(
+                     seed["ground_truth"], seed["_id"])},
                 {"role": "user",
                  "content": Prompts.format_extraction_user(turn2, today)},
                 {"role": "assistant",
@@ -241,10 +246,13 @@ def to_eval_entry(seed: dict, message) -> dict:
             "_id": seed["_id"],
             "today": seed["today"],
             "kind": "followup",
+            # `history` ở dạng THÔ (như DB trả về); benchmark bọc lại bằng
+            # format_extraction_history — đúng đường đi lúc serve.
             "history": [
                 {"role": "user", "content": turn1},
                 {"role": "assistant",
-                 "content": json.dumps(seed["ground_truth"], ensure_ascii=False)},
+                 "content": Prompts.format_quote_confirmation(
+                     seed["ground_truth"], seed["_id"])},
             ],
             "message": turn2,
             "ground_truth": seed["ground_truth2"],

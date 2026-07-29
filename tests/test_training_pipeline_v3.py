@@ -159,6 +159,104 @@ def test_multiturn_train_entry_has_five_messages():
     assert entry["_source"] == "logistics_extract_multiturn"
 
 
+# ===========================================================================
+# Khớp train ↔ serve (P4) — lỗi âm thầm nguy hiểm nhất
+# ===========================================================================
+
+
+def test_multiturn_history_shape_matches_serving():
+    """
+    Lượt assistant trong data phải là CÂU XÁC NHẬN — đúng thứ lịch sử chứa lúc
+    serve. Nếu là JSON trích xuất thì model học một hình dạng lịch sử không bao
+    giờ xuất hiện thật.
+    """
+    from offline_training.reverse_generate import to_train_entry
+
+    train, _ = generate(200, 0, seed=7)
+    seed = next(s for s in train if s.get("kind") == "followup")
+    entry = to_train_entry(seed, ("tin nhắn lượt 1", "thế xe 3 tấn"))
+
+    assistant_turn1 = entry["messages"][2]["content"]
+    assert not assistant_turn1.strip().startswith("{"), "không được là JSON"
+    assert assistant_turn1 == Prompts.format_quote_confirmation(
+        seed["ground_truth"], seed["_id"]
+    )
+    # câu xác nhận phải nêu tuyến để lượt sau kế thừa được
+    assert seed["ground_truth"]["destination"] in assistant_turn1
+
+
+def test_chat_builds_extraction_history_same_way_as_training():
+    """
+    chat.py bọc lịch sử bằng format_extraction_history; data train bọc lượt
+    user bằng format_extraction_user. Hai bên phải cho ra CÙNG chuỗi.
+    """
+    today = date(2026, 7, 27)
+    raw_history = [
+        {"role": "user", "content": "báo giá xe 5 tấn Hữu Nghị đi Hải Phòng"},
+        {"role": "assistant", "content": "Đã tạo nháp báo giá QD-01..."},
+    ]
+    built = Prompts.format_extraction_history(raw_history, today)
+
+    assert built[0]["content"] == Prompts.format_extraction_user(
+        raw_history[0]["content"], today
+    )
+    assert built[1] == raw_history[1]          # assistant giữ nguyên
+
+
+def test_extraction_history_ignores_malformed_records():
+    out = Prompts.format_extraction_history(
+        [{"role": "system", "content": "lậu"}, "rác", {"role": "user", "content": "ok"}],
+        date(2026, 7, 27),
+    )
+    assert len(out) == 1 and out[0]["role"] == "user"
+
+
+def test_benchmark_builds_same_chat_as_serving():
+    """Benchmark phải đo trên ĐÚNG đường đi production, không phải biến thể."""
+    from offline_training.benchmark_v3 import build_extraction_chat
+
+    row = {
+        "today": "2026-07-27",
+        "kind": "followup",
+        "history": [
+            {"role": "user", "content": "báo giá xe 5 tấn Hữu Nghị đi Hải Phòng"},
+            {"role": "assistant", "content": "Đã tạo nháp báo giá FU0001..."},
+        ],
+        "message": "thế xe 3 tấn thì sao",
+    }
+    chat = build_extraction_chat(row, Prompts)
+    today = date(2026, 7, 27)
+
+    assert chat[0]["content"] == Prompts.LOGISTICS_EXTRACT_SYSTEM
+    assert chat[1:3] == Prompts.format_extraction_history(row["history"], today)
+    assert chat[-1]["content"] == Prompts.format_extraction_user(row["message"], today)
+
+
+def test_catalog_fingerprint_changes_with_catalog(monkeypatch, tmp_path):
+    """Vân tay phải đổi khi catalog đổi — nếu không thì nó vô dụng."""
+    from src.core.workflow_schema import catalog_fingerprint, reload_catalog
+
+    reload_catalog()
+    default_fp = catalog_fingerprint()
+    assert len(default_fp) == 16
+
+    staging = tmp_path / "cat"
+    staging.mkdir()
+    (staging / "wf.json").write_text(json.dumps({
+        "name": "x",
+        "nodes": [{"name": "A", "type": "n8n-nodes-base.webhook",
+                   "typeVersion": 99, "position": [0, 0], "parameters": {}}],
+        "connections": {},
+    }), encoding="utf-8")
+    monkeypatch.setenv("N8N_TEMPLATES_DIR", str(staging))
+    reload_catalog()
+    assert catalog_fingerprint() != default_fp
+
+    monkeypatch.delenv("N8N_TEMPLATES_DIR", raising=False)
+    reload_catalog()
+    assert catalog_fingerprint() == default_fp
+
+
 def test_benchmark_scores_followup_separately():
     """Điểm chung đẹp mà câu nối tiếp kém = hội thoại nhiều lượt chưa dùng được."""
     from offline_training.benchmark_v3 import score_extraction

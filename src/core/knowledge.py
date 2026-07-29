@@ -1,14 +1,14 @@
-import chromadb
-from sentence_transformers import SentenceTransformer, CrossEncoder
-import os
 import glob
 import logging
-import uuid
+import os
+
+import chromadb
+import docx
 import torch
 from pypdf import PdfReader
-import docx
-from underthesea import word_tokenize
 from rank_bm25 import BM25Okapi
+from sentence_transformers import CrossEncoder, SentenceTransformer
+from underthesea import word_tokenize
 
 logger = logging.getLogger("projecta.knowledge")
 
@@ -35,7 +35,7 @@ class KnowledgeBase:
 
         self.client = chromadb.PersistentClient(path=persist_dir)
         self.collection = self.client.get_or_create_collection(name="project_a_docs")
-        
+
         self.bm25 = None
         self.bm25_docs = []
         self._bm25_dirty = True
@@ -116,20 +116,20 @@ class KnowledgeBase:
     def search(self, query: str, top_k=3):
         self._ensure_bm25()
         candidates = []
-        
+
         # Stage 1A: Dense Retrieval
         query_vec = self.embedder.encode([query], show_progress_bar=False).tolist()
         results = self.collection.query(query_embeddings=query_vec, n_results=10)
-        
+
         if results['documents'] and results['documents'][0]:
             candidates.extend(results['documents'][0])
-            
+
         # Stage 1B: Lexical (BM25) Retrieval
         if self.bm25:
             tokenized_query = word_tokenize(query.lower())
             bm25_results = self.bm25.get_top_n(tokenized_query, self.bm25_docs, n=5)
             candidates.extend(bm25_results)
-            
+
         # Deduplicate
         candidates = list(set(candidates))
         if not candidates:

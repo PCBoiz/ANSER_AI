@@ -145,22 +145,18 @@ def build_extraction_chat(row: dict, prompts) -> list[dict]:
     """
     Dựng hội thoại cho một ca eval — kèm lịch sử nếu là câu nối tiếp.
 
-    Lịch sử đi vào ĐÚNG khe hội thoại, giống hệt engine.generate_chat lúc
-    serve (P4): benchmark đo cùng đường đi mà production dùng.
+    Dùng ĐÚNG hai hàm mà chat.py gọi lúc serve (`format_extraction_history` +
+    `format_extraction_user`), nên benchmark đo trên cùng đường đi production
+    chứ không phải một biến thể gần giống (P4).
     """
     from datetime import date as _date
 
     today = _date.fromisoformat(row["today"])
-    chat = [{"role": "system", "content": prompts.LOGISTICS_EXTRACT_SYSTEM}]
-    for turn in row.get("history", []):
-        if turn["role"] == "user":
-            chat.append({"role": "user",
-                         "content": prompts.format_extraction_user(turn["content"], today)})
-        else:
-            chat.append(turn)
-    chat.append({"role": "user",
-                 "content": prompts.format_extraction_user(row["message"], today)})
-    return chat
+    return [
+        {"role": "system", "content": prompts.LOGISTICS_EXTRACT_SYSTEM},
+        *prompts.format_extraction_history(row.get("history"), today),
+        {"role": "user", "content": prompts.format_extraction_user(row["message"], today)},
+    ]
 
 
 def generate(llm, chats: list[list[dict]], json_schema: dict | None,

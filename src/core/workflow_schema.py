@@ -343,6 +343,25 @@ def allowed_types() -> list[str]:
     return sorted(get_node_catalog().keys())
 
 
+def catalog_fingerprint() -> str:
+    """
+    Vân tay của danh mục node đang dùng (type + typeVersion).
+
+    CODER_SYSTEM được dựng TỪ catalog này, nên dữ liệu fine-tune mang theo
+    system prompt của catalog lúc sinh data. Nếu lúc serve `N8N_TEMPLATES_DIR`
+    trỏ chỗ khác, prompt đổi mà model không biết — mọi thứ vẫn "chạy" nhưng
+    kém đi một cách âm thầm. Dataset ghi lại vân tay này; `preflight_check.py`
+    và `/health` đối chiếu.
+    """
+    import hashlib
+
+    catalog = get_node_catalog()
+    payload = "|".join(
+        f"{t}@{catalog[t]['typeVersion']}" for t in sorted(catalog)
+    )
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()[:16]
+
+
 def trigger_types() -> set[str]:
     return {t for t, meta in get_node_catalog().items() if meta.get("trigger")}
 
@@ -651,6 +670,7 @@ __all__ = [
     "get_node_catalog",
     "is_using_real_templates",
     "allowed_types",
+    "catalog_fingerprint",
     "trigger_types",
     "build_workflow_schema",
     "render_node_catalog",

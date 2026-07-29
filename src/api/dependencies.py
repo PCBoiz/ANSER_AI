@@ -7,10 +7,10 @@ import asyncio
 import logging
 import os
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Optional
 
-from fastapi import Header, HTTPException
+from fastapi import HTTPException
 from pydantic import BaseModel
 
 logger = logging.getLogger("projecta.api")

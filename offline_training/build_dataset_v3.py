@@ -33,6 +33,7 @@ import random
 import re
 import sys
 from collections import Counter
+from datetime import datetime
 from pathlib import Path
 
 ROOT = Path(__file__).parent.parent
@@ -110,6 +111,26 @@ def _coder_system() -> str:
     return Prompts.CODER_SYSTEM.format(
         tools=render_node_catalog(), example=render_examples()
     )
+
+
+# System prompt nào model được train trên — ghi vân tay để phát hiện lệch sau này.
+_TRACKED_PROMPTS = (
+    "LOGISTICS_EXTRACT_SYSTEM", "GENERAL_SYSTEM", "RETRIEVAL_SYSTEM",
+    "DATA_SYSTEM", "REPORT_SYSTEM", "EXPLAIN_SYSTEM", "AGENT_SYSTEM",
+)
+
+
+def _prompt_fingerprints() -> dict[str, str]:
+    import hashlib
+
+    out = {}
+    for name in _TRACKED_PROMPTS:
+        text = getattr(Prompts, name, "")
+        out[name] = hashlib.sha256(text.encode("utf-8")).hexdigest()[:12]
+    out["CODER_SYSTEM"] = hashlib.sha256(
+        _coder_system().encode("utf-8")
+    ).hexdigest()[:12]
+    return out
 
 
 def extract_json(text: str):
@@ -346,6 +367,24 @@ def main() -> None:
             for entry in rows:
                 f.write(json.dumps({"messages": entry["messages"]}, ensure_ascii=False) + "\n")
         print(f"\n✅ {path} — {len(rows)} mẫu")
+
+    # Vân tay catalog + prompt: preflight/serve đối chiếu để phát hiện lệch
+    # (CODER_SYSTEM dựng từ catalog; catalog đổi mà model không được train lại
+    # thì mọi thứ vẫn chạy nhưng kém đi âm thầm).
+    from src.core.workflow_schema import catalog_fingerprint
+    manifest = {
+        "built_at": datetime.now().isoformat(timespec="seconds"),
+        "n_train": len(train),
+        "n_eval": len(eval_),
+        "by_source": dict(Counter(e["_source"] for e in final)),
+        "catalog_fingerprint": catalog_fingerprint(),
+        "prompt_fingerprints": _prompt_fingerprints(),
+    }
+    (GENERATED_DIR / "dataset_manifest.json").write_text(
+        json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
+    print(f"✅ {GENERATED_DIR / 'dataset_manifest.json'} — vân tay catalog "
+          f"{manifest['catalog_fingerprint']}")
 
     print("\nPhân bố nguồn (train + eval):")
     for source, count in Counter(e["_source"] for e in final).most_common():

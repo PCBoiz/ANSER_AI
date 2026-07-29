@@ -1,5 +1,6 @@
 import httpx
 
+
 class HttpClientPool:
     _client: httpx.AsyncClient = None
 

@@ -1,8 +1,9 @@
 import json
+import logging
 import os
 import re
-import logging
-from json_repair import repair_json # <--- Import Healer
+
+from json_repair import repair_json  # <--- Import Healer
 
 logger = logging.getLogger(__name__)
 
@@ -17,7 +18,7 @@ class IntegrationManager:
 
     def deploy_internal(self, store_id, blueprint_json, name="New Automation"):
         logger.info("Saving workflow store_id=%s name='%s'", store_id, name)
-        
+
         # --- ROBUST VALIDATION & REPAIR ---
         try:
             if isinstance(blueprint_json, str):
@@ -30,20 +31,20 @@ class IntegrationManager:
                     payload = repair_json(blueprint_json, return_objects=True)
             else:
                 payload = blueprint_json
-                
+
             if not payload:
                 raise ValueError("Empty JSON after repair")
-                
+
         except Exception as e:
             return {"status": "error", "message": f"Invalid JSON format: {e}"}
 
         # 1. SAVE TO DB
         wf_id = self.memory.save_workflow(store_id, name, payload)
-        
+
         # 2. SAVE TO FILE
         safe_name = self._sanitize_filename(name)
         filename = f"{self.save_dir}/WF_{wf_id}_{safe_name}.json"
-        
+
         with open(filename, "w", encoding="utf-8") as f:
             json.dump(payload, f, indent=4, ensure_ascii=False)
 

@@ -5,7 +5,7 @@ Tính VAT theo Nghị định 72/2024/NĐ-CP và đối chiếu tổng hóa đơ
 Nguyên tắc deterministic-first: mọi số tiền dùng cho sổ sách phải đi qua đây;
 không tin số do LLM/VLM sinh ra mà không tính lại.
 """
-from decimal import Decimal, ROUND_HALF_UP
+from decimal import ROUND_HALF_UP, Decimal
 
 # Thuế suất GTGT (VAT)
 VAT_STANDARD = 0.10   # mức chuẩn (mặc định)
