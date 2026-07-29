@@ -93,11 +93,26 @@ def check_files() -> tuple[list[dict], list[dict]]:
 # 2. Cấu trúc mẫu
 # ---------------------------------------------------------------------------
 
+def _guess_branch(msgs: list[dict]) -> str:
+    """Đoán mẫu thuộc nhánh nào dựa trên system prompt — để báo lỗi CỤ THỂ."""
+    from src.core.prompts import Prompts
+
+    system = msgs[0].get("content", "") if msgs else ""
+    for name in ("LOGISTICS_EXTRACT_SYSTEM", "GENERAL_SYSTEM", "REPORT_SYSTEM",
+                 "DATA_SYSTEM", "RETRIEVAL_SYSTEM", "EXPLAIN_SYSTEM",
+                 "CODER_SYSTEM", "AGENT_SYSTEM"):
+        prompt = getattr(Prompts, name, "")
+        if prompt and system.startswith(prompt.split("{")[0][:60]):
+            return name
+    return "(không nhận ra prompt)"
+
+
 def check_shape(train: list[dict]) -> None:
     print("\n[2] Cấu trúc mẫu")
     bad_role, bad_order, empty = 0, 0, 0
+    empty_detail: list[str] = []
 
-    for row in train:
+    for idx, row in enumerate(train):
         msgs = row.get("messages")
         if not isinstance(msgs, list) or len(msgs) < 3:
             bad_order += 1
@@ -108,6 +123,12 @@ def check_shape(train: list[dict]) -> None:
             bad_order += 1
         if not str(msgs[-1].get("content", "")).strip():
             empty += 1
+            if len(empty_detail) < 5:
+                user = str(msgs[1].get("content", ""))[:70].replace("\n", " ")
+                empty_detail.append(
+                    f"#{idx} nhánh={_guess_branch(msgs)} "
+                    f"({len(msgs)} message) user={user!r}"
+                )
         # user/assistant phải xen kẽ sau system
         expected = "user"
         for m in msgs[1:]:
@@ -122,6 +143,8 @@ def check_shape(train: list[dict]) -> None:
         fail(f"{bad_order} mẫu sai thứ tự vai (phải system → user → assistant xen kẽ)")
     if empty:
         fail(f"{empty} mẫu có câu trả lời rỗng")
+        for line in empty_detail:
+            print(f"       {line}")
     if not (bad_role or bad_order or empty):
         ok("Mọi mẫu đúng thứ tự vai, không có câu trả lời rỗng")
 
