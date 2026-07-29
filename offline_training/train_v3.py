@@ -29,6 +29,11 @@ import json
 import os
 from pathlib import Path
 
+# Chống phân mảnh VRAM. PHẢI đặt TRƯỚC khi allocator CUDA khởi tạo, nên nằm
+# trên dòng `import torch`. Thông báo OOM của PyTorch tự gợi ý đúng cờ này khi
+# thấy "reserved but unallocated" lớn (lần chạy hỏng: 2,26 GB kẹt vì phân mảnh).
+os.environ.setdefault("PYTORCH_CUDA_ALLOC_CONF", "expandable_segments:True")
+
 import torch
 from datasets import Dataset
 from peft import LoraConfig, TaskType, get_peft_model
@@ -157,36 +162,81 @@ def collate(batch):
 
 
 # ── 4. Trainer ──────────────────────────────────────────────────────────
-trainer = Trainer(
-    model=model,
-    train_dataset=train_ds,
-    eval_dataset=eval_ds,
-    data_collator=collate,
-    args=TrainingArguments(
-        output_dir=OUT_DIR,
-        per_device_train_batch_size=1,      # seq 8k — bù bằng grad accum
-        gradient_accumulation_steps=16,     # lô hiệu dụng 16
-        num_train_epochs=EPOCHS,
-        learning_rate=LR,
-        lr_scheduler_type="cosine",
-        warmup_ratio=0.05,
-        bf16=bf16_ok,
-        fp16=not bf16_ok,
-        gradient_checkpointing=True,
-        eval_strategy="epoch",
-        save_strategy="epoch",
-        load_best_model_at_end=True,
-        metric_for_best_model="eval_loss",
-        greater_is_better=False,
-        save_total_limit=2,
-        logging_steps=10,
-        optim="paged_adamw_8bit",
-        report_to="none",
-        seed=42,
-    ),
+#
+# NÚT THẮT BỘ NHỚ CỦA QWEN3: từ vựng 151.936 token (gấp ~4,7 lần Qwen2.5).
+# Hàm loss của transformers làm `logits.float()` — tensor
+# (độ_dài_chuỗi × 151.936) bị NHÂN ĐÔI khi ép lên fp32. Với mẫu dài, riêng
+# bước này ngốn hàng chục GB và OOM *giữa chừng* (mẫu ngắn thì qua, gặp mẫu dài
+# mới chết) — rất khó đoán nếu chỉ nhìn VRAM lúc bắt đầu.
+#
+# Liger Kernel gộp lm_head + cross-entropy thành một kernel, tính loss theo lô
+# nhỏ mà KHÔNG bao giờ dựng nguyên tensor logits. Đây là cách sửa đúng gốc, chứ
+# không phải cắt bớt dữ liệu.
+# Batch tự chọn theo VRAM, GIỮ NGUYÊN lô hiệu dụng 16 (P5: tham số phần cứng
+# không đóng cứng trong code). Trên A100 40GB, batch 4 nhanh hơn L4 vài lần mà
+# kết quả không đổi — cùng số mẫu, cùng lô hiệu dụng.
+_VRAM_GB = torch.cuda.get_device_properties(0).total_memory / 1e9
+BATCH = int(os.getenv("BATCH_SIZE", "0")) or (
+    4 if _VRAM_GB >= 38 else 2 if _VRAM_GB >= 30 else 1
+)
+ACCUM = max(1, 16 // BATCH)
+print(f"Batch {BATCH} x accum {ACCUM} = lô hiệu dụng {BATCH * ACCUM}\n")
+
+_BASE_ARGS = dict(
+    output_dir=OUT_DIR,
+    per_device_train_batch_size=BATCH,
+    gradient_accumulation_steps=ACCUM,
+    num_train_epochs=EPOCHS,
+    learning_rate=LR,
+    lr_scheduler_type="cosine",
+    warmup_ratio=0.05,
+    bf16=bf16_ok,
+    fp16=not bf16_ok,
+    gradient_checkpointing=True,
+    # use_reentrant=False dùng ít bộ nhớ hơn và tương thích tốt với PEFT
+    gradient_checkpointing_kwargs={"use_reentrant": False},
+    eval_strategy="epoch",
+    save_strategy="epoch",
+    load_best_model_at_end=True,
+    metric_for_best_model="eval_loss",
+    greater_is_better=False,
+    save_total_limit=2,
+    logging_steps=10,
+    optim="paged_adamw_8bit",
+    report_to="none",
+    seed=42,
 )
 
-steps = int(len(train_ds) * EPOCHS // 16)
+
+def _build_trainer(use_liger: bool):
+    args = TrainingArguments(**_BASE_ARGS, **({"use_liger_kernel": True} if use_liger else {}))
+    return Trainer(model=model, train_dataset=train_ds, eval_dataset=eval_ds,
+                   data_collator=collate, args=args)
+
+
+try:
+    import liger_kernel  # noqa: F401
+    _want_liger = True
+except ImportError:
+    _want_liger = False
+    print("⚠ Chưa cài liger-kernel — với Qwen3 rất dễ OOM ở bước tính loss.\n"
+          "  Cài: pip install liger-kernel   (rồi chạy lại cell này)\n"
+          "  Hoặc hạ MAX_SEQ_LEN xuống 3072 để loại bớt mẫu dài.")
+
+if _want_liger:
+    try:
+        trainer = _build_trainer(True)
+        print("✓ Liger Kernel BẬT — không dựng nguyên tensor logits")
+    except Exception as exc:
+        # Bản liger cũ có thể chưa hỗ trợ kiến trúc Qwen3. Lùi lại chứ không sập:
+        # thà train chậm/hao bộ nhớ hơn còn hơn mất cả phiên GPU vì một tuỳ chọn.
+        print(f"⚠ Không bật được Liger ({exc}) — chạy đường thường.\n"
+              "  Nếu OOM, hạ MAX_SEQ_LEN xuống 3072.")
+        trainer = _build_trainer(False)
+else:
+    trainer = _build_trainer(False)
+
+steps = int(len(train_ds) * EPOCHS // (BATCH * ACCUM))
 print(f"Số bước dự kiến: ~{steps}\n🚀 Bắt đầu huấn luyện...\n")
 trainer.train()
 print(f"\nBest eval_loss: {trainer.state.best_metric}")
