@@ -678,6 +678,55 @@ Log **không được** chỉ nằm trên GPU host (ephemeral) — đẩy về b
 
 ---
 
+## 13b. RAG — chạy ở đâu và lấy dữ liệu gì (29/07/2026)
+
+### 13b.1. `rag_service` của Body KHÔNG trùng với `knowledge.py` của Brain
+
+Nghi ngờ ban đầu là hai nơi cùng làm RAG (vi phạm P4). Đọc mã nhánh `dev` của Body cho thấy **không phải**:
+
+| | `rag_service` (Body) | [`knowledge.py`](src/core/knowledge.py) (Brain) |
+|---|---|---|
+| Thực chất | **Cổng DB cho n8n** — ~20 endpoint chạy SQL tham số hoá (`daily-sales`, `low-stock`, `debtors`, `import-insert`…) | RAG tài liệu |
+| Phần RAG | Đúng 2 endpoint `/query` + `/init`, trên **một collection cứng `security_context`**, metadata `source: "mitre_attck"` — phục vụ workflow phân tích bảo mật | Corpus nghiệp vụ |
+| Embedder | **Không cấu hình** → Chroma dùng mặc định `all-MiniLM-L6-v2` (**chỉ tiếng Anh**) | `paraphrase-multilingual-MiniLM-L12-v2` |
+| Truy hồi | Dense thuần | **Lai** dense + BM25 (`underthesea` tách từ tiếng Việt) |
+| Xếp lại | Không | CrossEncoder + **ngưỡng liên quan** (không đạt ngưỡng thì trả rỗng) |
+| Lưu trữ | `HttpClient` → container `anser-chroma` | `PersistentClient` cùng máy với model |
+
+Tên `rag_service` gây hiểu nhầm: nó là **DB gateway**, phần RAG chỉ là một tính năng phụ cho một workflow bảo mật.
+
+### 13b.2. Quyết định: RAG nghiệp vụ chạy ở Brain
+
+| Lý do | Chi tiết |
+|---|---|
+| **Tiếng Việt** | Embedding mặc định của Chroma là mô hình tiếng Anh. Truy hồi nghị định tiếng Việt bằng nó sẽ kém rõ rệt. Brain đã có embedder đa ngữ + tách từ + rerank |
+| **P2 — chủ quyền dữ liệu** | Bảng giá nhà xe, hợp đồng, lịch sử tuyến là tài sản nhạy cảm nhất của khách. Giữ vector cùng máy chạy model = corpus không đi qua thêm một dịch vụ nào |
+| **Chi phí** | Dùng chung embedder đã nạp cho `SemanticRouter` — không tốn thêm VRAM. Đặt ở Body phải nạp embedder thứ hai |
+| **Không trùng** | Hai corpus khác nhau hoàn toàn (`security_context` vs tri thức nghiệp vụ) |
+
+**Ràng buộc P4 kèm theo:** `rag_service` **không được** mở thêm collection tri thức nghiệp vụ. Cần RAG thì n8n gọi Brain, đúng như đang gọi `/tools/*`.
+
+### 13b.3. Bốn lỗ hổng của `knowledge.py` phải vá trước khi nạp dữ liệu thật
+
+1. **Không trích dẫn được nguồn.** `search()` trả **chuỗi ghép**, vứt hết metadata. Trả lời về nghị định mà không nói *nghị định nào, điều nào* thì chủ DN không kiểm chứng được — đúng thứ tầng XAI (§8) tồn tại để tránh.
+2. **Không cô lập theo khách.** Không có bộ lọc `workspace_id`. Đa khách hàng thì bảng giá của khách A có thể lọt vào câu trả lời cho khách B — vi phạm P2 ở mức nghiêm trọng nhất.
+3. **Không có hiệu lực theo thời gian.** Nghị định hết hiệu lực được trả về ngang hàng với bản thay thế.
+4. **`ingest_folder()` nằm trong `__init__`** → nạp lại toàn bộ mỗi lần khởi động; không có ingest tăng dần.
+
+### 13b.4. Nguồn dữ liệu — và một nguồn KHÔNG nên dùng RAG
+
+| Nguồn | Cơ chế đúng | Ghi chú |
+|---|---|---|
+| **Dữ liệu riêng của khách** (bảng giá nhà xe, hợp đồng, lịch sử tuyến) | **RAG**, bắt buộc lọc theo `workspace_id`, 100% local | Giá trị cao nhất — không đối thủ nào sao chép được |
+| **Pháp luật vận tải VN** (nghị định tải trọng, giờ cấm, hoá đơn điện tử, thuế GTGT vận tải) | **RAG**, kèm số hiệu văn bản + ngày hiệu lực trong metadata | Công khai; [`legal_miner.py`](offline_training/legal_miner.py) đã có khung scrape |
+| **Dữ liệu vận hành thời gian thực** (giá dầu, phí BOT) | ❌ **KHÔNG dùng RAG** — dùng **tra cứu tại thời điểm gọi** | Xem dưới |
+
+**Vì sao giá dầu không được vào RAG:** giá đổi hàng ngày. Nhúng vào vector DB nghĩa là embedding của giá cũ nằm lại vĩnh viễn và vẫn được truy hồi ra — trả về một con số *trông hợp lệ* nhưng đã sai. Đó đúng là loại lỗi nguy hiểm nhất theo P1. Giá dầu đã có đường đúng: workflow PVOIL 6h sáng → `FuelIndex` → caller đọc bản mới nhất tại thời điểm tính (AGENTS §3.1c).
+
+Ranh giới chung: **RAG cho văn bản cần *tìm kiếm*; tool cho con số cần *tra cứu*.**
+
+---
+
 ## 14. Tham chiếu
 
 - Nghị định 72/2024/NĐ-CP — cơ sở tính VAT trong [`mcp_server.py`](src/core/mcp_server.py) (8% giảm / 10% chuẩn)
