@@ -633,6 +633,80 @@ Kèm theo: `pytest-asyncio` bị thiếu trong `requirements-dev.txt` khiến `t
 
 ---
 
+## 11c. Tồn kho — nguồn giá vốn đã tìm ra (30/07/2026)
+
+Khách gửi hai bản xuất **TỔNG HỢP TỒN KHO** (MISA, kho hàng hoá + kho khuyến mại,
+01/01→24/07/2026). Đây là lần đầu dự án chạm vào dữ liệu tài chính thật của khách.
+
+**Bối cảnh khách hàng đã được làm rõ:** công ty 4-5 người này **vừa phân phối dầu
+nhớt vừa làm vận tải** — không phải hai doanh nghiệp khác nhau. Hướng logistics
+của tập fine-tune v3 giữ nguyên; tồn kho là chiều **bổ sung**, không thay thế.
+
+### 11c.1. Bản xuất luôn cân đối, và điều đó không có nghĩa là đúng
+
+22/22 mã cân đối tuyệt đối (ĐK + Nhập − Xuất = CK, cả lượng lẫn tiền) — phần mềm
+tự tính nên không thể lệch. Ba lỗi nằm **dưới** lớp cân đối đó:
+
+| Lỗi | Bằng chứng | Tiền ghi sai chỗ |
+|---|---|---|
+| Tồn kho âm | `VT00059`: 87 + 4.400 − 4.508 = **−21 lít** | 1.218.356 đ |
+| Đơn giá tồn cuối vượt **mọi** giá đầu vào | `VT00023`: tồn cuối 60.595,69 đ/lít, giá vào cao nhất 57.342 đ/lít | 1.132.284 đ — **lãi kỳ này bị thổi lên** đúng bằng đó |
+| Hai phương pháp giá vốn song song | `VT00025` FIFO, còn `VT00008/39/59` bình quân di động (VAS 02 buộc nhất quán) | 1.635.531 đ |
+
+Lỗi thứ hai là bất đẳng thức chắc chắn: giá trị còn lại luôn là trung bình có
+trọng số của một tập con các lô đã nhập, nên **không bao giờ** ra ngoài khoảng
+[min, max] của các giá đã vào. Vượt ra = có chi phí phát sinh ngoài sổ hoặc phân
+bổ sai giữa "giá vốn" và "tồn kho".
+
+Thêm: 6 mã hàng chết (7,0 triệu đọng, 0 doanh thu trong 204 ngày), `VT00025` tồn
+đủ bán ~1,9 năm trong khi giá nhập vừa **+31,7%**, và **kho khuyến mại ghi giá trị
+bằng 0 tuyệt đối** — 8.568 đơn vị dầu nhớt thật không có đồng giá vốn nào, tức chi
+phí khuyến mại đang vô hình và lãi gộp bị thổi lên lần thứ hai.
+
+### 11c.2. Cột "Xuất kho / Giá trị" chính là COGS mà `reporting.py` đang thiếu
+
+`build_report` phải tự thú *"chỉ 62% doanh thu có giá vốn"* vì không ai nhập giá
+vốn theo từng dòng bán. Bảng này có giá vốn ở mức **từng mã hàng**: 868.497.372 đ
+cho kỳ. `inventory.unit_cost_table` + `fill_missing_cogs` bắc cầu sang `SaleLine`.
+
+Giá vốn điền theo đường này được **đánh dấu rõ trong `notes`** — nó là ước tính từ
+đơn giá xuất bình quân, không phải giá vốn ghi theo từng phiếu, và người đọc phải
+biết điều đó. Dòng thiếu số lượng thì bỏ qua chứ không đoán.
+
+### 11c.3. Vì sao là code, không phải LLM — và vì sao chưa phải VLM
+
+Cùng lý do đã chốt cho `reporting.py` (§ quyết định 27/07/2026), nhưng nặng hơn:
+output ở đây là **lời buộc tội sổ sách**. Một phát hiện sai làm chủ DN mất niềm tin
+ngay lập tức; một phát hiện bỏ sót thì vô hại. Nên mọi kiểm tra là bất đẳng thức số
+học chứng minh được, kèm bằng chứng đối chiếu tay. LLM chỉ diễn giải (nhánh REPORT).
+
+Output cố ý dùng **cùng hình dạng quy ước** với `build_report` (`summary` /
+`explain` / `warnings`) → model đã học nhánh REPORT đọc được ngay, **không cần
+train thêm**. Đây là lý do tồn kho không làm chậm tiến độ fine-tune đang chạy.
+
+PDF khách gửi được **in ra từ Excel**, nên xin `.xlsx` là đọc chính xác 100%. OCR
+bảng số tiền là tự chuốc rủi ro đọc nhầm 5 thành 6 ở cột giá vốn. VLM (§11.2, GĐ 3b)
+để dành cho thứ chỉ tồn tại dưới dạng ảnh: **hoá đơn giấy của nhà xe** — mà hoá đơn
+đó cũng chính là giá vốn, nên hai đường cùng lấp một lỗ.
+
+### 11c.4. Lệch cột là lỗi nguy hiểm nhất khi đọc bảng — ba lớp tự kiểm
+
+Đọc hỏng thì thấy ngay. **Lệch cột** thì mọi con số vẫn đọc được, vẫn trông hợp lý,
+nhưng nằm sai chỗ. `inventory_import.py` chặn bằng ba lớp, không lớp nào tự sửa dữ
+liệu — lệch thì báo, để người quyết định:
+
+1. Đơn giá BQ có sẵn trong file phải khớp `giá_trị / số_lượng` tính lại.
+2. Dòng "Tổng cộng" của chính file phải khớp tổng cộng lại — file tự tố cáo chính nó.
+3. ĐK + Nhập − Xuất = CK trên từng dòng (`audit_inventory` kiểm tiếp).
+
+Ô rỗng trả `None` chứ không trả `0.0`: nhầm "chưa biết" với "bằng không" là cách
+nhanh nhất để bịa ra một con số tài chính.
+
+**Chủ quyền dữ liệu (P2):** giá vốn thật của khách **không** được commit. Fixture
+test là số tổng hợp tái tạo đúng các quan hệ số học, làm tròn cho dễ đọc.
+
+---
+
 ## 12. Lộ trình
 
 > **Lộ trình thực thi chi tiết (mốc 2-3 tháng, có cổng ra từng giai đoạn) nằm ở
