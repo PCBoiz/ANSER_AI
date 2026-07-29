@@ -94,18 +94,31 @@ def check_files() -> tuple[list[dict], list[dict]]:
 # 2. Cấu trúc mẫu
 # ---------------------------------------------------------------------------
 
+_UNKNOWN_BRANCH = "(không nhận ra prompt)"
+
+# Mọi system prompt mà dữ liệu train được phép dùng. NGUỒN DUY NHẤT cho cả việc
+# thống kê nhánh lẫn việc kiểm tra prompt có khớp runtime không.
+_BRANCH_PROMPTS = (
+    "LOGISTICS_EXTRACT_SYSTEM", "GENERAL_SYSTEM", "REPORT_SYSTEM",
+    "DATA_SYSTEM", "RETRIEVAL_SYSTEM", "EXPLAIN_SYSTEM",
+    "CODER_SYSTEM", "AGENT_SYSTEM",
+)
+
+
 def _guess_branch(msgs: list[dict]) -> str:
-    """Đoán mẫu thuộc nhánh nào dựa trên system prompt — để báo lỗi CỤ THỂ."""
+    """
+    Mẫu thuộc nhánh nào, nhận theo system prompt.
+
+    Prompt có {context}/{tools} đã được format nên chỉ so phần đầu cố định.
+    """
     from src.core.prompts import Prompts
 
     system = msgs[0].get("content", "") if msgs else ""
-    for name in ("LOGISTICS_EXTRACT_SYSTEM", "GENERAL_SYSTEM", "REPORT_SYSTEM",
-                 "DATA_SYSTEM", "RETRIEVAL_SYSTEM", "EXPLAIN_SYSTEM",
-                 "CODER_SYSTEM", "AGENT_SYSTEM"):
+    for name in _BRANCH_PROMPTS:
         prompt = getattr(Prompts, name, "")
         if prompt and system.startswith(prompt.split("{")[0][:60]):
             return name
-    return "(không nhận ra prompt)"
+    return _UNKNOWN_BRANCH
 
 
 def check_shape(train: list[dict]) -> None:
@@ -195,22 +208,15 @@ def check_prompt_parity(train: list[dict]) -> None:
     else:
         warn("Chưa có dataset_manifest.json — chạy lại build_dataset_v3.py để ghi vân tay")
 
-    # System prompt trong data phải là bản runtime hiện hành
-    runtime_prompts = {
-        Prompts.LOGISTICS_EXTRACT_SYSTEM, Prompts.GENERAL_SYSTEM,
-    }
-    unknown = 0
-    for row in train:
-        system = row["messages"][0]["content"]
-        if system in runtime_prompts:
-            continue
-        # Các prompt có {context}/{tools} được format nên chỉ so phần đầu
-        if any(system.startswith(p.split("{")[0][:60])
-               for p in (Prompts.RETRIEVAL_SYSTEM, Prompts.DATA_SYSTEM,
-                         Prompts.REPORT_SYSTEM, Prompts.EXPLAIN_SYSTEM,
-                         Prompts.CODER_SYSTEM)):
-            continue
-        unknown += 1
+    # System prompt trong data phải là bản runtime hiện hành.
+    #
+    # Dùng LẠI `_guess_branch` thay vì liệt kê tay lần thứ hai: bản trước có một
+    # danh sách riêng ở đây và quên AGENT_SYSTEM, nên 143 mẫu agentic hợp lệ bị
+    # báo là "prompt không tồn tại". Một danh sách, một chỗ sửa (P4).
+    unknown = sum(
+        1 for row in train
+        if _guess_branch(row.get("messages", [])) == _UNKNOWN_BRANCH
+    )
     if unknown:
         fail(
             f"{unknown} mẫu dùng system prompt KHÔNG có trong prompts.py hiện tại — "

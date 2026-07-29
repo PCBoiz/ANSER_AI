@@ -143,6 +143,35 @@ def test_askback_trace_has_no_tool_call():
     assert entries[0]["_source"] == "agent_askback"
 
 
+def test_preflight_recognises_every_branch_prompt():
+    """
+    Preflight từng có danh sách prompt viết tay RIÊNG và quên AGENT_SYSTEM ->
+    143 mẫu agentic hợp lệ bị báo "prompt không tồn tại". Test này chặn việc
+    thêm prompt mới mà quên khai báo.
+    """
+    from offline_training.preflight_check import (
+        _BRANCH_PROMPTS,
+        _UNKNOWN_BRANCH,
+        _guess_branch,
+    )
+
+    for name in _BRANCH_PROMPTS:
+        prompt = getattr(Prompts, name)
+        # prompt có {context}/{tools} -> format như lúc dựng dữ liệu thật
+        if "{tools}" in prompt:
+            rendered = ag.agent_system() if name == "AGENT_SYSTEM" else prompt
+        elif "{context}" in prompt:
+            rendered = prompt.format(context="{}")
+        else:
+            rendered = prompt
+        got = _guess_branch([{"role": "system", "content": rendered}])
+        assert got != _UNKNOWN_BRANCH, f"{name} không được nhận ra"
+
+    assert _guess_branch(
+        [{"role": "system", "content": "You are Project A, a Retail Consultant."}]
+    ) == _UNKNOWN_BRANCH
+
+
 def test_agent_system_prompt_matches_runtime():
     """System prompt trong data phải là bản AgenticLoop dựng lúc chạy (P4)."""
     from src.agents.agentic import render_tools
