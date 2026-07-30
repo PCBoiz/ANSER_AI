@@ -13,6 +13,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from src.api.dependencies import RUNTIME_PROFILE, runtime
+from src.core.serving import Overloaded
 
 logger = logging.getLogger("projecta.api")
 logging.basicConfig(
@@ -65,9 +66,32 @@ async def attach_request_id(request: Request, call_next):
     return response
 
 
+# Quá tải KHÔNG phải lỗi máy chủ — nó là câu trả lời hợp lệ "đang bận, quay
+# lại sau". Trả 500 ở đây khiến client retry ngay lập tức và làm tình hình tệ
+# thêm; 503 kèm Retry-After nói cho client biết chờ bao lâu là đủ.
+@app.exception_handler(Overloaded)
+async def handle_overloaded(request: Request, exc: Overloaded):
+    return JSONResponse(
+        status_code=503,
+        content={"error": "overloaded", "detail": str(exc),
+                 "retry_after_s": exc.retry_after_s},
+        headers={"Retry-After": str(exc.retry_after_s)},
+    )
+
+
 # Health endpoint (stays here — it's app-level, not domain-specific)
 @app.get("/health")
 async def health():
+    # Thống kê điều tiết tải nằm ngay trong /health: chỉnh ngưỡng mà không đo
+    # được hàng đợi thì chỉ là đoán. `peak_queued` và `rejected_total` là hai
+    # con số quyết định nên nâng hay hạ max_concurrent.
+    load: dict = {}
+    engine = runtime.engine
+    for name in ("text_guard", "vision_guard"):
+        guard = getattr(engine, name, None)
+        if guard is not None:
+            load[name.replace("_guard", "")] = guard.snapshot()
+
     return JSONResponse(
         {
             "status": "ok",
@@ -79,6 +103,7 @@ async def health():
             "engine_error": runtime.engine_error,
             "kb_error": runtime.kb_error,
             "vision_error": runtime.vision_error,
+            "load": load,
         }
     )
 

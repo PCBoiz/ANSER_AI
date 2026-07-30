@@ -6,6 +6,7 @@ import time
 from collections import OrderedDict
 
 from src.core.config import Config
+from src.core.serving import guard_from_env
 
 logger = logging.getLogger("projecta.engine")
 
@@ -110,6 +111,13 @@ class ModelEngine:
         self.env = os.getenv("ENV", "LOCAL").upper()
         self.config = Config()
 
+        # Điều tiết tải. Trước đây KHÔNG có giới hạn nào: `run_in_executor(None, …)`
+        # dùng thread pool mặc định (~32 luồng), nên tới 32 lệnh `llm.generate()`
+        # có thể chồng lên nhau trên cùng một đối tượng LLM. Đó chính là hiện
+        # tượng "quá tải rồi treo" — xem src/core/serving.py.
+        self.text_guard = guard_from_env("text")
+        self.vision_guard = guard_from_env("vision")
+
         if self.env == "LOCAL":
             logger.info("Booting LOCAL mock engine (không load model thật)")
             self.llm = None
@@ -183,8 +191,11 @@ class ModelEngine:
             outputs = self.llm.generate([prompt], params)
             return outputs[0].outputs[0].text.strip()
 
-        # vLLM generate là blocking -> đẩy ra thread pool để không nghẽn event loop
-        return await loop.run_in_executor(None, _blocking_generate)
+        # vLLM generate là blocking -> đẩy ra thread pool để không nghẽn event loop.
+        # Guard chặn trước cửa: quá tải thì từ chối dứt khoát (503 + Retry-After)
+        # thay vì để mọi request cùng chậm dần đều cho tới lúc hết giờ.
+        async with self.text_guard.slot():
+            return await loop.run_in_executor(None, _blocking_generate)
 
     @staticmethod
     def _build_guided_decoding(json_schema: dict):
@@ -278,7 +289,8 @@ class ModelEngine:
             outputs = self.llm.generate([prompt], params)
             return outputs[0].outputs[0].text.strip()
 
-        return await loop.run_in_executor(None, _blocking_generate)
+        async with self.text_guard.slot():
+            return await loop.run_in_executor(None, _blocking_generate)
 
     # ------------------------------------------------------------------
     # VISION  (method MỚI — để vision_model không còn là "dead load")
@@ -324,7 +336,10 @@ class ModelEngine:
                 trimmed, skip_special_tokens=True, clean_up_tokenization_spaces=False
             )[0].strip()
 
-        return await loop.run_in_executor(None, _blocking_vision)
+        # Guard riêng cho vision: ảnh ngốn VRAM khác hẳn text, trộn chung một
+        # ngưỡng thì một luồng OCR nặng có thể đói cả nhánh chat.
+        async with self.vision_guard.slot():
+            return await loop.run_in_executor(None, _blocking_vision)
 
     # ------------------------------------------------------------------
     # BACKGROUND

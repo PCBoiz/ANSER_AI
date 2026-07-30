@@ -1,0 +1,156 @@
+# deploy/docker-compose.yml — dựng lại toàn bộ Brain bằng MỘT lệnh.
+#
+#     cd deploy && cp .env.example .env && nano .env && docker compose up -d
+#
+# KIẾN TRÚC: model chạy trong tiến trình RIÊNG, Brain gọi qua HTTP.
+#
+#   ┌─────────────┐   HTTP    ┌──────────────┐
+#   │   brain     │──────────▶│  vllm-text   │  GPU ~62%   Qwen3-8B AWQ
+#   │  (CPU only) │           └──────────────┘
+#   │  FastAPI    │   HTTP    ┌──────────────┐
+#   │  engine     │──────────▶│ vllm-vision  │  GPU ~20%   Qwen2.5-VL-3B
+#   │  tất định   │           └──────────────┘
+#   └─────────────┘
+#
+# Vì sao Brain KHÔNG cần GPU: mọi phần nặng nằm sau HTTP. Brain còn lại là
+# FastAPI + các engine tất định (pricing, reporting, inventory, calibration) —
+# toàn số học thuần. Hệ quả thực tế:
+#   - image Brain nhẹ (không CUDA), build và restart tính bằng giây
+#   - sửa code nghiệp vụ không phải nạp lại 6GB weights
+#   - vLLM sập thì /health và /tools/* vẫn sống
+#
+# Embedder + reranker của RAG chạy CPU. Với vài trăm tài liệu thì thừa sức, và
+# đổi lại là không phải tranh VRAM với model sinh.
+
+services:
+  vllm-text:
+    image: vllm/vllm-openai:v0.8.5          # ghim cứng: API vLLM trôi liên tục
+    container_name: anser-vllm-text
+    restart: unless-stopped
+    command:
+      - --model=/models/${TEXT_MODEL_DIR:?thiếu TEXT_MODEL_DIR trong .env}
+      - --served-model-name=anser-v3
+      - --quantization=awq
+      - --max-model-len=${TEXT_MAX_MODEL_LEN:-8192}
+      - --gpu-memory-utilization=${TEXT_GPU_FRACTION:-0.62}
+      - --port=8001
+      - --disable-log-requests               # P2: prompt chứa dữ liệu khách
+    volumes:
+      - ${MODELS_DIR:-./models}:/models:ro
+    ports:
+      - "127.0.0.1:8001:8001"                # CHỈ localhost — ra ngoài qua tunnel
+    shm_size: "8gb"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    healthcheck:
+      # Nạp 6GB weights mất vài phút -> start_period rộng, đừng để compose
+      # kết luận "unhealthy" trong lúc model còn đang nạp.
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8001/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 300s
+
+  # Giai đoạn 3b. Bật khi VLM đã sẵn sàng:  docker compose --profile vision up -d
+  vllm-vision:
+    image: vllm/vllm-openai:v0.8.5
+    container_name: anser-vllm-vision
+    profiles: ["vision"]
+    restart: unless-stopped
+    command:
+      - --model=${VISION_MODEL_ID:-Qwen/Qwen2.5-VL-3B-Instruct}
+      - --served-model-name=anser-vision
+      - --max-model-len=${VISION_MAX_MODEL_LEN:-4096}
+      - --gpu-memory-utilization=${VISION_GPU_FRACTION:-0.20}
+      - --limit-mm-per-prompt=image=2
+      - --port=8002
+      - --disable-log-requests
+    volumes:
+      - ${MODELS_DIR:-./models}:/models:ro
+      - hf-cache:/root/.cache/huggingface
+    ports:
+      - "127.0.0.1:8002:8002"
+    shm_size: "4gb"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8002/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 240s
+
+  brain:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+    container_name: anser-brain
+    restart: unless-stopped
+    environment:
+      ENV: SERVER
+      VLLM_BASE_URL: http://vllm-text:8001
+      VLLM_MODEL: anser-v3
+      VLLM_VISION_BASE_URL: http://vllm-vision:8002
+      VLLM_VISION_MODEL: anser-vision
+      # Ngưỡng điều tiết tải — PHẢI đo lại trên máy thật, xem README §5.
+      ANSER_TEXT_MAX_CONCURRENT: ${TEXT_MAX_CONCURRENT:-4}
+      ANSER_TEXT_MAX_QUEUE: ${TEXT_MAX_QUEUE:-16}
+      ANSER_TEXT_WAIT_TIMEOUT_S: ${TEXT_WAIT_TIMEOUT_S:-20}
+      REDIS_URL: redis://redis:6379/0
+      DATABASE_URL: ${DATABASE_URL:-}
+      API_TOKEN: ${API_TOKEN:?thiếu API_TOKEN trong .env}
+      VLLM_API_KEY: ${VLLM_API_KEY:-}
+    volumes:
+      - ../src/data/docs:/app/src/data/docs:ro
+      - vector-db:/app/data/vector_db
+    ports:
+      - "127.0.0.1:8000:8000"
+    depends_on:
+      vllm-text:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8000/health || exit 1"]
+      interval: 20s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
+
+  redis:
+    image: redis:7-alpine
+    container_name: anser-redis
+    restart: unless-stopped
+    # TASK_REGISTRY hiện là dict trong RAM: mất sạch khi restart, và sai hoàn
+    # toàn nếu chạy nhiều worker. Redis là chỗ giữ trạng thái tác vụ nền.
+    command: ["redis-server", "--save", "60", "1", "--appendonly", "no"]
+    volumes:
+      - redis-data:/data
+
+  # Đưa Brain ra Internet mà KHÔNG mở cổng nào trên máy thuê: không IP tĩnh,
+  # không cấu hình tường lửa, không tự lo chứng chỉ TLS.
+  tunnel:
+    image: cloudflare/cloudflared:latest
+    container_name: anser-tunnel
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run
+    environment:
+      TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN:?thiếu CLOUDFLARE_TUNNEL_TOKEN trong .env}
+    depends_on:
+      brain:
+        condition: service_started
+
+volumes:
+  vector-db:
+  redis-data:
+  hf-cache:
