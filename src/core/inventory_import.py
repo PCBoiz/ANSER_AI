@@ -38,6 +38,8 @@ _UNIT_TOL = 1.0
 _QTY_TOL = 0.01
 
 _DATE_RE = re.compile(r"(\d{1,2})/(\d{1,2})/(\d{4})")
+# '25.000', '1.500.000' — mọi nhóm sau dấu chấm đều đúng 3 chữ số.
+_THOUSAND_GROUPS_RE = re.compile(r"[+-]?\d{1,3}(?:\.\d{3})+")
 _WAREHOUSE_RE = re.compile(r"kho\s*:\s*([^,\n]+)", re.IGNORECASE)
 
 # (nhóm cột, cột con) -> tên trường trong InventoryLine
@@ -59,10 +61,18 @@ def parse_vn_number(value: Any) -> Optional[float]:
     Số theo quy ước Việt Nam: '.' phân nhóm nghìn, ',' phân thập phân.
 
         '57.660,45' -> 57660.45      '(21,00)' -> -21.0
+        '25.000'    -> 25000.0       '25.5'    -> 25.5
         '0,00'      -> 0.0           ''        -> None
 
     Âm ghi bằng ngoặc đơn (chuẩn kế toán). Bản xuất PDF hay rơi vãi dấu ')'
     thừa giữa các ô — ngoặc chỉ được coi là dấu âm khi bọc CẢ HAI đầu.
+
+    DẤU CHẤM ĐƠN ĐỘC — chỗ dễ sai chết người. '25.000' người Việt viết là hai
+    mươi lăm nghìn, nhưng `float()` đọc thành 25.0. Với ô giá dầu thì sai lệch
+    1000 lần đó đi thẳng vào `fuel_ratio` và làm hỏng toàn bộ hiệu chỉnh mà
+    không báo một chữ nào. Nên: dấu chấm chỉ được coi là phân nhóm nghìn khi
+    các nhóm sau nó ĐỀU đúng 3 chữ số ('25.000', '1.500.000'); ngược lại nó là
+    dấu thập phân ('25.5', '0.75').
 
     Ô rỗng trả None ("chưa biết"), KHÔNG trả 0.0 — nhầm hai thứ này là cách
     nhanh nhất để bịa ra một con số tài chính.
@@ -88,7 +98,11 @@ def parse_vn_number(value: Any) -> Optional[float]:
     if not text or not any(c.isdigit() for c in text):
         return None
 
-    text = text.replace(".", "").replace(",", ".")
+    if "," in text:
+        # Có dấu phẩy -> phẩy là thập phân, chấm là phân nhóm nghìn.
+        text = text.replace(".", "").replace(",", ".")
+    elif _THOUSAND_GROUPS_RE.fullmatch(text):
+        text = text.replace(".", "")
     try:
         number = float(text)
     except ValueError:

@@ -98,6 +98,64 @@ def test_ca_te_nhat_duoc_liet_ke_kem_so_lieu():
     assert worst[0]["actual_price"] == 4_000_000
 
 
+def test_dong_hong_bi_LOAI_chu_khong_lam_sap_ca_lan_chay():
+    """
+    Hồi quy audit 30/07/2026: `carrier_cost` âm ném ValueError từ compute_quote
+    và giết cả lần chạy. Một ô đánh nhầm dấu trừ trong 20 dòng không được phép
+    xoá sạch công sức nhập liệu của khách — nhưng cũng không được im lặng.
+    """
+    rows = perfect_rows(10)
+    rows.append(HistoricalQuote(quote_id="AM", carrier_cost=-5_000_000,
+                                fuel_price=25_000, actual_price=10_000_000))
+    r = replay_pricing(rows, rule())
+    assert r["summary"]["rows"] == 10
+    assert r["summary"]["rows_dropped"] == 1
+    assert r["dropped"][0]["quote_id"] == "AM"
+    assert any("bị loại" in w for w in r["warnings"])
+
+
+@pytest.mark.parametrize("bad,ly_do", [
+    (HistoricalQuote(quote_id="A", carrier_cost=10_000_000, actual_price=-1),
+     "giá đã chốt"),
+    (HistoricalQuote(quote_id="B", carrier_cost=10_000_000, actual_price=0),
+     "giá đã chốt"),
+    (HistoricalQuote(quote_id="C", carrier_cost=0, actual_price=10_000_000),
+     "giá nhà xe"),
+    (HistoricalQuote(quote_id="D", carrier_cost=10_000_000, actual_price=10_000_000,
+                     fuel_price=-1), "giá dầu"),
+])
+def test_moi_kieu_du_lieu_vo_ly_deu_bi_loai_kem_ly_do(bad, ly_do):
+    r = replay_pricing(perfect_rows(9) + [bad], rule())
+    assert r["summary"]["rows_dropped"] == 1
+    assert ly_do in r["dropped"][0]["reason"]
+
+
+def test_toan_dong_hong_thi_khong_no():
+    bad = HistoricalQuote(quote_id="X", carrier_cost=-1, actual_price=-1)
+    r = replay_pricing([bad], rule())
+    assert r["summary"] == {}
+    assert any("Không còn dòng hợp lệ" in w for w in r["warnings"])
+
+
+@pytest.mark.parametrize("n", [2, 3, 4, 10, 17])
+def test_p90_luon_nam_o_nua_TREN_cua_phan_bo(n):
+    """
+    Hồi quy audit 30/07/2026: chỉ số cũ `int(n*0.9)-1` trả về giá trị GẦN NHỎ
+    NHẤT khi n bé (n=2 ra min, n=3 ra giá trị giữa). Đúng ngược hướng với lý do
+    tồn tại của p90 — nó có mặt để phơi ca tệ ra, không phải để giấu đi.
+    """
+    rows = perfect_rows(n - 1)
+    rows.append(HistoricalQuote(quote_id="XAU", carrier_cost=10_000_000,
+                                fuel_price=25_000, actual_price=4_000_000))
+    s = replay_pricing(rows, rule())["summary"]
+    assert s["p90_abs_dev_pct"] >= s["median_abs_dev_pct"]
+    # Ca tệ chiếm hơn 10% mẫu thì p90 phải thấy nó. Từ n=10 trở lên nó chỉ còn
+    # <=10% nên p90 bỏ qua là ĐÚNG định nghĩa — lúc đó `max` mới là lớp bảo vệ.
+    if n < 10:
+        assert s["p90_abs_dev_pct"] == s["max_abs_dev_pct"]
+    assert s["max_abs_dev_pct"] == pytest.approx(175.0, abs=1.0)
+
+
 def test_qua_it_du_lieu_thi_noi_thang():
     r = replay_pricing(perfect_rows(3), rule())
     assert any("chưa đủ vững" in w for w in r["warnings"])
@@ -181,6 +239,36 @@ def test_khop_dung_roi_thi_khong_bao_dat_gia():
     assert f["gate_false_pass"] is False
 
 
+def test_bien_that_ngoai_luoi_thi_canh_bao_ket_mep():
+    """
+    Hồi quy audit 30/07/2026: lưới cũ dừng ở 30%, biên thật 42% bị kẹt ở mép và
+    báo về đúng "30.0" — nghe như đáp án. Giờ lưới rộng tới 60%, và kẹt mép thì
+    phải nói ra.
+    """
+    rows = perfect_rows(12, margin=42.0)
+    f = fit_pricing_rule(rows, rule(margin=10.0))
+    assert f["fitted"]["base_margin_pct"] == pytest.approx(42.0, abs=0.25)
+
+    # Ép lưới hẹp lại để tái hiện đúng tình huống cũ
+    hep = fit_pricing_rule(rows, rule(margin=10.0),
+                           margin_grid=[x / 4 for x in range(0, 121)])
+    assert hep["fitted"]["base_margin_pct"] == 30.0
+    assert any("KẸT Ở MÉP LƯỚI" in w for w in hep["warnings"])
+
+
+def test_he_so_dau_kich_tran_thi_canh_bao():
+    """fuel_sensitivity = 1.0 nghĩa là chuyển toàn bộ biến động dầu sang khách."""
+    rows = perfect_rows(14, margin=12.0, fuel_sens=1.0)
+    f = fit_pricing_rule(rows, rule(margin=10.0))
+    assert f["fitted"]["fuel_sensitivity"] == 1.0
+    assert any("kịch trần" in w for w in f["warnings"])
+
+
+def test_khop_dung_giua_luoi_thi_khong_canh_bao_ket_mep():
+    f = fit_pricing_rule(perfect_rows(12, margin=15.0), rule(margin=10.0))
+    assert not any("KẸT Ở MÉP" in w for w in f["warnings"])
+
+
 def test_khop_khong_tot_hon_thi_noi_that():
     """Sai lệch đến từ chỗ khác thì đừng vờ như đã hiệu chỉnh xong."""
     rows = perfect_rows(12, margin=10.0)
@@ -226,9 +314,49 @@ def test_ca_chon_sai_duoc_mo_xe_thua_o_tieu_chi_nao():
 
 
 def test_canh_bao_ca_sat_nut():
-    cases = [_case("C1", "B", b_kw={"credit": 45, "on_time": 0.99, "discount": 20})]
-    r = replay_carrier_choices(cases)
-    assert any("sát nút" in w for w in r["warnings"]) or r["cases"][0]["khớp"]
+    """Hai nhà xe giống hệt nhau, chỉ chênh 1% giá -> chênh điểm dưới 0,05."""
+    ca, oa = _carrier("A", 10_000_000)
+    cb, _ = _carrier("B", 10_000_000)
+    ob = QuoteOffer(carrier_id="B", price=10_100_000)
+    case = CarrierChoiceCase(
+        case_id="SATNUT",
+        request=RouteRequest(origin="HN", destination="DN", vehicle_type="xe tải 5 tấn"),
+        carriers=[ca, cb], offers=[oa, ob], chosen_carrier_id="B")
+    r = replay_carrier_choices([case])
+    assert r["cases"][0]["is_close_call"] is True
+    assert any("sát nút" in w for w in r["warnings"])
+
+
+def test_ca_chi_co_MOT_nha_xe_khong_duoc_tinh_vao_do_tin_cay():
+    """
+    Hồi quy audit 30/07/2026: 10 ca chỉ có một ứng viên cho 100% độ chính xác
+    mà không học được gì — không có bên thứ hai thì không có thông tin nào về
+    trọng số cả.
+    """
+    c, o = _carrier("A", 1_000_000)
+    solo = CarrierChoiceCase(
+        case_id="SOLO",
+        request=RouteRequest(origin="HN", destination="DN", vehicle_type="xe tải 5 tấn"),
+        carriers=[c], offers=[o], chosen_carrier_id="A")
+    r = replay_carrier_choices([solo] * 10)
+    assert r["summary"]["top1_accuracy_pct"] == 100.0        # con số ngây thơ
+    assert r["summary"]["informative_cases"] == 0            # sự thật
+    assert r["summary"]["top1_accuracy_informative_pct"] is None
+    assert any("chỉ có MỘT nhà xe" in w for w in r["warnings"])
+    assert any("KHÔNG ca nào" in w for w in r["warnings"])
+
+
+def test_do_chinh_xac_dang_tin_chi_dem_ca_co_tu_2_ung_vien():
+    c, o = _carrier("A", 1_000_000)
+    solo = CarrierChoiceCase(
+        case_id="SOLO",
+        request=RouteRequest(origin="HN", destination="DN", vehicle_type="xe tải 5 tấn"),
+        carriers=[c], offers=[o], chosen_carrier_id="A")
+    cases = [solo] * 8 + [_case("C1", "B")]     # ca thật duy nhất thì engine chọn sai
+    s = replay_carrier_choices(cases)["summary"]
+    assert s["top1_accuracy_pct"] == pytest.approx(88.9, abs=0.2)   # nghe rất đẹp
+    assert s["informative_cases"] == 1
+    assert s["top1_accuracy_informative_pct"] == 0.0               # sự thật
 
 
 def test_khop_trong_so_khong_duoc_roi_gia_dinh_qua_xa():
@@ -244,11 +372,23 @@ def test_bao_ca_do_chinh_xac_trong_mau_lan_kiem_cheo():
     assert "accuracy_in_sample_pct" in f and "accuracy_loo_pct" in f
 
 
-def test_canh_bao_khi_khop_qua_khit():
-    """Trong mẫu cao mà kiểm chéo thấp = học thuộc, không phải hiểu quy tắc."""
-    # Các ca mâu thuẫn nhau: cùng cấu hình nhưng lựa chọn ngược nhau.
+def test_kiem_cheo_bo_mot_la_that_chu_khong_phai_copy_so_trong_mau():
+    """
+    Với rounds=0 thì không leo đồi, mọi lần khớp đều trả về đúng base -> hai con
+    số phải BẰNG nhau. Đây là phép thử máy móc của LOO: nếu nó chỉ chép lại độ
+    chính xác trong mẫu thì test kia (dữ liệu mâu thuẫn) cũng không phát hiện ra.
+    """
+    cases = [_case(f"C{i}", "A" if i % 2 else "B") for i in range(10)]
+    f = fit_carrier_weights(cases, rounds=0)
+    assert f["moved"] == {}
+    assert f["accuracy_loo_pct"] == f["accuracy_in_sample_pct"]
+
+
+def test_du_lieu_mau_thuan_thi_khong_the_dat_do_chinh_xac_cao():
+    """Cùng cấu hình nhưng lựa chọn ngược nhau — không bộ trọng số nào giải được."""
     cases = [_case(f"C{i}", "A" if i % 2 else "B") for i in range(10)]
     f = fit_carrier_weights(cases)
+    assert f["accuracy_in_sample_pct"] <= 60.0
     gap = f["accuracy_in_sample_pct"] - f["accuracy_loo_pct"]
     assert gap < 15 or any("HỌC THUỘC" in w for w in f["warnings"])
 

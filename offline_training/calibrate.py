@@ -39,6 +39,7 @@ from src.core.calibration import (  # noqa: E402
     replay_pricing,
 )
 from src.core.carrier_selection import Carrier, QuoteOffer, RouteRequest  # noqa: E402
+from src.core.inventory_import import parse_vn_number  # noqa: E402
 from src.core.pricing import PricingRule, Surcharge  # noqa: E402
 
 QUOTE_FIELDS = [
@@ -63,22 +64,16 @@ _QUOTE_SAMPLE = [
 
 
 def _num(value: Any) -> Optional[float]:
-    """Số từ ô CSV. Chấp cả '12.000.000' lẫn '12000000'. Rỗng -> None."""
-    if value is None:
-        return None
-    text = str(value).strip().replace(" ", "")
-    if not text:
-        return None
-    if "," in text and "." in text:
-        text = text.replace(".", "").replace(",", ".")
-    elif text.count(".") > 1:
-        text = text.replace(".", "")
-    elif "," in text:
-        text = text.replace(",", ".")
-    try:
-        return float(text)
-    except ValueError:
-        return None
+    """
+    Số từ ô CSV — dùng CHUNG hàm đọc số của trình nhập tồn kho (P4).
+
+    Bản viết riêng trước đây đọc '25.000' thành 25.0 vì chỉ gộp dấu chấm khi có
+    từ hai dấu trở lên. Ô hay bị nhất chính là `fuel_price`, mà sai 1000 lần ở
+    đó thì `fuel_ratio` thành 0,001 và toàn bộ hiệu chỉnh nhiên liệu hoá rác —
+    im lặng, không một dòng cảnh báo. Hai nơi đọc số kiểu Việt Nam thì phải
+    dùng chung một hàm, không viết lại lần thứ hai.
+    """
+    return parse_vn_number(value)
 
 
 def _parse_surcharges(text: str) -> list[Surcharge]:
@@ -170,7 +165,8 @@ def _print_pricing(report: dict[str, Any]) -> None:
             print(f"  ⚠ {w}")
         return
     verdict = "ĐẠT" if s["passed"] else "CHƯA ĐẠT"
-    print(f"  Số báo giá đối chiếu : {s['rows']}")
+    print(f"  Số báo giá đối chiếu : {s['rows']}"
+          + (f"   (bỏ {s['rows_dropped']} dòng lỗi)" if s.get("rows_dropped") else ""))
     print(f"  Sai lệch TB tuyệt đối: {s['mape_pct']}%   (cổng < {s['gate_pct']}%)  → {verdict}")
     print(f"  Lệch hệ thống (bias) : {s['bias_pct']:+}%")
     print(f"  Trung vị / p90 / max : {s['median_abs_dev_pct']}% / "
@@ -300,6 +296,9 @@ def cmd_carriers(args) -> int:
     rep = replay_carrier_choices(cases)
     s = rep["summary"]
     print(f"  Chọn đúng: {s['top1_hits']}/{s['cases']}  ({s['top1_accuracy_pct']}%)")
+    if s["informative_cases"] < s["cases"]:
+        print(f"  Trên {s['informative_cases']} ca có từ 2 ứng viên: "
+              f"{s['top1_accuracy_informative_pct']}%   ← con số đáng tin")
     for c in rep["cases"]:
         if c["khớp"]:
             continue

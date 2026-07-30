@@ -31,6 +31,7 @@ BA CÁCH TỰ LỪA MÌNH MÀ MODULE NÀY TỪ CHỐI
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass, field
 from statistics import median
 from typing import Any, Iterable, Optional
@@ -100,10 +101,39 @@ def _predict(row: HistoricalQuote, rule: PricingRule) -> int:
     return int(result["quote"]["quoted_price"])
 
 
-def _deviations(rows: list[HistoricalQuote], rule: PricingRule) -> list[dict[str, Any]]:
-    out = []
+def _validate(row: HistoricalQuote) -> Optional[str]:
+    """Lý do dòng này không dùng được, hoặc None nếu dùng được."""
+    if row.carrier_cost is None or row.carrier_cost <= 0:
+        return "giá nhà xe phải > 0"
+    if row.actual_price is None or row.actual_price <= 0:
+        return "giá đã chốt phải > 0"
+    if row.fuel_price is not None and row.fuel_price <= 0:
+        return "giá dầu phải > 0"
+    return None
+
+
+def _deviations(
+    rows: list[HistoricalQuote], rule: PricingRule
+) -> tuple[list[dict[str, Any]], list[dict[str, str]]]:
+    """
+    Trả (sai lệch từng dòng, danh sách dòng bị loại kèm lý do).
+
+    Dòng hỏng bị LOẠI chứ không làm sập cả lần chạy: một ô đánh nhầm dấu trừ
+    trong 20 dòng không được phép xoá sạch công sức nhập liệu của khách. Nhưng
+    cũng không được im — dòng bị loại đi thẳng vào `warnings`.
+    """
+    out: list[dict[str, Any]] = []
+    dropped: list[dict[str, str]] = []
     for row in rows:
-        predicted = _predict(row, rule)
+        reason = _validate(row)
+        if reason:
+            dropped.append({"quote_id": row.quote_id, "reason": reason})
+            continue
+        try:
+            predicted = _predict(row, rule)
+        except ValueError as exc:
+            dropped.append({"quote_id": row.quote_id, "reason": str(exc)})
+            continue
         diff = predicted - row.actual_price
         out.append({
             "quote_id": row.quote_id,
@@ -113,14 +143,32 @@ def _deviations(rows: list[HistoricalQuote], rule: PricingRule) -> list[dict[str
             "actual_price": row.actual_price,
             "predicted_price": predicted,
             "diff": round(diff),
-            "deviation_pct": round(diff / row.actual_price * 100, 2) if row.actual_price else None,
+            "deviation_pct": round(diff / row.actual_price * 100, 2),
         })
-    return out
+    return out, dropped
 
 
 def _mape(devs: list[dict[str, Any]]) -> Optional[float]:
     vals = [abs(d["deviation_pct"]) for d in devs if d["deviation_pct"] is not None]
     return round(sum(vals) / len(vals), 2) if vals else None
+
+
+def _mape_of(rows: list[HistoricalQuote], rule: PricingRule) -> Optional[float]:
+    return _mape(_deviations(rows, rule)[0])
+
+
+def _percentile(sorted_vals: list[float], q: float) -> Optional[float]:
+    """
+    Phân vị theo hạng gần nhất: chỉ số = ceil(q × n) − 1.
+
+    Bản trước dùng `int(n * 0.9) - 1`, cho ra giá trị GẦN NHỎ NHẤT khi n nhỏ:
+    n=2 trả về min, n=3 trả về giá trị giữa. Đúng ngược hướng với lý do tồn tại
+    của chỉ số này — nó có mặt để phơi ca tệ nhất ra, không phải để giấu đi.
+    """
+    if not sorted_vals:
+        return None
+    idx = max(0, min(len(sorted_vals) - 1, math.ceil(q * len(sorted_vals)) - 1))
+    return sorted_vals[idx]
 
 
 def _fuel_spread_pct(rows: list[HistoricalQuote]) -> Optional[float]:
@@ -150,15 +198,22 @@ def replay_pricing(
             "đủ vững. Cần thêm dữ liệu trước khi tin con số dưới đây."
         )
 
-    devs = _deviations(rows, rule)
-    abs_devs = sorted(abs(d["deviation_pct"]) for d in devs if d["deviation_pct"] is not None)
+    devs, dropped = _deviations(rows, rule)
+    if dropped:
+        warnings.append(
+            f"{len(dropped)} dòng bị loại vì dữ liệu không hợp lệ: "
+            + "; ".join(f"{d['quote_id']} ({d['reason']})" for d in dropped[:5])
+            + ("…" if len(dropped) > 5 else "")
+        )
+    if not devs:
+        return {"summary": {}, "rows": [], "dropped": dropped, "explain": {},
+                "warnings": warnings + ["Không còn dòng hợp lệ nào để đối chiếu."]}
+
+    abs_devs = sorted(abs(d["deviation_pct"]) for d in devs)
     mape = _mape(devs)
-    bias = round(
-        sum(d["deviation_pct"] for d in devs if d["deviation_pct"] is not None)
-        / max(1, len(abs_devs)), 2
-    )
+    bias = round(sum(d["deviation_pct"] for d in devs) / len(devs), 2)
     within = sum(1 for v in abs_devs if v <= GATE_MAPE_PCT)
-    worst = sorted(devs, key=lambda d: -abs(d["deviation_pct"] or 0))[:5]
+    worst = sorted(devs, key=lambda d: -abs(d["deviation_pct"]))[:5]
 
     if bias > 1.0:
         warnings.append(
@@ -174,18 +229,19 @@ def replay_pricing(
     passed = mape is not None and mape < GATE_MAPE_PCT
     return {
         "summary": {
-            "rows": len(rows),
+            "rows": len(devs),
+            "rows_dropped": len(dropped),
             "mape_pct": mape,
             "bias_pct": bias,
-            "median_abs_dev_pct": round(median(abs_devs), 2) if abs_devs else None,
-            "p90_abs_dev_pct": round(abs_devs[int(len(abs_devs) * 0.9) - 1], 2)
-            if len(abs_devs) >= 2 else None,
-            "max_abs_dev_pct": round(abs_devs[-1], 2) if abs_devs else None,
+            "median_abs_dev_pct": round(median(abs_devs), 2),
+            "p90_abs_dev_pct": round(_percentile(abs_devs, 0.9) or 0.0, 2),
+            "max_abs_dev_pct": round(abs_devs[-1], 2),
             "within_gate": within,
             "gate_pct": GATE_MAPE_PCT,
             "passed": passed,
         },
         "rows": devs,
+        "dropped": dropped,
         "worst": worst,
         "explain": {
             "rule_used": {
@@ -239,7 +295,9 @@ def fit_pricing_rule(
             "Muốn hiệu chỉnh hệ số này thì cần báo giá ở nhiều mức giá dầu khác nhau."
         )
 
-    margins = list(margin_grid) if margin_grid is not None else [x / 4 for x in range(0, 121)]
+    # Lưới biên tới 60%: môi giới vận tải có tuyến ăn dày. Lưới cũ dừng ở 30%
+    # nên biên thật 42% bị kẹt ở mép và báo về đúng 30,0 — nghe như đáp án.
+    margins = list(margin_grid) if margin_grid is not None else [x / 4 for x in range(0, 241)]
     fuels = (
         list(fuel_grid) if fuel_grid is not None
         else ([x / 20 for x in range(0, 21)] if fuel_identifiable else [base.fuel_sensitivity])
@@ -255,7 +313,7 @@ def fit_pricing_rule(
                 min_margin_amount=base.min_margin_amount,
                 surcharges=list(base.surcharges),
             )
-            score = _mape(_deviations(rows, trial))
+            score = _mape_of(rows, trial)
             if score is None:
                 continue
             if best is None or score < best[0]:
@@ -265,7 +323,22 @@ def fit_pricing_rule(
         return {"fitted": None, "warnings": warnings + ["Không tính được sai lệch."]}
 
     score, margin, fuel = best
-    current = _mape(_deviations(rows, base))
+    current = _mape_of(rows, base)
+
+    # Kẹt ở mép lưới nghĩa là giá trị thật nằm NGOÀI vùng quét — con số trả về
+    # là mép, không phải đáp án. Im lặng ở đây là để người đọc tin nhầm.
+    if margins and margin >= max(margins) - 1e-9:
+        warnings.append(
+            f"Biên khớp được KẸT Ở MÉP LƯỚI ({margin}%) — giá trị thật nhiều khả "
+            "năng còn cao hơn. Đây không phải đáp án; hãy mở rộng `margin_grid` "
+            "rồi chạy lại."
+        )
+    if fuel_identifiable and fuels and fuel >= max(fuels) - 1e-9:
+        warnings.append(
+            f"Hệ số nhiên liệu khớp được kịch trần ({fuel}) — nghĩa là khách "
+            "chuyển TOÀN BỘ biến động giá dầu sang khách cuối. Xác nhận lại bằng "
+            "câu hỏi trực tiếp, đừng chỉ tin con số."
+        )
     fitted = PricingRule(
         base_margin_pct=margin,
         fuel_sensitivity=fuel,
@@ -336,6 +409,10 @@ def replay_carrier_choices(
         return {"summary": {}, "cases": [], "warnings": ["Chưa có ca chọn nhà xe nào."]}
 
     details, hits = [], 0
+    # Ca chỉ có MỘT ứng viên luôn "chọn đúng" — không có bên thứ hai để so thì
+    # không có thông tin nào về trọng số cả. Đếm chung vào độ chính xác là tự
+    # thổi phồng: 10 ca một ứng viên cho 100% mà không học được gì.
+    trivial = [c.case_id for c in cases if len({o.carrier_id for o in c.offers}) < 2]
     for case in cases:
         result = select_carrier(case.carriers, case.offers, case.request, weights)
         ranked = result["ranked"]
@@ -378,10 +455,28 @@ def replay_carrier_choices(
         })
 
     acc = round(hits / len(cases) * 100, 1)
+    informative = [d for d in details if d["case_id"] not in set(trivial)]
+    acc_informative = (
+        round(sum(d["khớp"] for d in informative) / len(informative) * 100, 1)
+        if informative else None
+    )
+
     warnings = []
-    if len(cases) < _MIN_ROWS:
+    if trivial:
         warnings.append(
-            f"Chỉ có {len(cases)} ca — quá ít để kết luận về trọng số."
+            f"{len(trivial)}/{len(cases)} ca chỉ có MỘT nhà xe chào giá — luôn "
+            "'chọn đúng' nhưng không nói lên điều gì về trọng số. Độ chính xác "
+            "đáng tin là con số trên các ca có từ 2 ứng viên trở lên."
+        )
+    if not informative:
+        warnings.append(
+            "KHÔNG ca nào có từ 2 nhà xe trở lên — chưa đối chiếu được trọng số. "
+            "Cần các lần khách có nhiều lựa chọn và đã cân nhắc."
+        )
+    if len(informative) < _MIN_ROWS:
+        warnings.append(
+            f"Chỉ có {len(informative)} ca có từ 2 ứng viên — quá ít để kết luận "
+            "về trọng số."
         )
     close = sum(1 for d in details if d["is_close_call"])
     if close:
@@ -391,7 +486,13 @@ def replay_carrier_choices(
         )
 
     return {
-        "summary": {"cases": len(cases), "top1_hits": hits, "top1_accuracy_pct": acc},
+        "summary": {
+            "cases": len(cases),
+            "top1_hits": hits,
+            "top1_accuracy_pct": acc,
+            "informative_cases": len(informative),
+            "top1_accuracy_informative_pct": acc_informative,
+        },
         "cases": details,
         "explain": {"weights_used": weights},
         "warnings": warnings,
