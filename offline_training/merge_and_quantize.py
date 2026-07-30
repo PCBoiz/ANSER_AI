@@ -71,6 +71,43 @@ def _require_dir(path: str, marker: str, what: str, hints: list[str]) -> None:
     raise SystemExit("\n".join(lines))
 
 
+def _neutralize_torchao() -> None:
+    """
+    Vô hiệu hoá đường torchao của PEFT. An toàn: pipeline này không dùng torchao
+    ở bất kỳ đâu (lượng tử hoá đi đường bitsandbytes lúc train, AWQ lúc serve).
+
+    VÌ SAO PHẢI LÀM: `peft.import_utils.is_torchao_available()` — một hàm tên
+    "is X available" — lại NÉM ImportError khi bản torchao cũ hơn yêu cầu, thay
+    vì trả về False. Colab cài sẵn torchao 0.10.0 còn PEFT mới đòi > 0.16.0, mà
+    `dispatch_torchao` được gọi cho MỌI module khi tiêm LoRA. Kết quả: merge
+    chết giữa chừng SAU KHI đã nạp xong 16GB weights (30/07/2026).
+
+    Vá ở HAI chỗ. `peft/tuners/lora/torchao.py` làm
+    `from peft.import_utils import is_torchao_available` ở đầu module, tức là
+    nó giữ tham chiếu RIÊNG — vá mỗi `import_utils` là không đủ.
+    """
+    try:
+        from peft import import_utils
+    except ImportError:
+        return
+    try:
+        import_utils.is_torchao_available()
+        return                              # bản torchao hợp lệ, không cần vá
+    except ImportError as exc:
+        reason = str(exc).split(".")[0]
+    except Exception:
+        return
+
+    import_utils.is_torchao_available = lambda: False
+    try:
+        from peft.tuners.lora import torchao as lora_torchao
+
+        lora_torchao.is_torchao_available = lambda: False
+    except ImportError:
+        pass
+    print(f"⚠ Bỏ qua nhánh torchao của PEFT ({reason}) — pipeline này không dùng torchao.")
+
+
 def stage_merge() -> None:
     """LoRA (train trên nền 4-bit) phải gộp vào weights ĐỦ PRECISION."""
     _require_dir(
@@ -83,6 +120,10 @@ def stage_merge() -> None:
     )
 
     import torch
+
+    # PHẢI gọi trước PeftModel.from_pretrained — sau đó là đã muộn.
+    _neutralize_torchao()
+
     from peft import PeftModel
     from transformers import AutoModelForCausalLM, AutoTokenizer
 
