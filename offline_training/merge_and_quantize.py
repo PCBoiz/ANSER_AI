@@ -42,8 +42,46 @@ N_CALIB = 128           # số mẫu calibration
 CALIB_MAX_CHARS = 6_000
 
 
+def _require_dir(path: str, marker: str, what: str, hints: list[str]) -> None:
+    """
+    Chặn TRƯỚC khi nạp model. Thiếu file thì báo ngay, đừng nạp 16GB weights rồi
+    mới phát hiện — mỗi lần sai đường dẫn tốn 4-5 phút và một lượt nạp vô ích.
+
+    Đây là lỗi có thật (30/07/2026): sau Runtime > Restart, Colab xoá sạch
+    /content nên LORA_DIR mặc định biến mất. Script nạp xong toàn bộ Qwen3-8B
+    rồi mới ném "Can't find 'adapter_config.json'" — và vì PEFT thử tiếp đường
+    Hugging Face Hub, thông báo cuối cùng lại là "Repo id must be in the form
+    'repo_name'", che mất nguyên nhân thật.
+    """
+    if Path(path, marker).exists():
+        return
+    exists = Path(path).exists()
+    lines = [
+        f"Không thấy {marker} trong {what}: {path}",
+        f"  (thư mục {'có tồn tại nhưng thiếu file' if exists else 'KHÔNG tồn tại'})",
+        "",
+        "Nhiều khả năng: Runtime > Restart đã xoá /content. Thử các đường sau:",
+    ]
+    lines += [f"  - {h}" for h in hints]
+    for candidate in hints:
+        if Path(candidate, marker).exists():
+            lines += ["", f"✓ TÌM THẤY ở: {candidate}",
+                      f"  Chạy lại sau khi đặt:  os.environ['{what}'] = '{candidate}'"]
+            break
+    raise SystemExit("\n".join(lines))
+
+
 def stage_merge() -> None:
     """LoRA (train trên nền 4-bit) phải gộp vào weights ĐỦ PRECISION."""
+    _require_dir(
+        LORA_DIR, "adapter_config.json", "LORA_DIR",
+        [
+            "/content/drive/MyDrive/ANSER_AI_Logistics/anser-v3-lora",
+            "/content/drive/MyDrive/ANSER_data/anser-v3-lora",
+            "/content/checkpoints/anser-v3-lora",
+        ],
+    )
+
     import torch
     from peft import PeftModel
     from transformers import AutoModelForCausalLM, AutoTokenizer
@@ -80,6 +118,12 @@ def _calibration_texts() -> list[str]:
 
 
 def stage_quant() -> None:
+    # Cùng lý do như stage_merge: bản gộp ~16GB nằm ở /content nên cũng bay
+    # theo mỗi lần restart. Biết sớm hơn 4 phút.
+    _require_dir(
+        MERGED_DIR, "config.json", "MERGED_DIR",
+        ["/content/checkpoints/anser-v3-merged"],
+    )
     try:
         from awq import AutoAWQForCausalLM
     except ImportError as exc:
