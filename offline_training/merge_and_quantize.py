@@ -146,6 +146,25 @@ def _calibration_texts() -> list[str]:
 
     assert DATA_FILE.exists(), f"Thiếu {DATA_FILE} — cần cho calibration AWQ"
     tokenizer = AutoTokenizer.from_pretrained(MERGED_DIR)
+
+    # `chat_template.jinja` là FILE RIÊNG (transformers >= 4.49). Bước quantize
+    # cài autoawq, mà gói đó hay kéo transformers XUỐNG bản cũ — bản cũ chỉ tìm
+    # template trong tokenizer_config.json nên không thấy file này, và
+    # apply_chat_template sẽ vỡ. Bắt ở đây, trước khi nạp 16GB.
+    if not getattr(tokenizer, "chat_template", None):
+        template_file = Path(MERGED_DIR, "chat_template.jinja")
+        raise SystemExit(
+            "Tokenizer không có chat template — mẫu calibration sẽ sai định dạng "
+            "so với lúc train (P4).\n"
+            + (
+                f"  File {template_file.name} CÓ trong {MERGED_DIR}, nhưng bản "
+                "transformers hiện tại không đọc được.\n"
+                "  Nhiều khả năng autoawq đã hạ cấp transformers. Cài lại:\n"
+                '    !pip install -q "transformers>=4.51.3"\n'
+                if template_file.exists()
+                else f"  Không thấy {template_file}. Bản gộp thiếu template.\n"
+            )
+        )
     rows = [json.loads(line) for line in DATA_FILE.read_text(encoding="utf-8").splitlines()
             if line.strip()]
     random.Random(42).shuffle(rows)
@@ -191,6 +210,13 @@ def stage_quant() -> None:
         )
     from transformers import AutoTokenizer
 
+    # Dựng mẫu calibration TRƯỚC khi nạp model. Chỉ mất vài giây, nhưng nó kiểm
+    # luôn cả ba thứ hay hỏng: file dữ liệu, tokenizer, và chat template. Trước
+    # đây `_calibration_texts()` nằm ở vị trí tham số của `model.quantize()` nên
+    # chỉ chạy SAU khi đã nạp xong 16GB — hỏng gì cũng phải chờ hết bốn phút.
+    calib = _calibration_texts()
+    print(f"✓ {len(calib)} mẫu calibration in-domain, đã render đúng chat template")
+
     print(f"Tải model đã gộp từ {MERGED_DIR}...")
     model = AutoAWQForCausalLM.from_pretrained(
         MERGED_DIR, safetensors=True, low_cpu_mem_usage=True
@@ -199,7 +225,7 @@ def stage_quant() -> None:
 
     quant_config = {"zero_point": True, "q_group_size": 128, "w_bit": 4, "version": "GEMM"}
     print(f"Quantize AWQ 4-bit với {N_CALIB} mẫu calibration in-domain...")
-    model.quantize(tokenizer, quant_config=quant_config, calib_data=_calibration_texts())
+    model.quantize(tokenizer, quant_config=quant_config, calib_data=calib)
 
     model.save_quantized(AWQ_DIR)
     tokenizer.save_pretrained(AWQ_DIR)
