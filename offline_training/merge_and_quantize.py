@@ -165,6 +165,22 @@ def stage_quant() -> None:
         MERGED_DIR, "config.json", "MERGED_DIR",
         ["/content/checkpoints/anser-v3-merged"],
     )
+
+    # File calibration cũng phải kiểm TẠI ĐÂY. Trước đây `_calibration_texts()`
+    # chỉ chạy khi đã tới lúc truyền tham số cho `model.quantize()`, tức là SAU
+    # khi nạp xong 16GB bản gộp — cùng đúng cái bẫy vừa vá cho stage_merge.
+    # Sau mỗi lần Runtime > Restart, ANSER_GENERATED_DIR mất theo, DATA_FILE
+    # tụt về đường trong repo và assert vỡ ở phút thứ tư.
+    if not DATA_FILE.exists():
+        raise SystemExit(
+            f"Thiếu dữ liệu calibration: {DATA_FILE}\n"
+            "  AWQ cần mẫu in-domain từ train_v3.jsonl để hiệu chuẩn.\n\n"
+            "Nhiều khả năng: sau Runtime > Restart thì ANSER_GENERATED_DIR mất.\n"
+            "Chạy lại cell 1.2, hoặc đặt tay:\n"
+            "  os.environ['ANSER_GENERATED_DIR'] = "
+            "'/content/drive/MyDrive/ANSER_AI_Logistics/generated'"
+        )
+
     try:
         from awq import AutoAWQForCausalLM
     except ImportError as exc:
