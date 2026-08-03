@@ -54,6 +54,79 @@ quả *có vẻ* hoạt động vì retrieval ổn, chỉ có xếp hạng lại
 **Thay bằng** `BAAI/bge-reranker-v2-m3` (đa ngữ, có tiếng Việt) hoặc bỏ hẳn reranker
 và dùng điểm hợp nhất dense + BM25. Đo trước khi chọn — đừng đổi model theo cảm tính.
 
+#### Kiểm giấy phép trước khi kiểm điểm số (03/08/2026)
+
+Đây là sản phẩm **bán cho khách**, nên giấy phép là bộ lọc đầu tiên, không phải
+điểm benchmark. Rà lại thì có một ứng viên phải loại thẳng:
+
+| Model | Giấy phép | Kết luận |
+|---|---|---|
+| `cross-encoder/ms-marco-MiniLM-L-6-v2` | Apache-2.0 | đang dùng — **chỉ tiếng Anh** |
+| `jinaai/jina-reranker-v2-base-multilingual` | **CC-BY-NC-4.0** | ❌ **cấm dùng thương mại.** Nhanh và tốt, nhưng muốn dùng thật thì phải mua API của Jina. Loại. |
+| `BAAI/bge-reranker-v2-m3` | Apache-2.0 | ✅ an toàn, đa ngữ, ~568M tham số |
+| `namdp-ptit/ViRanker` | Apache-2.0 | ✅ **chuyên tiếng Việt**, nền BGE-M3, thắng các baseline đa ngữ trên MMARCO-VI |
+
+**Chọn `ViRanker`, lùi về `bge-reranker-v2-m3` nếu nó trục trặc.** Hai model dùng
+chung nền BGE-M3 nên đổi qua lại chỉ là đổi một chuỗi tên, không phải viết lại.
+
+Điểm quan trọng hơn cả việc chọn: cả hai đều trả điểm đã chuẩn hoá về 0–1, khác
+`ms-marco` trả logit thô. Nghĩa là `KB_RELEVANCE_THRESHOLD` **lần đầu tiên có ý
+nghĩa** — 0,5 là "mô hình nghiêng về liên quan", còn hiện tại ngưỡng 0,0 trên
+logit tiếng Anh chấm câu tiếng Việt thì chỉ là một con số cho có.
+
+### 🟠 A.1.7 — Embedder cắt cụt quá nửa mỗi đoạn *(mới, 03/08/2026)*
+
+Mục A.1.2 ở trên viết "embedder thì đúng". **Sai.**
+
+`paraphrase-multilingual-MiniLM-L12-v2` có `max_seq_length = 128` token. Đoạn cắt
+ra là **150 từ**; tiếng Việt khoảng 1,5–2 token mỗi từ, tức 225–300 token. Phần
+vượt quá 128 **bị cắt bỏ im lặng** — không cảnh báo, không lỗi.
+
+Nghĩa là hơn nửa nội dung mỗi đoạn chưa từng được nhúng. Tìm kiếm dense đang chạy
+trên một nửa kho tài liệu, và không có gì trên màn hình cho thấy điều đó.
+
+Kiểm tra một dòng:
+
+```python
+from sentence_transformers import SentenceTransformer
+print(SentenceTransformer('sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2').max_seq_length)
+```
+
+**Thay bằng `BAAI/bge-m3`** (giấy phép MIT): 8192 token, 1024 chiều, đa ngữ mạnh ở
+tiếng Việt. Cùng nền với `ViRanker` nên embedder và reranker "hiểu" giống nhau.
+
+### 🟠 A.1.8 — Cắt đoạn KHÔNG THỂ biết bảng, vì cấu trúc đã bị xoá trước đó *(mới)*
+
+```python
+def smart_chunk(self, text, chunk_size=150, overlap=30):
+    words = word_tokenize(text)          # <-- xoá sạch xuống dòng
+    ...
+    chunk = " ".join(words[start:end])   # <-- nối lại bằng dấu cách
+```
+
+`word_tokenize` trên **cả tài liệu** rồi nối lại bằng dấu cách làm **biến mất mọi
+ký tự xuống dòng và ranh giới ô bảng** trước khi cắt một chữ nào.
+
+Nên bảng giá cước vào RAG là mất hẳn cấu trúc: `Hà Nội Đà Nẵng xe tải 5 tấn
+12.000.000 Hà Nội TP.HCM container 20ft 31.500.000` thành một dải chữ, và khi cắt
+ở giữa thì một đoạn có tuyến còn đoạn kia có số tiền. Model nhận được "12.000.000"
+mà không biết của tuyến nào.
+
+Đây là **nguyên nhân gốc**, không phải triệu chứng: giữ nguyên `word_tokenize` thì
+mọi cải tiến cắt đoạn đều vô nghĩa. Bảng giá lại đúng là tài liệu giá trị nhất
+trong nguồn 1.
+
+**Sửa:** giữ nguyên văn bản thô, cắt theo cấu trúc (dòng trống, tiêu đề, dòng
+bảng), chỉ dùng `word_tokenize` cho BM25 — nơi duy nhất thật sự cần tách từ.
+
+### 🟡 A.1.9 — Thư viện RAG chưa cài, `knowledge.py` hiện không import nổi *(mới)*
+
+`chromadb`, `sentence-transformers`, `rank_bm25`, `underthesea` đều có trong
+`requirements.txt` nhưng chưa cài ở môi trường phát triển. `dependencies.py` bắt
+ngoại lệ và đặt `kb_error`, nên app vẫn sống và `/health` báo `kb_ready: false` —
+không ai thấy gì hỏng. Cần nhớ điều này khi đọc `/health`: `kb_ready: false` lâu
+nay **không phải** vì chưa nạp tài liệu.
+
 ### 🟠 A.1.3 — Không trả nguồn, nên xAI không dùng được
 
 ```python
@@ -233,16 +306,41 @@ luật đã dùng cho `inventory.py`: lệch thì **báo**, đừng tự sửa, 
 
 ### 🟡 B.2.4 — Qwen2-VL-2B đã cũ
 
-Qwen2.5-VL-3B mạnh hơn rõ ở tài liệu và OCR. Kiểm tra VRAM trên L4 22,5GB:
+Qwen2.5-VL-3B mạnh hơn rõ ở tài liệu và OCR. Nâng model là bước rẻ nhất trong cả
+phần này.
 
-| Thành phần | VRAM |
-|---|---|
-| Qwen3-8B AWQ 4-bit | ~6 GB |
-| Qwen2.5-VL-3B 4-bit | ~2,5 GB |
-| KV cache + activations | ~5 GB |
-| **Tổng** | **~13,5 GB / 22,5 GB** |
+#### ⚠ Bảng VRAM bản đầu SAI — tính lại theo code đang chạy (03/08/2026)
 
-Còn dư. Nâng model là bước rẻ nhất trong cả phần này.
+Bảng cũ ghi "Qwen2.5-VL-3B **4-bit** ~2,5 GB". Nhưng [engine.py](src/core/engine.py#L160)
+nạp vision bằng `torch_dtype=torch.bfloat16` — **không lượng tử hoá gì cả**. Và
+`gpu_memory_utilization` là **phần trăm tổng VRAM cấp cho vLLM**, không phải phần
+vLLM thực dùng; 0,55 nghĩa là vLLM giữ chỗ 12,4 GB bất kể weights chỉ 6 GB.
+
+Tính lại cho đúng thứ code thật sự làm:
+
+| Thành phần | VRAM | Ghi chú |
+|---|---|---|
+| vLLM (`gpu_memory_utilization=0.55`) | 12,4 GB | giữ chỗ cứng, gồm cả KV cache |
+| Qwen2.5-VL-3B **bf16** | ~7,5 GB | 3,75B × 2 byte; bản 2B cũ là ~4,5 GB |
+| `bge-m3` (embedder mới) | ~1,2 GB | |
+| `ViRanker` (reranker mới) | ~1,2 GB | |
+| **Tổng** | **~22,3 GB / 22,5 GB** | **không còn chỗ cho activation lẫn phân mảnh** |
+
+Tức là nâng VLM lên 3B **cộng với** nâng embedder/reranker là **tràn**. Bản đầu
+kết luận "còn dư" vì giả định 4-bit cho vision, mà code không làm thế.
+
+**Cách xử lý — chạy embedder + reranker trên CPU.** Truy vấn RAG thưa (vài lượt
+mỗi phút, không phải mỗi token), nên đổi ~200 ms độ trễ lấy 2,4 GB VRAM là hời.
+Nó còn mở ra hai thứ: Brain chạy được trên máy không GPU (đúng `deploy/Dockerfile`
+CPU-only đã có), và VLM có đủ chỗ thở.
+
+Còn tràn thì hạ `gpu_memory_utilization` xuống 0,45 (≈10,1 GB) — Qwen3-8B AWQ chỉ
+cần ~6 GB weights, phần còn lại là KV cache, mà `max_model_len` đang là 4096 nên
+không cần nhiều.
+
+**Đừng lượng tử hoá vision xuống 4-bit để lấy chỗ.** Việc của nó là đọc chính xác
+con số tiền trên tờ giấy nhàu; đó đúng là loại tác vụ mất mát lượng tử hoá gây hại
+nhất, và ta lại chưa có bộ ảnh thật nào để đo xem mất bao nhiêu.
 
 ## B.3. Thứ tự làm — bốn bước rẻ trước, fine-tune sau cùng
 

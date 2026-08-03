@@ -378,8 +378,13 @@ class ManagerAgent(BaseAgent):
     def __init__(self, engine, memory, kb=None):
         super().__init__(engine, "manager")
         self.kb = kb
-        # Dùng chung embedder của KB nếu có -> tránh nạp MiniLM 2 lần lên VRAM
-        shared_embedder = getattr(kb, "embedder", None) if kb else None
+        # Dùng chung embedder của KB nếu có -> tránh nạp model 2 lần lên VRAM.
+        #
+        # `loaded_embedder()` chứ KHÔNG phải `.embedder`: từ 03/08/2026 KB nạp
+        # embedder lười, nên đọc thẳng thuộc tính ở đây sẽ kéo 600MB model xuống
+        # ngay lúc khởi động — đúng thứ việc nạp lười sinh ra để tránh. Chưa nạp
+        # thì router tự lo (và tự lùi về chế độ từ khoá nếu không nạp được).
+        shared_embedder = kb.loaded_embedder() if hasattr(kb, "loaded_embedder") else None
         self.router = SemanticRouter(embedder=shared_embedder)
 
     # -- định tuyến --------------------------------------------------------
