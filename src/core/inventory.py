@@ -572,18 +572,34 @@ def _period_days(start: Optional[str], end: Optional[str]) -> int:
 # Cầu nối sang reporting.py — lấp chỗ giá vốn còn thiếu
 # ---------------------------------------------------------------------------
 
-def unit_cost_table(lines: list[InventoryLine]) -> dict[str, float]:
+def unit_cost_of(line: InventoryLine) -> tuple[Optional[float], str]:
     """
-    Bảng tra đơn giá vốn theo mã hàng VÀ theo tên hàng.
+    Đơn giá vốn của một dòng, KÈM chỗ nó được lấy ra.
 
     Ưu tiên đơn giá XUẤT (đúng nghĩa giá vốn hàng bán trong kỳ). Mã không phát
     sinh xuất thì lùi về đơn giá tồn cuối, rồi tồn đầu — vẫn là giá vốn hợp lệ
     để ước lượng, chỉ kém chính xác hơn.
+
+    Trả cả nguồn vì ba mức này KHÔNG đáng tin như nhau: "xuất" là giá vốn thật
+    đã phát sinh, còn "tồn đầu" chỉ là giá của hàng chưa bán được ngày nào. Ai
+    nhìn con số cũng phải biết mình đang nhìn loại nào.
     """
+    for value, source in (
+        (line.out_unit(), "xuất"),
+        (line.closing_unit(), "tồn cuối"),
+        (line.opening_unit(), "tồn đầu"),
+    ):
+        if value is not None and value > 0:
+            return value, source
+    return None, ""
+
+
+def unit_cost_table(lines: list[InventoryLine]) -> dict[str, float]:
+    """Bảng tra đơn giá vốn theo mã hàng VÀ theo tên hàng."""
     table: dict[str, float] = {}
     for ln in lines:
-        cost = ln.out_unit() or ln.closing_unit() or ln.opening_unit()
-        if cost is None or cost <= 0:
+        cost, _ = unit_cost_of(ln)
+        if cost is None:
             continue
         for key in (ln.code, ln.name):
             k = (key or "").strip()

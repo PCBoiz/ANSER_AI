@@ -8,7 +8,7 @@ import logging
 import os
 import re
 from dataclasses import dataclass
-from typing import Optional
+from typing import Optional, Union
 
 from fastapi import HTTPException
 from pydantic import BaseModel
@@ -25,8 +25,15 @@ RUNTIME_PROFILE = os.getenv("RUNTIME_PROFILE", "full").strip().lower()
 # ---------------------------------------------------------------------------
 
 class ChatRequest(BaseModel):
-    user_id: int
-    store_id: int
+    # int HOẶC chuỗi. Body bán lẻ (Flask) gửi số nguyên; Body logistics (Next.js)
+    # dùng UUID cho `users.id` và `warehouses.id`. Ép `int` ở đây chặn thẳng
+    # Body mới, trong khi bên dưới vốn đã coi hai trường này là ĐỊNH DANH MỜ —
+    # `memory.py` còn để mặc định `workspace_id="1"`, một chuỗi.
+    #
+    # Cố ý KHÔNG ép hết về str: số nguyên 1 và chuỗi "1" là hai khoá khác nhau
+    # trong bảng lịch sử, nên ép kiểu sẽ làm mồ côi hội thoại cũ của Body bán lẻ.
+    user_id: Union[int, str]
+    store_id: Union[int, str]
     message: str
 
 
@@ -155,14 +162,26 @@ def require_api_token(x_api_token: Optional[str]) -> None:
         raise HTTPException(status_code=401, detail="Unauthorized")
 
 
+def _coerce_identity(raw: str) -> Union[int, str]:
+    """Giữ nguyên hình dạng: '7' -> 7, còn UUID thì để nguyên chuỗi."""
+    try:
+        return int(raw)
+    except ValueError:
+        return raw
+
+
 def resolve_identity(
     req: ChatRequest, x_user_id: Optional[str], x_store_id: Optional[str]
-) -> tuple[int, int]:
+) -> tuple[Union[int, str], Union[int, str]]:
+    """
+    Header thắng thân request khi có đủ cả hai.
+
+    Trước đây header bắt buộc phải parse được thành int, nên UUID của Body
+    logistics bị trả 400 ngay ở cửa. Giờ chấp cả hai dạng — cái nào vào thì
+    giữ nguyên dạng đó, không ép qua lại.
+    """
     if x_user_id and x_store_id:
-        try:
-            return int(x_user_id), int(x_store_id)
-        except ValueError as exc:
-            raise HTTPException(status_code=400, detail="Invalid identity headers") from exc
+        return _coerce_identity(x_user_id), _coerce_identity(x_store_id)
     return req.user_id, req.store_id
 
 

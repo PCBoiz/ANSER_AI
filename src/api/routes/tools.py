@@ -16,20 +16,28 @@ trong template thật.
 GET /tools trả manifest (tên + mô tả + JSON Schema vào/ra) — vòng agentic dùng
 làm danh mục tool-calling, và lớp MCP sau này bọc đúng manifest này ("MCP bọc
 REST"). Định nghĩa MỘT lần ở đây, ba nơi dùng chung (P4).
+
+MỘT NGOẠI LỆ: POST /tools/inventory-import nhận multipart file thay vì JSON, nên
+CỐ Ý không nằm trong manifest — model không sinh ra được một file upload, và
+`_TOOL_IMPL` gọi handler theo dạng `handler(model, token)` mà chữ ký của nó khác.
+Đưa vào manifest là quảng cáo với MCP client một tool gọi kiểu gì cũng hỏng.
+Đường đi của nó là Body -> Brain, không phải model -> Brain.
 """
 
 from __future__ import annotations
 
 import logging
+from dataclasses import asdict
 from typing import Any, Optional
 
-from fastapi import APIRouter, Header, HTTPException
+from fastapi import APIRouter, File, Form, Header, HTTPException, Request, UploadFile
 from pydantic import BaseModel, Field
 
-from src.api.dependencies import require_api_token
+from src.api.dependencies import MAX_UPLOAD_BYTES, require_api_token
 from src.core import carrier_selection as cs
 from src.core import forecasting as fc
 from src.core import inventory as inv
+from src.core import inventory_import as inv_import
 from src.core import reporting as rp
 from src.core.mcp_server import MCPServer
 from src.core.pricing import PricingRule, Surcharge, compute_quote
@@ -303,6 +311,96 @@ async def tool_inventory_audit(
         )
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc))
+
+
+@router.post("/inventory-import")
+async def tool_inventory_import(
+    request: Request,
+    file: UploadFile = File(..., description="Bảng tổng hợp N-X-T do MISA/Fast/Bravo xuất (.xlsx)"),
+    sheet: Optional[str] = Form(None),
+    x_api_token: Optional[str] = Header(None),
+):
+    """
+    Nạp bảng tổng hợp tồn kho từ .xlsx rồi kiểm luôn — một lần gửi file.
+
+    Ngoại lệ có chủ ý so với phần còn lại của router: các endpoint khác nhận
+    JSON thuần, endpoint này nhận file. Lý do là phần khó nhất của kiểm kho
+    KHÔNG nằm ở phép kiểm mà ở chỗ đọc đúng bảng — bắt Body tự dựng lại ba lớp
+    tự kiểm của `inventory_import` là chép logic sang ngôn ngữ thứ hai rồi để
+    nó trôi khỏi bản gốc (P4).
+
+    File KHÔNG được ghi ra đĩa: đọc thẳng từ bộ nhớ rồi thả (P2 — sổ kho của
+    khách không nằm lại trên máy Brain, nhất là khi Brain chạy GPU thuê).
+
+    Đọc hỏng thì KHÔNG kiểm. Một bảng bị lệch cột vẫn cho ra bản kiểm sạch bong
+    trông rất thuyết phục — mọi con số đều sai nhưng không phép kiểm nào nhận ra,
+    vì chúng vẫn cân đối với nhau ở cột bên cạnh.
+    """
+    require_api_token(x_api_token)
+
+    content_length = int(request.headers.get("content-length") or "0")
+    if content_length > MAX_UPLOAD_BYTES:
+        raise HTTPException(status_code=413, detail="File quá lớn")
+    data = await file.read()
+    if len(data) > MAX_UPLOAD_BYTES:
+        raise HTTPException(status_code=413, detail="File quá lớn")
+
+    try:
+        res = inv_import.load_xlsx_bytes(data, sheet=sheet)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+    except RuntimeError as exc:  # thiếu openpyxl — lỗi cài đặt, không phải lỗi file
+        raise HTTPException(status_code=503, detail=str(exc))
+
+    payload: dict[str, Any] = {
+        "import": {
+            "ok": res.ok,
+            "file_name": file.filename,
+            "warehouse": res.warehouse,
+            "period_start": res.period_start,
+            "period_end": res.period_end,
+            "rows_parsed": len(res.lines),
+            "warnings": res.warnings,
+            "checks": res.checks,
+            "lines": [asdict(ln) for ln in res.lines],
+        },
+        "unit_costs": [],
+        "audit": None,
+        "audit_skipped_reason": None,
+    }
+
+    if not res.ok:
+        # `unit_costs` cũng để rỗng, cùng một lý do với `audit`: giá vốn suy ra
+        # từ bảng đọc lệch cột là số sai, mà nó lại đi thẳng vào cột giá vốn của
+        # từng mặt hàng rồi ở lại đó. Sai kiểu này còn khó lần ra hơn cả một bản
+        # kiểm sai, vì bản kiểm thì người ta đọc rồi bỏ, còn giá vốn thì nằm lại
+        # và âm thầm chảy vào mọi báo cáo lãi lỗ sau này.
+        payload["audit_skipped_reason"] = (
+            "Chưa đọc chắc chắn được bảng nên không kiểm và không lấy giá vốn — "
+            "xem 'checks'. Kiểm trên dữ liệu đọc sai còn nguy hơn không kiểm: "
+            "kết quả trông sạch sẽ và thuyết phục trong khi mọi con số đã lệch cột."
+        )
+        return payload
+
+    # Giá vốn suy ra được cho từng mã, KÈM chỗ lấy ra. Body dùng bảng này để
+    # điền cột giá vốn đang rỗng. Đưa kèm ở đây thay vì để Body tự chia
+    # giá_trị/số_lượng: thứ tự ưu tiên (xuất -> tồn cuối -> tồn đầu) là quy tắc
+    # nghiệp vụ, chép sang TypeScript là tạo bản sao thứ hai rồi để nó trôi khỏi
+    # bản gốc (P4).
+    payload["unit_costs"] = [
+        {"code": ln.code, "name": ln.name, "unit": ln.unit,
+         "unit_cost": round(cost), "source": source}
+        for ln, (cost, source) in ((ln, inv.unit_cost_of(ln)) for ln in res.lines)
+        if cost is not None
+    ]
+
+    payload["audit"] = inv.audit_inventory(
+        res.lines,
+        warehouse=res.warehouse,
+        period_start=res.period_start,
+        period_end=res.period_end,
+    )
+    return payload
 
 
 # ===========================================================================
