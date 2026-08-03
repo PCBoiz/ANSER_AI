@@ -129,7 +129,7 @@ class ModelEngine:
         logger.info("Booting COLAB engine — target GPU L4 22.5GB")
 
         import torch
-        from transformers import AutoProcessor, Qwen2VLForConditionalGeneration
+        from transformers import AutoModelForVision2Seq, AutoProcessor
         from vllm import LLM
 
         # 1) Text brain — vLLM.
@@ -147,16 +147,27 @@ class ModelEngine:
             gpu_memory_utilization=vc["gpu_memory_utilization"],
             max_model_len=vc["max_model_len"],
             dtype=vc["dtype"],
-            quantization=vc.get("quantization"),   # AWQ phải khai báo rõ
+            # None = để vLLM tự đọc `quantization_config` trong config.json và
+            # chọn nhân hợp GPU. Chỉ khác None khi có TEXT_QUANTIZATION.
+            quantization=vc.get("quantization"),
             enforce_eager=vc.get("enforce_eager", False),  # fix CUDA graph bug với Qwen
             trust_remote_code=True,
         )
 
         # 2) Vision eye — transformers, load vào phần VRAM CÒN LẠI ngoài pool vLLM.
-        #    FP bf16 ~4.5GB (khớp config.vision_model_id mặc định).
-        #    Nếu đổi config sang bản -AWQ thì bỏ torch_dtype và để model tự dùng quant config.
+        #
+        #    `AutoModelForVision2Seq` thay cho `Qwen2VLForConditionalGeneration`
+        #    (03/08/2026): lớp cụ thể kia KHÔNG nạp được Qwen2.5-VL — kiến trúc
+        #    đó cần `Qwen2_5_VLForConditionalGeneration`. Đóng đinh một lớp cụ
+        #    thể nghĩa là mỗi lần đổi model vision lại phải sửa code; `Auto...`
+        #    đọc `architectures` trong config.json và chọn đúng lớp.
+        #
+        #    VRAM bf16: Qwen2-VL-2B ~4,5GB, Qwen2.5-VL-3B ~7,5GB. Cộng cả vLLM
+        #    (gpu_memory_utilization là phần GIỮ CHỖ, không phải phần dùng thật)
+        #    thì L4 22,5GB rất sát trần — xem RAG_VLM_KE_HOACH.md §B.2.4, và đó
+        #    là lý do embedder/reranker của RAG chạy CPU.
         logger.info("Loading vision model: %s", self.config.vision_model_id)
-        self.vision_model = Qwen2VLForConditionalGeneration.from_pretrained(
+        self.vision_model = AutoModelForVision2Seq.from_pretrained(
             self.config.vision_model_id,
             torch_dtype=torch.bfloat16,
             device_map="cuda",

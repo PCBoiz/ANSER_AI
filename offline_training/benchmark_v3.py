@@ -182,13 +182,45 @@ def score_narration(rows: list[dict], outputs: list[str]) -> dict:
 # ---------------------------------------------------------------------------
 
 def build_llm(model_path: str):
+    """
+    Dựng vLLM offline.
+
+    ÉP `quantization="awq"` LÀ SAI — sửa 03/08/2026 sau khi benchmark chết ngay
+    lúc khởi tạo:
+
+        ValueError: torch.bfloat16 is not supported for quantization method awq.
+                    Supported dtypes: [torch.float16]
+
+    Hai cái sai chồng nhau. Thứ nhất, nhận dạng bằng cách dò chữ "awq" trong
+    ĐƯỜNG DẪN: một thư mục tên bất kỳ có chứa "awq" là bị ép nhầm, còn model AWQ
+    để ở thư mục tên khác thì không nhận ra. Thứ hai, ép tay ghi đè lựa chọn của
+    vLLM — chính nó đã báo trong log:
+
+        Detected that the model can run with awq_marlin, however you specified
+        quantization=awq explicitly, so forcing awq
+
+    `awq_marlin` vừa nhanh hơn vừa chạy được bfloat16; nhân `awq` cũ thì không,
+    nên `dtype="auto"` (ra bfloat16 theo config Qwen3) đâm thẳng vào ràng buộc
+    float16 rồi nổ.
+
+    Cách đúng: ĐỂ YÊN cho vLLM đọc `quantization_config` trong config.json và tự
+    chọn nhân. Nó có đủ thông tin hơn ta — biết cả compute capability của GPU
+    đang chạy (awq_marlin cần Ampere trở lên, T4 thì không có).
+
+    `BENCH_QUANT` để ép tay khi cần; ép thì phải hạ dtype xuống float16 vì nhân
+    awq cũ chỉ nhận đúng kiểu đó.
+    """
     from vllm import LLM
 
-    quantization = "awq" if "awq" in model_path.lower() else None
+    forced = os.getenv("BENCH_QUANT", "").strip() or None
+    dtype = os.getenv("BENCH_DTYPE", "").strip() or ("float16" if forced == "awq" else "auto")
+    if forced:
+        print(f"  ép quantization={forced}, dtype={dtype} (BENCH_QUANT)")
+
     return LLM(
         model=model_path,
-        quantization=quantization,
-        dtype="auto",
+        quantization=forced,
+        dtype=dtype,
         max_model_len=8192,
         gpu_memory_utilization=float(os.getenv("BENCH_GPU_UTIL", "0.85")),
         enforce_eager=os.getenv("BENCH_ENFORCE_EAGER", "1") == "1",
