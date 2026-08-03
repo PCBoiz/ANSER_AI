@@ -14,6 +14,8 @@ from fastapi import APIRouter, File, Header, HTTPException, Request, UploadFile
 
 from src.api.dependencies import MAX_UPLOAD_BYTES, require_api_token, runtime
 from src.core.config import Config
+from src.core.freight_invoice import FreightInvoice
+from src.core.freight_invoice import verify as verify_freight
 from src.core.mcp_server import MCPServer
 from src.core.schemas import InvoicePayload
 
@@ -133,6 +135,67 @@ async def ocr_endpoint(
         raise
     except Exception as exc:
         logger.exception("OCR endpoint failed: %s", exc)
+        return {"success": False, "error": str(exc)}
+    finally:
+        _safe_unlink(path)
+
+
+@router.post("/ocr/freight")
+async def ocr_freight_endpoint(
+    request: Request,
+    file: UploadFile = File(...),
+    x_api_token: Optional[str] = Header(None),
+):
+    """
+    Đọc HOÁ ĐƠN CƯỚC VẬN TẢI của nhà xe -> JSON + kiểm số học.
+
+    Đường RIÊNG, không thay `/ocr`. Công ty vừa phân phối dầu nhớt (nhập hàng ->
+    hoá đơn bán lẻ, `InvoicePayload`) vừa làm vận tải (thuê nhà xe -> hoá đơn
+    cước, `FreightInvoice`). Hai loại chứng từ khác hình dạng hẳn nhau: hoá đơn
+    cước có tuyến, loại xe, biển số, số chuyến, và phụ phí đứng riêng. Nhét
+    chung một lược đồ là mất khả năng đối chiếu với sổ chuyến.
+
+    Khác `/ocr` ở hai chỗ:
+      - có RÀNG BUỘC giải mã theo lược đồ (đường bán lẻ sinh tự do rồi vá cú
+        pháp — mà vá cú pháp không dựng lại được trường thiếu),
+      - lớp kiểm tính lại cộng tiền hàng, tiền thuế VÀ tổng cộng, chứ không chỉ
+        tổng.
+    """
+    require_api_token(x_api_token)
+    await runtime.ensure_vision_runtime()
+    if not runtime.vision:
+        raise HTTPException(status_code=503, detail="Vision runtime unavailable")
+
+    path = await _read_upload_to_tmp(request, file)
+    try:
+        extracted = await runtime.vision.extract_freight_invoice(path)
+        if "error" in extracted:
+            return {"success": False, "backend": _vision_backend(),
+                    "error": extracted["error"], "raw": extracted.get("raw", "")}
+
+        try:
+            invoice = FreightInvoice(**extracted)
+        except Exception as exc:
+            return {"success": False, "backend": _vision_backend(),
+                    "error": f"schema_invalid: {exc}", "raw_json": extracted}
+
+        # TẤT ĐỊNH TRƯỚC: VLM chỉ đọc chữ, mọi phép cộng nhân tính lại bằng code.
+        check = verify_freight(invoice)
+
+        return {
+            "success": True,
+            "backend": _vision_backend(),
+            "invoice": invoice.model_dump(),
+            "validation": check,
+            # Sai mà biết mình sai thì còn dùng được. `ok` đòi cả "không lệch"
+            # lẫn "đã thật sự kiểm được" — ảnh mờ đọc ra rỗng KHÔNG được coi là
+            # một tờ hoá đơn sạch.
+            "needs_manual_review": not check["ok"],
+        }
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.exception("OCR freight endpoint failed: %s", exc)
         return {"success": False, "error": str(exc)}
     finally:
         _safe_unlink(path)

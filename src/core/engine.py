@@ -82,6 +82,39 @@ def sanitize_history(history: list[dict] | None) -> list[dict]:
     return cleaned
 
 
+def _prefix_allowed_fn(tokenizer, json_schema: dict):
+    """
+    Ràng buộc giải mã theo JSON Schema cho `model.generate()` của transformers.
+
+    Trả `None` khi không dựng được — gọi bên ngoài phải coi đó là "chạy tự do"
+    chứ không phải lỗi. Đọc được mà JSON lệch vẫn hơn không đọc được gì; nhưng
+    lớp kiểm số học phía sau (`freight_invoice.verify`) mới là chỗ chặn thật, và
+    nó không dựa vào ràng buộc này.
+
+    Dùng `lm-format-enforcer` chứ không phải `outlines`: nó cắm thẳng vào
+    `prefix_allowed_tokens_fn` — đúng cơ chế transformers đã có sẵn — nên không
+    phải bọc lại vòng sinh, và không đụng gì tới đường vLLM.
+    """
+    try:
+        from lmformatenforcer import JsonSchemaParser
+        from lmformatenforcer.integrations.transformers import (
+            build_transformers_prefix_allowed_tokens_fn,
+        )
+    except ImportError:
+        logger.warning(
+            "Thiếu lm-format-enforcer — sinh JSON KHÔNG ràng buộc. "
+            "Cài: pip install lm-format-enforcer"
+        )
+        return None
+    try:
+        return build_transformers_prefix_allowed_tokens_fn(
+            tokenizer, JsonSchemaParser(json_schema)
+        )
+    except Exception as exc:
+        logger.warning("Không dựng được ràng buộc JSON (%s) — sinh tự do", exc)
+        return None
+
+
 class ModelEngine:
     """
     Singleton quản lý 2 model trên 1 GPU L4 22.5GB:
@@ -306,10 +339,20 @@ class ModelEngine:
     # ------------------------------------------------------------------
     # VISION  (method MỚI — để vision_model không còn là "dead load")
     # ------------------------------------------------------------------
-    async def generate_vision(self, image_path: str, prompt: str, max_new_tokens: int = 512):
+    async def generate_vision(self, image_path: str, prompt: str, max_new_tokens: int = 512,
+                              json_schema: dict | None = None):
         """
-        Chạy Qwen2-VL trên 1 ảnh + prompt, trả về text.
+        Chạy VLM trên 1 ảnh + prompt, trả về text.
         Bất đồng bộ: inference nặng được đẩy ra thread pool (không block event loop).
+
+        `json_schema` bật RÀNG BUỘC GIẢI MÃ: model chỉ được sinh ra token nào giữ
+        chuỗi hợp lệ theo lược đồ. Đường text (vLLM) đã có `guided_json` từ lâu;
+        đường ảnh chạy qua transformers nên trước giờ KHÔNG có gì ràng buộc —
+        JSON hỏng là chuyện thường, và `json_repair` chỉ vá được cú pháp chứ
+        không dựng lại được trường bị thiếu.
+
+        Thiếu `lm-format-enforcer` thì chạy KHÔNG ràng buộc kèm cảnh báo, chứ
+        không chết: đọc được mà JSON lệch vẫn hơn không đọc gì.
         """
         if self.env == "LOCAL":
             await asyncio.sleep(0.05)
@@ -340,8 +383,14 @@ class ModelEngine:
                 return_tensors="pt",
             ).to(self.vision_model.device)
 
+            gen_kwargs = {"max_new_tokens": max_new_tokens}
+            if json_schema is not None:
+                fn = _prefix_allowed_fn(self.vision_processor.tokenizer, json_schema)
+                if fn is not None:
+                    gen_kwargs["prefix_allowed_tokens_fn"] = fn
+
             with torch.no_grad():
-                generated = self.vision_model.generate(**inputs, max_new_tokens=max_new_tokens)
+                generated = self.vision_model.generate(**inputs, **gen_kwargs)
             trimmed = [out[len(inp):] for inp, out in zip(inputs.input_ids, generated)]
             return self.vision_processor.batch_decode(
                 trimmed, skip_special_tokens=True, clean_up_tokenization_spaces=False

@@ -9,6 +9,14 @@ ddgs
 einops
 fastapi
 json_repair
+# Ràng buộc giải mã JSON cho ĐƯỜNG ẢNH. Đường text đi qua vLLM nên đã có
+# `guided_json`; đường ảnh chạy qua transformers.generate() nên trước giờ không
+# có gì ràng buộc — JSON hỏng là chuyện thường, mà `json_repair` chỉ vá được cú
+# pháp chứ không dựng lại được trường bị thiếu.
+# Chọn lm-format-enforcer chứ không phải outlines: nó cắm thẳng vào
+# `prefix_allowed_tokens_fn` — cơ chế transformers đã có sẵn — nên không phải
+# bọc lại vòng sinh và không đụng gì tới đường vLLM.
+lm-format-enforcer
 lunardate
 nest_asyncio
 numpy
