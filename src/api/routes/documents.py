@@ -13,11 +13,24 @@ from typing import Optional
 from fastapi import APIRouter, File, Header, HTTPException, Request, UploadFile
 
 from src.api.dependencies import MAX_UPLOAD_BYTES, require_api_token, runtime
+from src.core.config import Config
 from src.core.mcp_server import MCPServer
 from src.core.schemas import InvoicePayload
 
 logger = logging.getLogger("projecta.api.documents")
 router = APIRouter()
+
+
+def _vision_backend() -> str:
+    """
+    Tên model vision ĐANG chạy, đọc từ config chứ không ghi cứng.
+
+    Bốn chỗ trong file này từng ghi cứng "qwen2-vl-2b". Đổi model (03/08/2026:
+    lên Qwen2.5-VL-3B) là nhãn thành sai — mà nhãn này chính là thứ dùng để so
+    kết quả OCR giữa hai lần chạy. Nhãn sai thì không lần ra được con số nào do
+    model nào đọc.
+    """
+    return Config().vision_model_id
 
 
 def _safe_unlink(path: str) -> None:
@@ -58,7 +71,7 @@ async def upload_file(
     path = await _read_upload_to_tmp(request, file)
     try:
         caption = await runtime.vision.analyze_image(path, task_hint="caption")
-        return {"status": "success", "backend": "qwen2-vl-2b", "vision_analysis": caption}
+        return {"status": "success", "backend": _vision_backend(), "vision_analysis": caption}
     except HTTPException:
         raise
     except Exception as exc:
@@ -89,7 +102,7 @@ async def ocr_endpoint(
         if "error" in extracted:
             return {
                 "success": False,
-                "backend": "qwen2-vl-2b",
+                "backend": _vision_backend(),
                 "error": extracted["error"],
                 "raw": extracted.get("raw", ""),
             }
@@ -100,7 +113,7 @@ async def ocr_endpoint(
         except Exception as exc:
             return {
                 "success": False,
-                "backend": "qwen2-vl-2b",
+                "backend": _vision_backend(),
                 "error": f"schema_invalid: {exc}",
                 "raw_json": extracted,
             }
@@ -111,7 +124,7 @@ async def ocr_endpoint(
 
         return {
             "success": True,
-            "backend": "qwen2-vl-2b",
+            "backend": _vision_backend(),
             "invoice": invoice.model_dump(),
             "validation": validation,                 # is_valid / calculated_total / difference
             "needs_manual_review": not validation["is_valid"],
