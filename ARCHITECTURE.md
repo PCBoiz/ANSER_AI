@@ -5,6 +5,11 @@
 > **Thay thế:** v1.0 (08/05/2026) và `ANSER_AI_SPEC.md` v1.0 (23/06/2026)
 > **Phạm vi:** Repo `AI_ANSER` (module Brain). Repo Body (Flask/VPS/Neon) nằm ngoài phạm vi sửa đổi nhưng là ràng buộc tích hợp.
 
+> 📐 **Hình vẽ ở [ARCHITECTURE_DIAGRAMS.md](ARCHITECTURE_DIAGRAMS.md)** — C4 mức
+> 1→3, sơ đồ tuần tự cho ba luồng chính, phụ thuộc giữa các module, và ngân sách
+> VRAM. Tách file vì tài liệu này đã dài; **quyết định kiến trúc vẫn nằm ở đây**,
+> file kia chỉ vẽ lại cho dễ nhìn.
+
 ---
 
 ## 0. Vì sao có bản 2.0 — 5 thay đổi chiến lược
