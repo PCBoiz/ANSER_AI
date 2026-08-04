@@ -34,6 +34,7 @@ import logging
 from typing import Any, Callable, Optional
 
 from src.core.prompts import Prompts
+from src.core.utils import extract_json_block
 
 logger = logging.getLogger("projecta.agents.agentic")
 
@@ -113,8 +114,7 @@ class AgenticLoop:
     @staticmethod
     def _parse(raw: str) -> Optional[dict]:
         """Bóc quyết định. Guided decoding lo cấu trúc; đây là lưới an toàn."""
-        from src.api.routes.chat import _extract_json_block
-        obj, _err = _extract_json_block(raw or "")
+        obj, _err = extract_json_block(raw or "")
         return obj if isinstance(obj, dict) else None
 
     async def run(self, question: str, history: list[dict] | None = None) -> dict:

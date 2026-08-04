@@ -36,6 +36,7 @@ from src.api.dependencies import (
 from src.core import metrics
 from src.core.engine import TASK_REGISTRY
 from src.core.schemas import RetailChatResponse
+from src.core.utils import extract_json_block
 from src.core.workflow_schema import validate_workflow
 
 logger = logging.getLogger("projecta.api.chat")
@@ -90,56 +91,13 @@ def _save_turn(user_id, store_id, user_msg: str, answer: str) -> None:
         logger.warning("Không lưu được lượt hội thoại: %s", exc)
 
 
-def _extract_json_block(text: str):
-    """
-    Tách object JSON đầu tiên trong text bằng cách đếm ngoặc.
-    Trả về (dict, None) nếu hợp lệ, hoặc (None, lý_do_lỗi).
-
-    Dùng đếm ngoặc thay vì regex vì workflow JSON lồng nhiều tầng.
-    """
-    if not text:
-        return None, "empty output"
-
-    start = text.find("{")
-    if start == -1:
-        return None, "no JSON object found"
-
-    depth = 0
-    in_string = False
-    escaped = False
-    for i in range(start, len(text)):
-        ch = text[i]
-        if escaped:
-            escaped = False
-            continue
-        if ch == "\\":
-            escaped = True
-            continue
-        if ch == '"':
-            in_string = not in_string
-            continue
-        if in_string:
-            continue
-        if ch == "{":
-            depth += 1
-        elif ch == "}":
-            depth -= 1
-            if depth == 0:
-                candidate = text[start:i + 1]
-                try:
-                    return json.loads(candidate), None
-                except json.JSONDecodeError as exc:
-                    # Thử json_repair cho lỗi nhẹ (dấu phẩy thừa...)
-                    try:
-                        from json_repair import repair_json
-                        repaired = repair_json(candidate, return_objects=True)
-                        if isinstance(repaired, dict) and repaired:
-                            return repaired, None
-                    except Exception:
-                        pass
-                    return None, f"JSONDecodeError: {exc.msg} tại vị trí {exc.pos}"
-
-    return None, "unbalanced braces (thiếu dấu })"
+# Hàm THUẦN, đã chuyển sang `src/core/utils.py` (03/08/2026). Giữ alias để 5 chỗ
+# gọi trong file này không phải sửa.
+#
+# Vì sao chuyển: `agents/agentic.py` phải import ngược lên module route này chỉ
+# để dùng nó — một hàm đếm ngoặc trên chuỗi, chẳng liên quan gì HTTP. Import đặt
+# trong thân hàm nên né được vòng lặp import và KHÔNG AI THẤY GÌ.
+_extract_json_block = extract_json_block
 
 
 # Validate workflow nay nằm ở src/core/workflow_schema.py — NGUỒN SỰ THẬT DUY NHẤT

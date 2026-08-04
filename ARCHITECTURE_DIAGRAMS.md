@@ -298,19 +298,46 @@ graph LR
     engine --> config & serving
     kb --> chunking
     inv_imp --> inventory
+    agentic["agents/agentic.py"] --> utils["core/utils.py"]
 
     classDef l4 fill:#438dd5,stroke:#2e6295,color:#fff
     classDef l3 fill:#6a1b9a,stroke:#4a148c,color:#fff
     classDef l2 fill:#2e7d32,stroke:#1b5e20,color:#fff
     classDef l1 fill:#546e7a,stroke:#37474f,color:#fff
     class main,rtools,rdocs,rchat l4
-    class manager,vision,engine,kb l3
+    class manager,vision,engine,kb,agentic l3
     class pricing,inventory,inv_imp,freight,reporting l2
-    class config,serving,chunking,schemas l1
+    class config,serving,chunking,schemas,utils l1
 ```
 
-**Mũi tên chỉ đi xuống.** Tầng 2 không bao giờ import tầng 3 — đó là lý do test
-nghiệp vụ chạy không cần GPU, không cần DB, không cần mạng.
+**Mũi tên chỉ đi xuống** — và từ 03/08/2026 điều đó **kiểm được**, không còn là
+lời hứa: [`tests/test_layering.py`](tests/test_layering.py) duyệt AST toàn bộ
+`src/` và đỏ nếu có module nào import ngược tầng. Duyệt AST chứ không grep, vì
+lỗi lần trước nằm trong **thân hàm** — grep theo dòng đầu file không thấy.
+
+### Chuyện đã xảy ra: bản đầu của trang này khẳng định sai
+
+Bản đầu viết "mũi tên chỉ đi xuống" trong khi `agents/agentic.py` (T3) đang
+import `api/routes/chat.py` (T4) để dùng `_extract_json_block`. Tôi vẽ tay theo
+trí nhớ về *thiết kế* nên đã khẳng định điều mình muốn đúng, không phải điều
+đang đúng. Bản đồ Grapuco sinh tự động bắt được.
+
+Đã sửa: hàm chuyển sang `core/utils.py` (nó chỉ đếm ngoặc trên một chuỗi, chẳng
+liên quan gì HTTP), `chat.py` giữ alias cho 5 chỗ gọi cũ.
+
+### Rà toàn repo: 1 thật trên 5 chỗ Grapuco báo
+
+| Grapuco báo | Thực tế |
+|---|---|
+| `agentic.py` → `routes/chat.py` | ✅ **thật** — đã sửa |
+| `core/integrations.py` → `core/memory.py` | ❌ tiêm phụ thuộc: `memory_manager` truyền vào `__init__` |
+| `core/tools.py` → `core/memory.py` | ❌ tiêm phụ thuộc: `memory` là **tham số hàm** |
+| `core/workflow_schema.py` → `agents/researcher.py` | ❌ trùng tên hàm `search`, không có tham chiếu nào |
+
+Cạnh `CALLS` của phân tích tĩnh là **manh mối, không phải phán quyết**. Nó không
+phân biệt được "gọi qua đối tượng được truyền vào" với "phụ thuộc cứng vào
+module" — mà đó chính là ranh giới giữa thiết kế tốt và nợ kỹ thuật. Cạnh
+`IMPORTS` thì đáng tin: cả hai lần nó báo đều đúng.
 
 ---
 
