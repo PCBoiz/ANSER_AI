@@ -30,6 +30,29 @@ import sys
 from collections import Counter
 from pathlib import Path
 
+# ---------------------------------------------------------------------------
+# TẮT TENSORFLOW — PHẢI đặt trước mọi import chạm tới transformers
+# ---------------------------------------------------------------------------
+# Cài vLLM kéo protobuf xuống 4.25.9 (cả cây phụ thuộc của nó cần bản đó), trong
+# khi TensorFlow 2.20 có sẵn của Colab đòi >= 5.28. `transformers` thấy TF tồn
+# tại là import ở mức module, và chuỗi gãy ngay:
+#
+#     import vllm -> vllm.config -> transformers.image_processing_auto
+#       -> transformers/image_transforms.py:47   import tensorflow as tf
+#         -> ImportError: cannot import name 'runtime_version' from 'google.protobuf'
+#
+# Ta KHÔNG dùng TensorFlow một dòng nào. `USE_TORCH=1` khiến transformers bỏ qua
+# nó hẳn (nó tự ghi log "Disabling Tensorflow because USE_TORCH is set").
+#
+# VÌ SAO ĐẶT Ở ĐÂY chứ không chỉ trong notebook (03/08/2026): notebook phải
+# import tay vào Colab, còn file này thì cell 1.2 `git clone` tự kéo về. Bản vá
+# đầu tiên chỉ nằm trong notebook, nên nó không bao giờ tới được máy người dùng
+# — họ chạy lại và gặp đúng lỗi cũ, không có gì cho thấy vì sao.
+#
+# `setdefault` chứ không gán đè: ai cố tình đặt USE_TF=1 thì tôn trọng.
+os.environ.setdefault("USE_TORCH", "1")
+os.environ.setdefault("USE_TF", "0")
+
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
