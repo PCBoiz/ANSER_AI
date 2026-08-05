@@ -35,6 +35,7 @@ from src.api.dependencies import (
 )
 from src.core import metrics
 from src.core.engine import TASK_REGISTRY
+from src.core.grounding import guard_answer
 from src.core.schemas import RetailChatResponse
 from src.core.utils import extract_json_block
 from src.core.workflow_schema import validate_workflow
@@ -324,6 +325,9 @@ async def chat_endpoint(
         )
 
         resp = ""
+        # Dữ liệu TẤT ĐỊNH mà câu trả lời phải neo vào. Nhánh nào có thì gán;
+        # rỗng nghĩa là không có gì để đối chiếu, và khi đó KHÔNG chặn.
+        grounding_ctx = ""
 
         # ------------------------------------------------------------------
         # LOGISTICS — trích xuất yêu cầu báo giá -> kích hoạt workflow n8n
@@ -346,6 +350,7 @@ async def chat_endpoint(
         # nói thẳng là chưa có, KHÔNG bịa một báo cáo nghe hợp lý.
         elif cat == "REPORT":
             report_ctx, report_err = await _build_report_context(store_id, request_id)
+            grounding_ctx = report_ctx or ""
             if report_err:
                 resp = report_err
                 metric.asked_back = True
@@ -369,6 +374,7 @@ async def chat_endpoint(
                 )
                 metric.asked_back = True
             else:
+                grounding_ctx = explain_ctx
                 resp = await runtime.manager.explain_result(
                     user_msg, context=explain_ctx, history=history
                 )
@@ -439,6 +445,7 @@ async def chat_endpoint(
                 )
                 db_context = "(không lấy được dữ liệu từ cơ sở dữ liệu)"
 
+            grounding_ctx = db_context
             resp = await runtime.manager.answer_data(
                 user_msg, context=db_context, history=history
             )
@@ -475,6 +482,7 @@ async def chat_endpoint(
                     # dùng kiến thức sẵn có thay vì than phiền thiếu context
                     context_docs = ""
 
+            grounding_ctx = context_docs
             resp = await runtime.manager.answer_retrieval(
                 user_msg, context=context_docs, history=history
             )
@@ -486,6 +494,28 @@ async def chat_endpoint(
             resp = await runtime.manager.answer_general(user_msg, history=history)
 
         cleaned = clean_output(resp)
+
+        # CHỐT CHẶN NEO SỐ LIỆU — chạy TRƯỚC khi câu trả lời ra ngoài.
+        #
+        # `narration_numbers_ok` đã tồn tại từ lâu và chạy ở hai chỗ: lọc dữ
+        # liệu huấn luyện, và chấm điểm benchmark. Nhưng KHÔNG chạy ở chỗ thứ
+        # ba, chỗ quan trọng nhất — lúc phục vụ. Nghĩa là ta đo được model bịa
+        # số 8-10 ca trên 27, rồi vẫn để con số bịa đó đi thẳng ra màn hình chủ
+        # doanh nghiệp (nối vào 05/08/2026).
+        #
+        # CHỈ chặn khi CÓ dữ liệu gốc để đối chiếu. Nhánh GENERAL và LOGISTICS
+        # không có `grounding_ctx`; chặn ở đó là chặn oan mọi con số >= 4 chữ số,
+        # kể cả số người dùng vừa tự nhắc trong câu hỏi.
+        if grounding_ctx:
+            verdict = guard_answer(cleaned, grounding_ctx)
+            if verdict.blocked:
+                logger.warning(
+                    "Chặn câu trả lời (%s: %s)", verdict.reason, verdict.offending,
+                    extra={"request_id": request_id},
+                )
+                metric.blocked_reason = verdict.reason
+                cleaned = verdict.safe_answer
+
 
         # Lưu lượt để câu sau có ngữ cảnh + ghi nhật ký đo lường
         _save_turn(user_id, store_id, user_msg, cleaned)

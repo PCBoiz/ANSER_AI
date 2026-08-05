@@ -89,6 +89,10 @@ class TurnMetric:
     workflow_valid: Optional[bool] = None    # TECHNICAL: sinh được JSON hợp lệ
     workflow_retried: Optional[bool] = None  # TECHNICAL: có phải retry không
     tool_calls: Optional[int] = None         # vòng agentic: số tool đã gọi
+    # Chốt chặn neo số liệu đã chặn câu trả lời vì lý do gì ("bịa số" /
+    # "lộ nội bộ"). Đếm được cái này mới biết model bịa bao nhiêu LÚC CHẠY THẬT
+    # — trước đây chỉ biết con số lúc benchmark, trên tập eval 27 câu.
+    blocked_reason: Optional[str] = None
     error: Optional[str] = None
     extra: dict = field(default_factory=dict)
     ts: str = ""

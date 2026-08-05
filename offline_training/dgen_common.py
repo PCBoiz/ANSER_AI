@@ -13,7 +13,6 @@ from __future__ import annotations
 
 import json
 import os
-import re
 import unicodedata
 from pathlib import Path
 
@@ -48,46 +47,24 @@ def fuzzy_contains(haystack: str, needle: str) -> bool:
 # Kiểm tra số liệu trong lời diễn giải (P1)
 # ---------------------------------------------------------------------------
 
-_NUM_RE = re.compile(r"\d[\d.,]*\d|\d")
-
-
-def numbers_in(text: str) -> set[str]:
-    """Tập các con số đã bỏ dấu phân tách nghìn: '3.450.000đ' -> '3450000'."""
-    return {
-        m.group(0).replace(".", "").replace(",", "")
-        for m in _NUM_RE.finditer(text)
-    }
-
-
-def narration_numbers_ok(answer: str, context: str, min_digits: int = 4):
-    """
-    Mọi con số >= `min_digits` chữ số trong answer PHẢI xuất hiện trong context.
-
-    Đây là chốt chặn P1 cho dữ liệu diễn giải: teacher chỉ được diễn đạt lại
-    số do engine tính, số "sáng tác" là loại. Số ngắn (<4 chữ số: %, số câu,
-    ngày trong tháng) được bỏ qua để tránh loại oan.
-
-    Trả (ok, con_số_vi_phạm | None).
-    """
-    ctx_numbers = numbers_in(context)
-    for token in numbers_in(answer):
-        if len(token) >= min_digits and token not in ctx_numbers:
-            return False, token
-    return True, None
-
-
-# Từ CẤM trong nội dung soạn cho KHÁCH CUỐI (P2: biên là bí mật kinh doanh).
-# So word-boundary CÓ DẤU — bỏ dấu sẽ khiến "lãi" khớp nhầm "lại".
-_CUSTOMER_FORBIDDEN_RE = re.compile(
-    r"\b(biên|margin|lãi|giá gốc|giá nhà xe|carrier_cost|internal)\b",
-    re.IGNORECASE,
+# Ba ham duoi day CHUYEN sang src/core/grounding.py (05/08/2026) va import
+# nguoc vao day. Ly do: phep kiem "moi con so phai co trong du lieu" truoc
+# day chi chay o khau SINH DU LIEU va khau DO — khong chay luc phuc vu nguoi
+# dung. Nen ta biet ro model bia so bao nhieu phan tram, va van de con so bia
+# do di thang ra man hinh chu doanh nghiep.
+#
+# Giu MOT ban duy nhat de phep kiem luc do va phep kiem luc chay khong bao gio
+# troi khoi nhau (P4) — hai ban chep tay lech nhau thi diem benchmark khong
+# con noi gi ve thuc te.
+from src.core.grounding import (  # noqa: E402
+    customer_leak as customer_leak,
 )
-
-
-def customer_leak(answer: str) -> list[str]:
-    """Các từ lộ thông tin nội bộ tìm thấy trong nội dung gửi khách cuối."""
-    return _CUSTOMER_FORBIDDEN_RE.findall(answer)
-
+from src.core.grounding import (  # noqa: E402
+    narration_numbers_ok as narration_numbers_ok,
+)
+from src.core.grounding import (  # noqa: E402
+    numbers_in as numbers_in,
+)
 
 # ---------------------------------------------------------------------------
 # JSONL incremental + resume

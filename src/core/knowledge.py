@@ -157,6 +157,31 @@ def content_hash(text: str) -> str:
     return hashlib.sha256(text.encode("utf-8")).hexdigest()[:16]
 
 
+def to_float_lists(vectors: Any) -> list[list[float]]:
+    """
+    Chuẩn hoá vector về `list[list[float]]` KIỂU PYTHON THUẦN.
+
+    `SentenceTransformer.encode()` trả mảng numpy. `list(hàng_numpy)` cho ra một
+    list các `np.float32` — trông như list số nhưng Chroma từ chối thẳng:
+
+        ValueError: Expected embeddings to be a list of floats or ints, ...
+                    got [[np.float32(0.129…), …]]
+
+    Bản cũ dùng `.tolist()` nên không dính; bản viết lại đổi sang `list(v)` và
+    làm hỏng. Test không bắt được vì collection giả nhận mọi thứ — chỉ chạy thật
+    với Chroma thật mới lộ ra (05/08/2026).
+
+    Nhận cả numpy array, list lồng, lẫn tensor torch.
+    """
+    tolist = getattr(vectors, "tolist", None)
+    if callable(tolist):
+        return tolist()
+    return [
+        v.tolist() if callable(getattr(v, "tolist", None)) else [float(x) for x in v]
+        for v in vectors
+    ]
+
+
 def sigmoid(x: float) -> float:
     # Chặn biên trước khi exp: logit rất âm làm exp tràn số.
     if x < -30:
@@ -379,7 +404,7 @@ class KnowledgeBase:
         self.collection.add(
             ids=[f"{workspace_id}:{source}:{digest}:{c.index}" for c in chunks],
             documents=texts,
-            embeddings=[list(v) for v in self.embedder.encode(texts)],
+            embeddings=to_float_lists(self.embedder.encode(texts)),
             metadatas=[{**meta_chung, "chunk_index": c.index, "heading": c.heading}
                        for c in chunks],
         )
@@ -467,7 +492,7 @@ class KnowledgeBase:
 
         dense: list[tuple[str, dict[str, Any]]] = []
         kq = self.collection.query(
-            query_embeddings=[list(v) for v in self.embedder.encode([query])],
+            query_embeddings=to_float_lists(self.embedder.encode([query])),
             n_results=n_candidates,
             where=dieu_kien,
         )
@@ -522,6 +547,7 @@ __all__ = [
     "KnowledgeBase",
     "Passage",
     "content_hash",
+    "to_float_lists",
     "format_for_prompt",
     "is_effective",
     "merge_candidates",

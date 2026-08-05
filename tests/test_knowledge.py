@@ -370,3 +370,42 @@ def test_khoi_tao_KHONG_doc_dia_khong_nap_model():
     """
     kb = KnowledgeBase(embedder=None, reranker=None, collection=FakeCollection())
     assert kb._embedder is None and kb._reranker is None
+
+
+# ---------------------------------------------------------------------------
+# Chuẩn hoá vector — bug chỉ lộ ra khi chạy với Chroma THẬT
+# ---------------------------------------------------------------------------
+
+def test_vector_numpy_phai_ra_float_python_thuan():
+    """
+    `SentenceTransformer.encode()` trả mảng numpy. `list(hàng_numpy)` cho ra list
+    các `np.float32` — trông như list số nhưng Chroma từ chối thẳng:
+
+        ValueError: Expected embeddings to be a list of floats or ints,
+                    ... got [[np.float32(0.129…), …]]
+
+    Test cũ không bắt được vì collection giả nhận mọi thứ. Chỉ chạy thật mới lộ
+    (05/08/2026).
+    """
+    np = pytest.importorskip("numpy")
+    from src.core.knowledge import to_float_lists
+
+    out = to_float_lists(np.array([[0.1, 0.2], [0.3, 0.4]], dtype=np.float32))
+    assert isinstance(out, list) and isinstance(out[0], list)
+    assert all(type(x) is float for hang in out for x in hang), \
+        "còn numpy scalar thì Chroma vẫn từ chối"
+
+
+def test_chuan_hoa_nhan_ca_list_thuong():
+    from src.core.knowledge import to_float_lists
+
+    assert to_float_lists([[1, 2], [3, 4]]) == [[1.0, 2.0], [3.0, 4.0]]
+
+
+def test_chuan_hoa_nhan_list_cac_mang_numpy():
+    """Vài phiên bản trả list các mảng 1 chiều thay vì một mảng 2 chiều."""
+    np = pytest.importorskip("numpy")
+    from src.core.knowledge import to_float_lists
+
+    out = to_float_lists([np.array([0.1, 0.2], dtype=np.float32)])
+    assert all(type(x) is float for x in out[0])
