@@ -111,10 +111,12 @@ async def health():
 # Register routers
 from src.api.routes.chat import router as chat_router
 from src.api.routes.documents import router as documents_router
+from src.api.routes.knowledge import router as knowledge_router
 from src.api.routes.tools import mcp_router
 from src.api.routes.tools import router as tools_router
 
 app.include_router(chat_router)
 app.include_router(documents_router)
 app.include_router(tools_router)   # tầng tool tất định — n8n + agentic dùng chung
+app.include_router(knowledge_router)  # nạp/tra cứu kho tri thức (RAG), có workspace
 app.include_router(mcp_router)     # MCP bọc đúng manifest trên (không định nghĩa lại)
