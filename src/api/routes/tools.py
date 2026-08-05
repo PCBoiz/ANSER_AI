@@ -496,6 +496,18 @@ _TOOL_IMPL: dict[str, tuple[type[BaseModel], Any]] = {
 }
 
 
+def get_tool_request_model(name: str) -> type[BaseModel] | None:
+    """
+    Pydantic model của tham số một tool. None = không có tool đó.
+
+    Có mặt để benchmark chấm được "model điền tham số đúng kiểu chưa" bằng ĐÚNG
+    lớp validate mà endpoint dùng lúc chạy thật — chấm bằng một bản kiểm riêng
+    thì điểm đẹp mà production vẫn 422 (P4).
+    """
+    entry = _TOOL_IMPL.get(name)
+    return entry[0] if entry else None
+
+
 async def run_tool(name: str, arguments: dict) -> Any:
     """
     Chạy một tool theo tên + tham số thô (từ model hoặc từ MCP client).

@@ -16,6 +16,7 @@ from offline_training.benchmark_v3 import (
     parse_outputs,
     score_agent,
     score_narration,
+    score_planner,
     tach_tool_tu_json_cut,
 )
 
@@ -62,29 +63,88 @@ def test_khong_co_tool_thi_KHONG_bia_ra_mot_cai(raw):
 # Agentic: cắt cụt KHÔNG được tính thành "chọn None"
 # ---------------------------------------------------------------------------
 
-def test_cat_cut_khong_con_bi_tinh_la_chon_None():
+def test_cat_cut_khong_con_bi_tinh_la_khong_goi_tool():
     """
     Bản cũ: JSON cắt cụt -> json.loads hỏng -> dict rỗng -> `chose = None` ->
-    "chọn None, đúng phải là 'report'". Model ĐÃ chọn đúng, chỉ chưa viết xong
-    phần tham số. Nới trần 700 -> 2048 không cứu được (vẫn 9/19 cắt cụt) vì
-    `arguments` chứa nguyên mảng dữ liệu, dài không có giới hạn tự nhiên.
+    "chọn None". Model ĐÃ chọn, chỉ chưa viết xong phần tham số.
+
+    Hai mẫu này đều là tool CẦN DỮ LIỆU HỆ THỐNG. Từ 05/08/2026 `arguments` của
+    chúng bị bỏ hẳn `sales`/`carriers` khỏi lược đồ nên chuyện cắt cụt gần như
+    không còn xảy ra — nhưng phần cứu vẫn phải giữ, vì đây là mẫu THẬT từ báo
+    cáo hỏng và nó chứng minh việc chấm không đổ lỗi nhầm cho model.
     """
     rows = [
-        {"_id": "AG0000", "expected_tool": "report"},
-        {"_id": "AG0002", "expected_tool": "carrier_selection"},
+        {"_id": "AG0000", "tool": "report"},
+        {"_id": "AG0002", "tool": "carrier_selection"},
     ]
     kq = score_agent(rows, [CAT_CUT_REPORT, CAT_CUT_CARRIER])
-    assert kq["tool_choice_rate"] == 1.0
+    assert kq["call_rate"] == 1.0
     assert kq["cuu_tu_json_cut"] == 2
+    assert kq["failures"] == []
+    # Tham số của tool cần dữ liệu hệ thống KHÔNG được chấm: production ghi đè
+    # chúng, nên chấm ở đây là chấm thứ bị vứt đi.
+    assert kq["n_arg"] == 0
+
+
+def test_tham_so_cat_cut_van_bi_tinh_truot_voi_tool_model_phai_dien():
+    """
+    Cứu tên tool KHÔNG được biến thành cứu điểm. `quote` là tool model PHẢI tự
+    điền tham số (suy từ lời người dùng), nên `arguments` đứt giữa chừng là
+    trượt thật — production sẽ trả 422.
+    """
+    rows = [{"_id": "AG0003", "tool": "quote"}]
+    kq = score_agent(rows, ['{"thought": "x", "tool": "quote", "arguments": {"a'])
+    assert kq["call_rate"] == 1.0          # có gọi tool
+    assert kq["arg_fill_rate"] == 0.0      # nhưng tham số không dùng được
+    assert "quote" in kq["failures"][0][1]
+
+
+def test_tham_so_dung_kieu_thi_qua():
+    """Chấm bằng ĐÚNG pydantic của endpoint — không phải một bản kiểm riêng."""
+    rows = [{"_id": "AG0004", "tool": "vat"}]
+    kq = score_agent(rows, [
+        '{"thought": "x", "tool": "vat", "arguments": '
+        '{"items": [{"name": "A", "price": 100000, "qty": 1}], "stated_total": 110000}}'
+    ])
+    assert kq["arg_fill_rate"] == 1.0
     assert kq["failures"] == []
 
 
-def test_van_bao_chon_sai_khi_model_that_su_chon_sai():
-    """Cứu tên tool KHÔNG được biến thành cứu điểm."""
-    rows = [{"_id": "AG0003", "expected_tool": "carrier_selection"}]
-    kq = score_agent(rows, ['{"thought": "x", "tool": "quote", "arguments": {"a'])
-    assert kq["tool_choice_rate"] == 0.0
-    assert "quote" in kq["failures"][0][1]
+# ---------------------------------------------------------------------------
+# Bảng luật: chỗ "chọn đúng tool" nay được quyết định
+# ---------------------------------------------------------------------------
+
+def test_bang_luat_cham_duoc_ma_khong_can_gpu():
+    rows = [
+        {"_id": "P1", "tool": "report", "question": "quý này lãi hay lỗ"},
+        {"_id": "P2", "tool": "forecast_reorder",
+         "question": "có nên nhập thêm hàng không"},
+    ]
+    kq = score_planner(rows)
+    assert kq["tool_rate"] == 1.0 and kq["coverage"] == 1.0
+    assert kq["failures"] == []
+
+
+def test_bang_luat_bao_truot_khi_khong_luat_nao_khop():
+    """
+    Không khớp luật nào thì câu rơi về nhánh router cũ — vẫn trả lời được, nhưng
+    KHÔNG dùng tool tất định. Tính là trượt, nếu không thì bảng luật rỗng cũng
+    được 100%.
+    """
+    rows = [{"_id": "P3", "tool": "report", "question": "hôm nay trời đẹp nhỉ"}]
+    kq = score_planner(rows)
+    assert kq["tool_rate"] == 0.0 and kq["coverage"] == 0.0
+    assert "không luật nào khớp" in kq["failures"][0][1]
+
+
+def test_bang_luat_cham_ca_ca_hoi_lai():
+    """
+    Ca HỎI LẠI có `expected_tool = None`, nhưng bảng luật VẪN phải nhận ra ý
+    định — chính vì đã lên kế hoạch mà thiếu tham số nên model mới hỏi lại được.
+    """
+    rows = [{"_id": "P4", "tool": "report", "expected_tool": None,
+             "ask_back": True, "question": "quý vừa rồi lãi hay lỗ"}]
+    assert score_planner(rows)["tool_rate"] == 1.0
 
 
 def test_thieu_du_kien_ma_goi_tool_van_bi_bat_du_json_cat_cut():

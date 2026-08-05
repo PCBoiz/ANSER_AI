@@ -63,19 +63,62 @@ DEFAULT_MAX_STEPS = 4
 MAX_OBSERVATION_CHARS = 3000
 
 
-def build_decision_schema(tool_names: list[str]) -> dict[str, Any]:
+def arguments_schema(tool_def: dict, bo_truong: tuple[str, ...] = ()) -> dict[str, Any]:
+    """
+    Schema cho `arguments`, BỎ những trường hệ thống tự cấp.
+
+    Vì sao phải bỏ chứ không chỉ ghi đè sau: để trống `arguments` thì model ngồi
+    viết ra nguyên mảng `sales` cho `report` — thứ `data_provider` vứt đi ngay
+    sau đó. Ở benchmark đó là lãng phí token; ở production nó là ngõ cụt, vì
+    mảng dài làm JSON chạm trần token, cắt cụt, `_parse` trả None, vòng lặp gãy
+    và người dùng nhận "tôi chưa hoàn thành được yêu cầu này".
+
+    Tức là ta bắt model bịa dữ liệu, rồi vứt đi, rồi hỏng vì chính việc bịa đó.
+
+    `$defs` phải mang theo: schema pydantic dùng `$ref` trỏ vào đó, bỏ lại thì
+    grammar gãy ngay lúc dựng.
+    """
+    goc = tool_def.get("input_schema") or {}
+    props = {
+        ten: mo_ta
+        for ten, mo_ta in (goc.get("properties") or {}).items()
+        if ten not in bo_truong
+    }
+    out: dict[str, Any] = {"type": "object", "properties": props}
+    buoc = [r for r in (goc.get("required") or []) if r not in bo_truong]
+    if buoc:
+        out["required"] = buoc
+    if "$defs" in goc:
+        out["$defs"] = goc["$defs"]
+    return out
+
+
+def build_decision_schema(
+    tool_names: list[str], arg_schema: dict[str, Any] | None = None
+) -> dict[str, Any]:
     """
     JSON Schema cho MỘT quyết định của agent — đưa vào guided_json.
 
     `oneOf` gọi-tool / trả-lời: grammar không cho model xuất nửa vời (vừa gọi
     tool vừa tuyên bố đáp án), thứ hay xảy ra khi chỉ dặn bằng lời trong prompt.
+
+    `arg_schema` (tuỳ chọn): ràng buộc `arguments` khi đã biết chắc tool nào sẽ
+    chạy — xem `arguments_schema`.
     """
-    return {
+    args = dict(arg_schema) if arg_schema else {"type": "object"}
+
+    # `$defs` phải NÂNG LÊN GỐC. `$ref: "#/$defs/SaleLineIn"` là con trỏ tính từ
+    # gốc TÀI LIỆU, không phải từ object chứa nó — để nguyên trong `arguments`
+    # thì grammar đi tìm ở gốc, không thấy, và gãy lúc dựng chứ không phải lúc
+    # sinh. Loại lỗi nổ ở phút 20 của phiên Colab.
+    defs = args.pop("$defs", None)
+
+    schema: dict[str, Any] = {
         "type": "object",
         "properties": {
             "thought": {"type": "string", "maxLength": 400},
             "tool": {"type": "string", "enum": tool_names},
-            "arguments": {"type": "object"},
+            "arguments": args,
             "answer": {"type": "string", "maxLength": 2000},
         },
         "required": ["thought"],
@@ -85,6 +128,9 @@ def build_decision_schema(tool_names: list[str]) -> dict[str, Any]:
         ],
         "additionalProperties": False,
     }
+    if defs:
+        schema["$defs"] = defs
+    return schema
 
 
 def build_answer_schema() -> dict[str, Any]:
@@ -161,6 +207,20 @@ class AgenticLoop:
         obj, _err = extract_json_block(raw or "")
         return obj if isinstance(obj, dict) else None
 
+    def _arg_schema(self, ten_tool: str) -> Optional[dict[str, Any]]:
+        """
+        Ràng buộc `arguments` cho tool sắp chạy — bỏ trường hệ thống tự cấp.
+
+        Trả None khi không tìm thấy định nghĩa tool: thà để `arguments` tự do
+        còn hơn dựng một grammar sai rồi chặn mọi câu trả lời.
+        """
+        from src.core.tool_planner import system_data_fields
+
+        for t in self.tool_defs:
+            if t.get("name") == ten_tool:
+                return arguments_schema(t, system_data_fields(ten_tool))
+        return None
+
     @staticmethod
     async def _maybe_await(value: Any) -> Any:
         """
@@ -198,7 +258,7 @@ class AgenticLoop:
             # Ràng buộc ở tầng SAMPLING, không phải trong prompt: còn kế hoạch
             # thì enum chỉ có một tên; hết kế hoạch thì chỉ còn `answer`.
             if plan:
-                schema = build_decision_schema([plan[0]])
+                schema = build_decision_schema([plan[0]], self._arg_schema(plan[0]))
             elif co_ke_hoach:
                 schema = answer_schema
             else:
@@ -320,6 +380,7 @@ class AgenticLoop:
 
 __all__ = [
     "AgenticLoop",
+    "arguments_schema",
     "build_answer_schema",
     "build_decision_schema",
     "render_tools",

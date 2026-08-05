@@ -16,7 +16,12 @@ import json
 
 import pytest
 
-from src.agents.agentic import AgenticLoop, build_answer_schema
+from src.agents.agentic import (
+    AgenticLoop,
+    arguments_schema,
+    build_answer_schema,
+    build_decision_schema,
+)
 
 _TOOLS = [
     {"name": "report", "description": "báo cáo lãi lỗ",
@@ -142,6 +147,114 @@ async def test_van_hoi_lai_duoc_khi_thieu_tham_so():
     assert out["answer"].startswith("Đơn hàng tổng")
     assert out["tool_calls"] == 0
     assert "answer" in (manager.schemas[0].get("properties") or {})
+
+
+# --------------------------------------------------------------------------
+# Ràng buộc `arguments` — chống bịa dữ liệu RỒI CHẾT VÌ NÓ
+# --------------------------------------------------------------------------
+
+def test_bo_truong_he_thong_cap_khoi_schema():
+    """
+    Để `arguments` tự do thì model viết ra nguyên mảng `sales` cho `report` —
+    thứ `data_provider` vứt đi ngay sau đó. Mảng dài làm JSON chạm trần token,
+    cắt cụt, `_parse` trả None, vòng lặp gãy. Bắt model bịa, rồi vứt, rồi hỏng
+    vì chính việc bịa đó.
+    """
+    tool = {"name": "report", "input_schema": {
+        "type": "object",
+        "properties": {"granularity": {"type": "string"}, "sales": {"type": "array"},
+                       "expenses": {"type": "array"}},
+        "required": ["sales"],
+    }}
+    s = arguments_schema(tool, ("sales", "expenses"))
+    assert list(s["properties"]) == ["granularity"]
+    # `sales` là bắt buộc trong schema gốc — bỏ trường thì phải bỏ cả ràng buộc,
+    # nếu không grammar đòi một trường không còn tồn tại và không sinh nổi gì.
+    assert "required" not in s
+
+
+def test_giu_nguyen_tham_so_model_duoc_phep_dien():
+    """`vat` suy được từ lời người dùng — không được cắt bớt gì."""
+    tool = {"name": "vat", "input_schema": {
+        "type": "object",
+        "properties": {"items": {"type": "array"}, "stated_total": {"type": "number"}},
+        "required": ["items", "stated_total"],
+    }}
+    s = arguments_schema(tool, ())
+    assert set(s["properties"]) == {"items", "stated_total"}
+    assert set(s["required"]) == {"items", "stated_total"}
+
+
+def test_defs_duoc_nang_len_goc_tai_lieu():
+    """
+    `$ref: "#/$defs/X"` là con trỏ tính từ gốc TÀI LIỆU, không từ object chứa nó.
+    Để `$defs` nằm trong `arguments` thì grammar đi tìm ở gốc, không thấy, và gãy
+    lúc DỰNG — tức là ở phút 20 của phiên Colab, không phải lúc test.
+    """
+    tool = {"name": "report", "input_schema": {
+        "type": "object",
+        "properties": {"sales": {"items": {"$ref": "#/$defs/SaleLineIn"}}},
+        "$defs": {"SaleLineIn": {"type": "object"}},
+    }}
+    s = build_decision_schema(["report"], arguments_schema(tool, ()))
+    assert "SaleLineIn" in s["$defs"]
+    assert "$defs" not in s["properties"]["arguments"]
+
+
+def test_moi_tool_that_deu_dung_schema_hop_le():
+    """
+    Chạy trên manifest THẬT. Một `$ref` treo ở đây là vòng agentic chết hẳn trên
+    GPU trong khi mọi test khác vẫn xanh.
+    """
+    jsonschema = pytest.importorskip("jsonschema")
+    from src.api.routes.tools import get_tool_defs
+    from src.core.tool_planner import system_data_fields
+
+    for t in get_tool_defs():
+        s = build_decision_schema(
+            [t["name"]], arguments_schema(t, system_data_fields(t["name"]))
+        )
+        jsonschema.Draft202012Validator.check_schema(s)
+
+        refs = set()
+        def quet(o):
+            if isinstance(o, dict):
+                if "$ref" in o:
+                    refs.add(o["$ref"])
+                for v in o.values():
+                    quet(v)
+            elif isinstance(o, list):
+                for v in o:
+                    quet(v)
+        quet(s)
+        co = set(s.get("$defs") or {})
+        treo = [r for r in refs
+                if not r.startswith("#/$defs/") or r.split("/")[-1] not in co]
+        assert not treo, f"{t['name']}: $ref treo {treo}"
+
+
+@pytest.mark.asyncio
+async def test_vong_lap_dung_schema_da_chan_cho_tool_can_du_lieu():
+    """Nối từ đầu đến cuối: kế hoạch -> schema thu hẹp -> model không thấy `sales`."""
+    manager = _GhiSchema([
+        {"thought": "1", "tool": "report", "arguments": {"granularity": "quarter"}},
+        {"thought": "2", "answer": "Xong."},
+    ])
+    tools = [{"name": "report", "description": "báo cáo", "input_schema": {
+        "type": "object",
+        "properties": {"granularity": {"type": "string"}, "sales": {"type": "array"}},
+        "required": ["sales"],
+    }}]
+
+    await AgenticLoop(
+        manager, tools, lambda n, a: {"ok": 1},
+        planner=lambda q, names: ["report"],
+        data_provider=lambda n, a: ({**a, "sales": [{"revenue": 1}]}, None),
+    ).run("quý này lãi hay lỗ")
+
+    arg_props = manager.schemas[0]["properties"]["arguments"]["properties"]
+    assert "sales" not in arg_props, "model vẫn bị hỏi mảng dữ liệu sẽ bị vứt đi"
+    assert "granularity" in arg_props
 
 
 # --------------------------------------------------------------------------

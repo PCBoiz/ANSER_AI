@@ -113,11 +113,29 @@ _PIPELINE = ["inventory_audit", "report", "forecast_reorder", "carrier_selection
 # phải dành cho việc viết câu trả lời.
 MAX_PLAN = 3
 
-# Tool mà `arguments` KHÔNG thể suy ra từ lời người dùng — dữ liệu phải đến từ
-# hệ thống. Xem docstring đầu file: đây là hàng rào chống bịa dữ liệu đầu vào.
-NEEDS_SYSTEM_DATA = frozenset({
-    "report", "inventory_audit", "forecast_reorder", "carrier_selection",
-})
+# Tool -> những TRƯỜNG mà hệ thống cấp, model không được đụng vào.
+#
+# Không chỉ để chặn bịa dữ liệu. Nó còn quyết định hình dạng JSON Schema đưa vào
+# guided decoding: `arguments` bỏ trống hoàn toàn thì model ngồi viết ra nguyên
+# mảng `sales` — thứ `data_provider` vứt đi ngay sau đó. Đo được 9/19 ca chạm
+# trần 2048 token vì đúng chuyện này (05/08/2026), và cắt cụt thì JSON hỏng,
+# `_parse` trả None, vòng lặp gãy -> người dùng nhận "tôi chưa hoàn thành được".
+#
+# Nghĩa là ta bắt model bịa ra dữ liệu, rồi vứt đi, rồi hỏng vì việc bịa đó.
+SYSTEM_DATA_FIELDS: dict[str, tuple[str, ...]] = {
+    "report": ("sales", "expenses"),
+    "inventory_audit": ("lines",),
+    "forecast_reorder": ("items",),
+    "carrier_selection": ("carriers", "offers"),
+}
+
+# Dẫn xuất, không viết tay lần hai (P4).
+NEEDS_SYSTEM_DATA = frozenset(SYSTEM_DATA_FIELDS)
+
+
+def system_data_fields(tool: str) -> tuple[str, ...]:
+    """Trường do hệ thống cấp cho tool này. Rỗng = model điền toàn bộ."""
+    return SYSTEM_DATA_FIELDS.get(tool, ())
 
 
 def plan_tools(question: str, available: list[str] | None = None) -> list[str]:
@@ -148,4 +166,11 @@ def needs_system_data(tool: str) -> bool:
     return tool in NEEDS_SYSTEM_DATA
 
 
-__all__ = ["plan_tools", "needs_system_data", "NEEDS_SYSTEM_DATA", "MAX_PLAN"]
+__all__ = [
+    "plan_tools",
+    "needs_system_data",
+    "system_data_fields",
+    "NEEDS_SYSTEM_DATA",
+    "SYSTEM_DATA_FIELDS",
+    "MAX_PLAN",
+]

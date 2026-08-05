@@ -174,16 +174,80 @@ def score_extraction(rows: list[dict], outputs: list[str]) -> dict:
     }
 
 
+def score_planner(rows: list[dict]) -> dict:
+    """
+    Chấm BẢNG LUẬT chọn tool — KHÔNG cần GPU, chạy được ngay trên máy thường.
+
+    Từ 05/08/2026 tool do `core/tool_planner.py` chọn chứ không phải model, nên
+    đây mới là chỗ "chọn đúng tool" được quyết định. Đo tách hẳn ra vì nó là mã
+    tất định: sai thì sửa được bằng một dòng regex, không phải huấn luyện lại.
+
+    Ground truth dùng `tool` chứ không dùng `expected_tool`: ca HỎI LẠI có
+    `expected_tool = None` (model không được gọi tool), nhưng bảng luật vẫn phải
+    nhận ra ý định — chính vì đã lên kế hoạch mà thiếu tham số nên model mới
+    hỏi lại được.
+    """
+    from src.api.routes.tools import get_tool_defs
+    from src.core.tool_planner import plan_tools
+
+    names = [t["name"] for t in get_tool_defs()]
+    n_ok = n_co_ke_hoach = 0
+    failures = []
+
+    for row in rows:
+        mong_doi = row.get("tool")
+        plan = plan_tools(row.get("question", ""), names)
+        if plan:
+            n_co_ke_hoach += 1
+            if mong_doi in plan:
+                n_ok += 1
+            else:
+                failures.append((row["_id"], f"kế hoạch {plan}, đúng phải có {mong_doi!r}"))
+        else:
+            # Không luật nào khớp -> câu đi tiếp vào nhánh router cũ. Vẫn trả lời
+            # được, nhưng không dùng tool tất định — nên tính là trượt.
+            failures.append((row["_id"], f"không luật nào khớp (cần {mong_doi!r})"))
+
+    n = len(rows)
+    return {
+        "n": n,
+        "tool_rate": n_ok / n if n else None,
+        "coverage": n_co_ke_hoach / n if n else None,
+        "failures": failures,
+    }
+
+
+def _kiem_tham_so(ten_tool: str, args: dict) -> str | None:
+    """Tham số có qua được pydantic của chính endpoint không. None = hợp lệ."""
+    from src.api.routes.tools import get_tool_request_model
+
+    model_cls = get_tool_request_model(ten_tool)
+    if model_cls is None:
+        return f"không có tool {ten_tool!r}"
+    try:
+        model_cls(**(args or {}))
+        return None
+    except Exception as exc:
+        return str(exc).splitlines()[0][:110]
+
+
 def score_agent(rows: list[dict], outputs: list[str]) -> dict:
     """
-    Đo hai việc DUY NHẤT model được làm trong vòng agentic:
-      1. chọn ĐÚNG tool cho câu hỏi có đủ dữ kiện
-      2. biết HỎI LẠI khi thiếu dữ kiện, thay vì gọi tool với giá trị bịa
+    Đo hai việc CÒN LẠI của model sau khi bảng luật đã chọn tool:
 
-    Tách riêng hai tỷ lệ: model chọn tool giỏi mà không biết hỏi lại là nguy
-    hiểm hơn — nó tạo kết quả sai trong im lặng.
+      1. biết HỎI LẠI khi thiếu dữ kiện, thay vì gọi tool với giá trị bịa
+      2. điền tham số ĐÚNG KIỂU cho tool mà nó được phép điền
+
+    Không còn đo "chọn đúng tool": enum trong grammar chỉ có một tên, model
+    không sinh nổi tên khác. Giữ lại chỉ tiêu đó là tự chấm điểm cho một ràng
+    buộc cú pháp, và điểm 100% ấy không nói gì về model.
+
+    Tham số của `report`/`inventory_audit`... KHÔNG chấm: production lấy dữ liệu
+    từ nguồn tất định và ghi đè, nên chấm ở đây là chấm thứ bị vứt đi.
     """
-    n_tool = n_tool_ok = n_ask = n_ask_ok = 0
+    from src.core.tool_planner import needs_system_data
+
+    n_ask = n_ask_ok = n_goi = n_goi_ok = n_arg = n_arg_ok = 0
     failures = []
     n_cuu = 0
 
@@ -206,19 +270,29 @@ def score_agent(rows: list[dict], outputs: list[str]) -> dict:
                 n_ask_ok += 1
             else:
                 failures.append((row["_id"], f"thiếu dữ kiện mà vẫn gọi tool {chose!r}"))
+            continue
+
+        n_goi += 1
+        if not chose:
+            failures.append((row["_id"], "không gọi tool nào dù đủ dữ kiện"))
+            continue
+        n_goi_ok += 1
+
+        if needs_system_data(chose):
+            continue
+        n_arg += 1
+        loi = _kiem_tham_so(chose, decision.get("arguments") or {})
+        if loi is None:
+            n_arg_ok += 1
         else:
-            n_tool += 1
-            if chose == row["expected_tool"]:
-                n_tool_ok += 1
-            else:
-                failures.append(
-                    (row["_id"], f"chọn {chose!r}, đúng phải là {row['expected_tool']!r}")
-                )
+            failures.append((row["_id"], f"tham số {chose} không hợp lệ: {loi}"))
 
     return {
         "n": len(rows),
-        "tool_choice_rate": n_tool_ok / n_tool if n_tool else None,
+        "call_rate": n_goi_ok / n_goi if n_goi else None,
         "ask_back_rate": n_ask_ok / n_ask if n_ask else None,
+        "arg_fill_rate": n_arg_ok / n_arg if n_arg else None,
+        "n_arg": n_arg,
         "failures": failures,
         "parse": tk_parse,
         "cuu_tu_json_cut": n_cuu,
@@ -367,6 +441,38 @@ def smoke_test_guided(llm) -> None:
             "  3. lược đồ có kiểu mà xgrammar chưa đỡ được không\n\n"
             "Bỏ qua chốt này: BENCH_SKIP_GUIDED_CHECK=1 (KHÔNG khuyến nghị)"
         )
+
+    # ---- lược đồ THẬT của vòng agentic --------------------------------------
+    # Lược đồ đồ chơi ở trên chỉ chứng minh guided decoding có chạy. Lược đồ
+    # thật thì lồng `oneOf`, `$defs` + `$ref`, và `enum` một phần tử — xgrammar
+    # đỡ những thứ đó ở mức khác hẳn. Dựng hỏng thì nó nổ lúc DỰNG grammar, tức
+    # là ở phút 20 của phiên Colab chứ không phải bây giờ.
+    from src.agents.agentic import arguments_schema, build_decision_schema
+    from src.api.routes.tools import get_tool_defs
+    from src.core.tool_planner import system_data_fields
+
+    for t in get_tool_defs():
+        ten = t["name"]
+        s = build_decision_schema([ten], arguments_schema(t, system_data_fields(ten)))
+        try:
+            raw = generate(
+                llm,
+                [[{"role": "user", "content": f"Gọi tool {ten} với tham số bất kỳ."}]],
+                s, max_tokens=200, temperature=0.0,
+            )[0][0]
+            json.loads(raw)
+        except Exception as exc:
+            print(f"    lược đồ {ten} HỎNG: {exc}")
+            print(f"    lược đồ: {json.dumps(s, ensure_ascii=False)[:400]}")
+            raise SystemExit(
+                f"Lược đồ quyết định của tool {ten!r} không dựng được grammar.\n"
+                "Gần như chắc chắn là `$ref` treo: `arguments_schema()` bỏ trường "
+                "nhưng `$defs` phải được NÂNG LÊN GỐC của lược đồ quyết định — "
+                "`#/$defs/X` là con trỏ tính từ gốc tài liệu, không từ object "
+                "chứa nó.\n"
+                "Chạy `pytest tests/test_agentic_plan.py -k schema` để khoanh vùng."
+            ) from exc
+    print(f"[chốt chặn] lược đồ agentic ({len(get_tool_defs())} tool): ✓ dựng được")
 
 
 
@@ -590,51 +696,98 @@ def main() -> None:
     if "agent" not in args.skip:
         rows = cap(load_jsonl(GENERATED_DIR / "eval_agent.jsonl"))
         if rows:
-            from src.agents.agentic import build_decision_schema, render_tools
+            from src.agents.agentic import (
+                arguments_schema,
+                build_decision_schema,
+                render_tools,
+            )
             from src.api.routes.tools import get_tool_defs
+            from src.core.tool_planner import plan_tools, system_data_fields
 
             tool_defs = get_tool_defs()
+            theo_ten = {t["name"]: t for t in tool_defs}
+            names = [t["name"] for t in tool_defs]
+
+            # ---- 4a. BẢNG LUẬT (tất định, không tốn GPU) -------------------
+            kh = score_planner(rows)
+            print(f"\n[bảng luật chọn tool] n={kh['n']}   — mã tất định, không có model")
+            print(f"  chọn đúng tool  {kh['tool_rate'] * 100:5.1f}%")
+            print(f"  có kế hoạch     {kh['coverage'] * 100:5.1f}%"
+                  "  (không khớp luật nào -> rơi về nhánh router cũ)")
+            for _id, reason in kh["failures"][:10]:
+                print(f"  ✗ {_id}: {reason}")
+
+            plan_min = float(os.getenv("PLANNER_TOOL_MIN", "0.90"))
+            if kh["tool_rate"] is not None and kh["tool_rate"] < plan_min:
+                gate_fail.append(
+                    f"bang luat tool_rate {kh['tool_rate']:.4f} < {plan_min} "
+                    "(sua regex trong tool_planner.py, khong phai huan luyen lai)")
+
+            # ---- 4b. MODEL, chạy ĐÚNG schema như lúc serve ------------------
+            # Mỗi câu một schema riêng: enum thu về đúng tool bảng luật đã chọn,
+            # và `arguments` bỏ những trường production tự bơm vào. Dựng khác đi
+            # là đo một đường mà khách sẽ không bao giờ đi qua.
             system = Prompts.AGENT_SYSTEM.format(tools=render_tools(tool_defs))
-            chats = [
-                [{"role": "system", "content": system},
-                 {"role": "user", "content": r["question"]}]
-                for r in rows
-            ]
-            # 700 -> 2048: quyết định agentic phải nhét CẢ THAM SỐ vào `arguments`,
-            # mà tham số của `report` hay `carrier_selection` là nguyên mảng dòng
-            # bán / danh sách nhà xe. Trần 700 cắt cụt JSON giữa chừng ở ~45% số
-            # ca, và vì cắt cụt cũng làm `json.loads` hỏng nên nó bị tính thành
-            # "model chọn None" — điểm chọn tool tụt thảm mà không phải lỗi model
-            # (đo được 05/08/2026 ở CẢ baseline lẫn bản fine-tune).
-            outputs, _finish = generate(
-                llm, chats,
-                build_decision_schema([t["name"] for t in tool_defs]),
-                max_tokens=int(os.getenv("BENCH_AGENT_MAX_TOKENS", "2048")),
-                temperature=0.0,
-            )
+
+            # GOM THEO SCHEMA rồi mới sinh. Mỗi câu một lời gọi `generate` là bỏ
+            # hết batching của vLLM — 27 câu thành 27 lượt tuần tự, đủ để một
+            # phiên Colab đắt gấp mấy lần mà không đo thêm được gì.
+            nhom: dict[str, list[int]] = {}
+            for i, row in enumerate(rows):
+                plan = plan_tools(row.get("question", ""), names)
+                khoa = plan[0] if plan and plan[0] in theo_ten else ""
+                nhom.setdefault(khoa, []).append(i)
+
+            outputs: list[str] = [""] * len(rows)
+            finishes: list[str] = [""] * len(rows)
+            for ten, idxs in nhom.items():
+                if ten:
+                    schema = build_decision_schema(
+                        [ten], arguments_schema(theo_ten[ten], system_data_fields(ten))
+                    )
+                else:
+                    schema = build_decision_schema(names)
+                o, f = generate(
+                    llm,
+                    [[{"role": "system", "content": system},
+                      {"role": "user", "content": rows[i]["question"]}] for i in idxs],
+                    schema,
+                    max_tokens=int(os.getenv("BENCH_AGENT_MAX_TOKENS", "1024")),
+                    temperature=0.0,
+                )
+                for vi_tri, i in enumerate(idxs):
+                    outputs[i] = o[vi_tri]
+                    finishes[i] = f[vi_tri]
+
+            n_cut = sum(1 for f in finishes if f == "length")
             result = score_agent(rows, outputs)
-            print(f"\n[agentic] n={result['n']}")
+            print(f"\n[agentic — phần của model] n={result['n']}")
             in_thong_ke_parse(result["parse"])
+            if n_cut:
+                print(f"  ⚠ {n_cut}/{len(finishes)} đầu ra vẫn CẮT CỤT")
             if result["cuu_tu_json_cut"]:
-                print(f"    (đã moi lại tên tool từ {result['cuu_tu_json_cut']} JSON bị"
-                      f" cắt cụt — model ĐÃ chọn, chỉ chưa viết xong tham số)")
-            if result["tool_choice_rate"] is not None:
-                print(f"  chọn đúng tool  {result['tool_choice_rate'] * 100:5.1f}%")
+                print(f"    (moi lại tên tool từ {result['cuu_tu_json_cut']} JSON cắt cụt)")
             if result["ask_back_rate"] is not None:
                 print(f"  biết hỏi lại    {result['ask_back_rate'] * 100:5.1f}%"
                       "  (thiếu dữ kiện thì KHÔNG được gọi tool)")
+            if result["call_rate"] is not None:
+                print(f"  chịu gọi tool   {result['call_rate'] * 100:5.1f}%"
+                      "  (đủ dữ kiện thì phải gọi, không được trả lời chay)")
+            if result["arg_fill_rate"] is not None:
+                print(f"  điền tham số    {result['arg_fill_rate'] * 100:5.1f}%"
+                      f"  (n={result['n_arg']}, chấm bằng pydantic của endpoint)")
             for _id, reason in result["failures"][:10]:
                 print(f"  ✗ {_id}: {reason}")
 
-            tool_min = float(os.getenv("AGENT_TOOL_MIN", "0.85"))
             ask_min = float(os.getenv("AGENT_ASKBACK_MIN", "0.75"))
-            if result["tool_choice_rate"] is not None and result["tool_choice_rate"] < tool_min:
-                gate_fail.append(
-                    f"agentic tool_choice {result['tool_choice_rate']:.4f} < {tool_min}")
+            arg_min = float(os.getenv("AGENT_ARG_MIN", "0.80"))
             if result["ask_back_rate"] is not None and result["ask_back_rate"] < ask_min:
                 gate_fail.append(
                     f"agentic ask_back {result['ask_back_rate']:.4f} < {ask_min} "
                     "(goi tool voi tham so bia)")
+            if result["arg_fill_rate"] is not None and result["arg_fill_rate"] < arg_min:
+                gate_fail.append(
+                    f"agentic arg_fill {result['arg_fill_rate']:.4f} < {arg_min}")
         else:
             print("\n[agentic] ⚠ thiếu eval_agent.jsonl — bỏ qua")
 

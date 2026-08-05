@@ -46,6 +46,11 @@ offline_training/generated/_catalog/
 offline_training/generated/train_v3.jsonl
 offline_training/generated/eval_v3.jsonl
 
+# Bang ton kho mau la SAN PHAM cua sample_data/make_sample_data.py. Dung lai
+# duoc bang mot lenh, va commit .xlsx thi moi lan chinh so lieu lai them mot ban
+# nhi phan vao lich su.
+sample_data/*.xlsx
+
 # Backup cuc bo — KHONG track trong git (moi ban backup nhan doi moi bi mat lo commit;
 # chinh _backups da nhan mat khau Neon thanh 12 ban trong su co 27/07/2026)
 /_backups/
