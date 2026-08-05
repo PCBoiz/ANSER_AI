@@ -245,6 +245,62 @@ def test_tai_lieu_nap_qua_http_thi_chat_tra_cuu_duoc(moi_truong, monkeypatch):
 
 
 # ---------------------------------------------------------------------------
+# DATA_INTERNAL — kỳ phải đọc từ CÂU HỎI, không đóng cứng
+# ---------------------------------------------------------------------------
+
+class _SaasGia:
+    def __init__(self):
+        self.periods = []
+
+    def lookup_product(self, query, workspace_id=1):
+        return "[]"
+
+    def get_sales_report(self, workspace_id=1, period="today"):
+        self.periods.append(period)
+        return {"period": period, "revenue": "20.000.000 VND", "orders": 2}
+
+
+@pytest.fixture
+def saas_gia(monkeypatch):
+    from src.api.routes import chat as chat_mod
+
+    gia = _SaasGia()
+    monkeypatch.setattr(chat_mod, "_get_saas", lambda: gia)
+    return gia
+
+
+def test_ky_lay_tu_cau_hoi_chu_khong_dong_cung(moi_truong, monkeypatch, saas_gia):
+    from src.api import dependencies as deps
+
+    monkeypatch.setattr(deps.runtime, "kb", None, raising=False)
+    moi_truong.category = "DATA_INTERNAL"
+    _hoi("tháng này doanh số thế nào")
+
+    assert saas_gia.periods == ["month"], "đóng cứng 'today' thì hỏng ở đây"
+    assert "THÁNG NÀY" in moi_truong.contexts[0]
+
+
+def test_ky_chua_truy_van_duoc_thi_khong_dua_so_hom_nay_vao(
+    moi_truong, monkeypatch, saas_gia
+):
+    """
+    Chỗ đắt nhất của cả nhánh này. Đưa số HÔM NAY vào ngữ cảnh cho câu hỏi
+    "tháng trước" thì model trả lời trôi chảy bằng con số của kỳ khác, và chốt
+    chặn neo số liệu KHÔNG bắt được — con số ấy có thật trong ngữ cảnh.
+    """
+    from src.api import dependencies as deps
+
+    monkeypatch.setattr(deps.runtime, "kb", None, raising=False)
+    moi_truong.category = "DATA_INTERNAL"
+    _hoi("tháng trước bán được bao nhiêu")
+
+    assert saas_gia.periods == [], "không được truy vấn kỳ nào khi chưa hỗ trợ"
+    ctx = moi_truong.contexts[0]
+    assert "THÁNG TRƯỚC" in ctx and "CHƯA LẤY ĐƯỢC" in ctx
+    assert "20.000.000" not in ctx, "số của kỳ khác không được lọt vào ngữ cảnh"
+
+
+# ---------------------------------------------------------------------------
 # Vòng agentic
 # ---------------------------------------------------------------------------
 

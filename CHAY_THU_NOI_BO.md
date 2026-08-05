@@ -1,4 +1,4 @@
-# Chạy thử nội bộ — bản 05/08/2026
+# Chạy thử nội bộ — bản 06/08/2026
 
 Tài liệu này để **chạy được**, không phải để đọc. Mỗi bước có cách biết mình đã
 làm đúng, và cuối mỗi phần là những gì **sẽ không chạy** kèm lý do — vì phần
@@ -117,6 +117,10 @@ Rồi mở một đường hầm để máy bạn gọi vào (ngrok hoặc cloud
 | `TEXT_MODEL_ID` | đường dẫn model AWQ |
 | `API_AUTH_TOKEN` | token Body phải gửi kèm |
 | `KB_WORKSPACE_ID` | phạm vi kho tri thức, **để trống = `default`** |
+| `DATABASE_URL` | DB của Body — thiếu thì nhánh dữ liệu nội bộ không có gì để đọc |
+
+> Thiếu `DATABASE_URL` thì `Config` lùi về SQLite rỗng: mọi câu tra cứu hàng hoá
+> trả "không tìm thấy". Không phải lỗi, nhưng biết trước thì đỡ mất công.
 
 **Kiểm sống:** `GET /health` phải trả `text` sẵn sàng. Nếu `kb_error` có nội dung
 thì phần tài liệu sẽ 503 — cài thêm `chromadb sentence-transformers rank_bm25
@@ -180,7 +184,21 @@ khác nhau. Đây là chỗ đáng xem nhất trong cả buổi.
 
 Không dựng được ca bịa số theo ý muốn thì bỏ qua — chốt chặn này đã có test.
 
-### 5.4. Câu nhiều bước
+### 5.4. Hỏi kỳ nào thì trả kỳ đó
+
+| Làm | Phải thấy |
+|---|---|
+| "doanh số hôm nay bao nhiêu" | số của hôm nay, nhãn ghi rõ **HÔM NAY** |
+| "tháng này bán được bao nhiêu" | số của **tháng này**, không phải hôm nay |
+| "**tháng trước** bán được bao nhiêu" | nói thẳng chưa lấy được kỳ đó, mời hỏi lại theo hôm nay/tuần này/tháng này |
+
+Dòng thứ ba là chỗ đáng xem. Trước 06/08 hệ thống luôn trả số **hôm nay** cho
+mọi câu hỏi kỳ nào, và chốt chặn neo số liệu không bắt được vì con số ấy **có
+thật** trong dữ liệu. Đúng số, sai câu hỏi — không có triệu chứng gì.
+
+Nếu thấy nó trả về một con số cho câu "tháng trước" thì báo ngay.
+
+### 5.5. Câu nhiều bước
 
 | Làm | Phải thấy |
 |---|---|
@@ -190,7 +208,7 @@ Không dựng được ca bịa số theo ý muốn thì bỏ qua — chốt ch�
 Đúng là câu trả lời "chưa có dữ liệu". Thứ cần xác nhận là nó **đi vào vòng
 agentic và dừng lại đúng chỗ**, thay vì để model tự nghĩ ra doanh thu.
 
-### 5.5. Sinh workflow n8n
+### 5.6. Sinh workflow n8n
 
 | Làm | Phải thấy |
 |---|---|

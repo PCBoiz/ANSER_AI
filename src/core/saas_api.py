@@ -7,6 +7,8 @@ src/core/saas_api.py — Tra cứu dữ liệu nghiệp vụ trực tiếp từ 
 """
 import json
 import logging
+import re
+from dataclasses import dataclass
 
 from sqlalchemy import create_engine, text
 from sqlalchemy.exc import SQLAlchemyError
@@ -46,6 +48,62 @@ def _period_filter(period: str) -> str:
     return f"date({S_DATE}) = CURRENT_DATE"
 
 
+# =====================================================================
+#  ĐỌC KỲ TỪ CÂU HỎI
+# ---------------------------------------------------------------------
+#  Đặt CẠNH `_period_filter` có chủ đích: danh sách kỳ đọc được và danh
+#  sách kỳ truy vấn được phải luôn khớp nhau. Tách ra hai file thì thêm
+#  một kỳ ở bên này mà quên bên kia, và biểu hiện là số của kỳ SAI —
+#  loại lỗi không có triệu chứng.
+# =====================================================================
+
+SUPPORTED_PERIODS = ("today", "week", "month")
+
+# Kỳ KHÔNG truy vấn được — phải khớp TRƯỚC, vì "tháng vừa rồi" và "tháng
+# này" chỉ khác nhau một từ mà ra hai con số hoàn toàn khác.
+_KY_CHUA_CO = (
+    ("hôm qua", re.compile(r"hôm qua|ngày hôm qua|bữa qua", re.I)),
+    ("tuần trước", re.compile(r"tuần (trước|rồi|vừa rồi|qua)", re.I)),
+    ("tháng trước", re.compile(r"tháng (trước|rồi|vừa rồi|qua)", re.I)),
+    ("quý", re.compile(r"quý\s*(này|trước|vừa rồi|rồi|[1-4]|i{1,3}v?|iv)", re.I)),
+    ("năm", re.compile(r"năm (nay|ngoái|trước|vừa rồi|qua)|cả năm", re.I)),
+)
+
+_KY_CO = (
+    ("today", "hôm nay", re.compile(r"hôm nay|bữa nay|ngày hôm nay", re.I)),
+    ("week", "tuần này", re.compile(r"tuần (này|nay)", re.I)),
+    ("month", "tháng này", re.compile(r"tháng (này|nay)", re.I)),
+)
+
+
+@dataclass(frozen=True)
+class KyHoi:
+    """Kỳ người dùng đang hỏi. `ho_tro=False` -> chưa truy vấn được kỳ đó."""
+
+    period: str        # khoá đưa vào `_period_filter`; rỗng khi chưa hỗ trợ
+    nhan: str          # tên tiếng Việt để dán vào ngữ cảnh và câu trả lời
+    ho_tro: bool
+
+
+def parse_period(question: str) -> KyHoi:
+    """
+    Đọc kỳ từ câu hỏi. Không nhắc kỳ nào -> hôm nay.
+
+    VÌ SAO CẦN: `chat.py` từng đóng cứng `period="today"` bất kể người dùng hỏi
+    kỳ nào. Hỏi "tháng trước bán được bao nhiêu" thì model chỉ nhận được số HÔM
+    NAY, và chốt chặn neo số liệu KHÔNG bắt được — con số ấy có thật trong ngữ
+    cảnh. Đúng số, sai câu hỏi: loại sai tệ nhất vì không có dấu hiệu gì.
+    """
+    q = question or ""
+    for nhan, mau in _KY_CHUA_CO:
+        if mau.search(q):
+            return KyHoi("", nhan, False)
+    for period, nhan, mau in _KY_CO:
+        if mau.search(q):
+            return KyHoi(period, nhan, True)
+    return KyHoi("today", "hôm nay", True)
+
+
 class SaasAPI:
     def __init__(self):
         self.config = Config()
@@ -63,11 +121,17 @@ class SaasAPI:
         self._require_engine()
         try:
             with self.engine.connect() as conn:
+                # LOWER(...) LIKE LOWER(...) thay cho ILIKE: `ILIKE` là cú pháp
+                # riêng của PostgreSQL, nên mọi lần tra cứu đều ném
+                # OperationalError khi `DATABASE_URL` trống và Config lùi về
+                # SQLite. Lỗi đó bị `except SQLAlchemyError` nuốt và trả ra "Lỗi
+                # hệ thống khi tìm sản phẩm" — trông y hệt một sự cố DB thật.
+                # Hai cách viết cho cùng kết quả trên Postgres.
                 sql = text(f"""
                     SELECT {P_ID}, {P_NAME}, {P_PRICE}, {P_STOCK}
                     FROM {PRODUCTS_TABLE}
                     WHERE {P_WORKSPACE} = :ws_id
-                      AND {P_NAME} ILIKE :query
+                      AND LOWER({P_NAME}) LIKE LOWER(:query)
                     LIMIT 20
                 """)
                 rows = conn.execute(
@@ -127,7 +191,7 @@ class SaasAPI:
                 sql_find = text(f"""
                     SELECT {P_ID}, {P_PRICE}
                     FROM {PRODUCTS_TABLE}
-                    WHERE {P_NAME} ILIKE :name AND {P_WORKSPACE} = :ws_id
+                    WHERE LOWER({P_NAME}) LIKE LOWER(:name) AND {P_WORKSPACE} = :ws_id
                     LIMIT 1
                 """)
                 item = conn.execute(

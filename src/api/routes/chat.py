@@ -590,13 +590,32 @@ async def chat_endpoint(
         # ------------------------------------------------------------------
         elif cat == "DATA_INTERNAL":
             saas = _get_saas()
+            # Kỳ ĐỌC TỪ CÂU HỎI. Bản cũ đóng cứng "today": hỏi "tháng trước bán
+            # được bao nhiêu" thì model chỉ nhận số HÔM NAY, và chốt chặn neo số
+            # liệu không bắt được vì con số ấy có thật trong ngữ cảnh. Đúng số,
+            # sai câu hỏi — không có triệu chứng nào (sửa 05/08/2026).
+            from src.core.saas_api import parse_period
+
+            ky = parse_period(user_msg)
             try:
                 products = saas.lookup_product(user_msg, workspace_id=store_id)
-                sales = saas.get_sales_report(workspace_id=store_id, period="today")
-                db_context = (
-                    f"[SẢN PHẨM KHỚP TRUY VẤN]\n{products}\n\n"
-                    f"[DOANH SỐ HÔM NAY]\n{json.dumps(sales, ensure_ascii=False)}"
-                )
+                if ky.ho_tro:
+                    sales = saas.get_sales_report(workspace_id=store_id, period=ky.period)
+                    khoi_ban = (
+                        f"[DOANH SỐ {ky.nhan.upper()}]\n"
+                        f"{json.dumps(sales, ensure_ascii=False)}"
+                    )
+                else:
+                    # KHÔNG đưa số hôm nay vào đây. Thiếu số thì model nói không
+                    # biết; có số sai kỳ thì nó trả lời trôi chảy và sai.
+                    khoi_ban = (
+                        f"[DOANH SỐ {ky.nhan.upper()}]\n"
+                        f"CHƯA LẤY ĐƯỢC — hệ thống mới truy vấn được hôm nay, "
+                        f"tuần này và tháng này. Nói rõ điều này với người dùng "
+                        f"và mời họ hỏi lại theo một trong ba kỳ đó."
+                    )
+                    metric.asked_back = True
+                db_context = f"[SẢN PHẨM KHỚP TRUY VẤN]\n{products}\n\n{khoi_ban}"
             except Exception as exc:
                 logger.warning(
                     "Truy vấn DB thất bại: %s", exc,
