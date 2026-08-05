@@ -26,6 +26,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import sys
 from collections import Counter
 from pathlib import Path
@@ -184,11 +185,20 @@ def score_agent(rows: list[dict], outputs: list[str]) -> dict:
     """
     n_tool = n_tool_ok = n_ask = n_ask_ok = 0
     failures = []
+    n_cuu = 0
 
     decisions, tk_parse = parse_outputs(outputs, "agentic")
-    for row, decision in zip(rows, decisions):
+    for row, decision, raw in zip(rows, decisions, outputs):
         chose = decision.get("tool")
         answered = bool(decision.get("answer"))
+
+        # JSON cắt cụt -> dict rỗng -> "chọn None". Nhưng `tool` nằm trước
+        # `arguments` nên tên tool đã sinh xong; moi lại để đo ĐÚNG cái đang đo.
+        if chose is None and not answered:
+            cuu = tach_tool_tu_json_cut(raw)
+            if cuu:
+                chose = cuu
+                n_cuu += 1
 
         if row.get("ask_back"):
             n_ask += 1
@@ -211,19 +221,39 @@ def score_agent(rows: list[dict], outputs: list[str]) -> dict:
         "ask_back_rate": n_ask_ok / n_ask if n_ask else None,
         "failures": failures,
         "parse": tk_parse,
+        "cuu_tu_json_cut": n_cuu,
     }
 
 
-def score_narration(rows: list[dict], outputs: list[str]) -> dict:
-    """Không bịa số + không lộ biên. Tách điểm theo nhánh (quote/explain/report...)."""
+def score_narration(rows: list[dict], outputs: list[str],
+                    finishes: list[str] | None = None) -> dict:
+    """
+    Không bịa số + không lộ biên. Tách điểm theo nhánh (quote/explain/report...).
+
+    TÁCH RIÊNG ca bị CẮT CỤT (05/08/2026). Câu văn đứt giữa chừng thường đứt
+    ngay giữa một con số, và bộ chấm thấy một chuỗi số không có trong ngữ cảnh
+    thì kết luận "bịa số". Buổi đo cho ra `[carrier] bịa số 0006` — đó không
+    phải một con số bịa, đó là mảnh vụn của một con số bị chặt đôi.
+
+    Cắt cụt VẪN là lỗi (model chưa nói hết câu), nhưng là lỗi KHÁC: nó sửa bằng
+    cách nới trần token, còn bịa số thì phải sửa dữ liệu huấn luyện. Gộp hai
+    thứ vào một tỷ lệ là chỉ đường sai cho người đi sửa.
+    """
     n_pass, failures = 0, []
     by_kind: dict[str, list[bool]] = {}
+    n_cut = 0
+    finishes = finishes or [""] * len(outputs)
 
-    for row, answer in zip(rows, outputs):
+    for row, answer, finish in zip(rows, outputs, finishes):
         kind = row.get("kind", "quote")
+        bi_cut = finish == "length"
         ok, bad = narration_numbers_ok(answer, row["context"])
         passed = True
-        if not ok:
+        if bi_cut:
+            n_cut += 1
+            failures.append((row["_id"], f"[{kind}] CẮT CỤT giữa chừng (chạm trần token)"))
+            passed = False
+        elif not ok:
             failures.append((row["_id"], f"[{kind}] bịa số {bad}"))
             passed = False
         elif kind == "customer" and (leaks := customer_leak(answer)):
@@ -232,9 +262,14 @@ def score_narration(rows: list[dict], outputs: list[str]) -> dict:
         n_pass += passed
         by_kind.setdefault(kind, []).append(passed)
 
+    n = max(len(rows), 1)
     return {
         "n": len(rows),
-        "pass_rate": n_pass / max(len(rows), 1),
+        "pass_rate": n_pass / n,
+        # Tỷ lệ trên phần ĐO ĐƯỢC: bỏ ca cắt cụt ra khỏi mẫu số. Đây mới là con
+        # số nói về kỷ luật số liệu của model.
+        "pass_rate_do_duoc": (n_pass / (n - n_cut)) if n - n_cut > 0 else None,
+        "n_cat_cut": n_cut,
         "by_kind": {k: sum(v) / len(v) for k, v in by_kind.items()},
         "failures": failures,
     }
@@ -312,7 +347,7 @@ def smoke_test_guided(llm) -> None:
         llm,
         [[{"role": "user", "content": "Tra ve JSON: ten='xe tai', so=5"}]],
         schema, max_tokens=64, temperature=0.0,
-    )[0]
+    )[0][0]
     try:
         obj = json.loads(raw)
         ok = isinstance(obj, dict) and "ten" in obj and "so" in obj
@@ -377,18 +412,36 @@ def generate(llm, chats: list[list[dict]], json_schema: dict | None,
     outputs = llm.generate(prompts, params)
 
     # CẮT CỤT vì chạm trần token là chuyện KHÁC HẲN với sinh ra rác, nhưng cả
-    # hai đều làm `json.loads` hỏng rồi thành dict rỗng — nhìn số cuối cùng
-    # không phân biệt được. Buổi đo 05/08/2026: agentic 47% đầu ra không đọc
-    # được, mẫu thô là JSON hoàn toàn hợp lệ nhưng đứt giữa chừng
-    # (`"discount": 0, ` rồi hết) — tức trần 700 token quá chật, không phải
-    # model dở. vLLM có sẵn `finish_reason`, chỉ là trước đây ta vứt đi.
+    # hai đều làm `json.loads` hỏng rồi thành dict rỗng. vLLM có sẵn
+    # `finish_reason`, trước đây ta vứt đi — nên trả kèm để tầng chấm điểm phân
+    # biệt được "model làm sai" với "model chưa nói hết câu".
     n_trunc = sum(1 for o in outputs if o.outputs[0].finish_reason == "length")
     if n_trunc:
         print(f"  ⚠ {n_trunc}/{len(outputs)} đầu ra bị CẮT CỤT vì chạm trần "
-              f"{max_tokens} token — JSON đứt giữa chừng sẽ tính là lỗi đọc. "
-              f"Nới trần rồi đo lại.")
+              f"{max_tokens} token.")
 
-    return [o.outputs[0].text.strip() for o in outputs]
+    return (
+        [o.outputs[0].text.strip() for o in outputs],
+        [o.outputs[0].finish_reason for o in outputs],
+    )
+
+
+def tach_tool_tu_json_cut(raw: str) -> str | None:
+    """
+    Moi tên tool ra khỏi JSON bị cắt cụt.
+
+    Quyết định agentic có hình dạng {"thought": ..., "tool": ..., "arguments": …}
+    — `tool` nằm TRƯỚC `arguments`, mà `arguments` mới là chỗ phình to và bị cắt.
+    Nên gần như lúc nào tên tool cũng đã được sinh ra trọn vẹn trước khi chạm trần.
+
+    Trước đây một quyết định cắt cụt bị tính thành "model chọn None", kéo tỷ lệ
+    chọn tool xuống thảm. Nhưng model ĐÃ chọn — nó chỉ chưa viết xong phần tham
+    số. Hai chuyện đó phải đo riêng: nới trần token từ 700 lên 2048 không đổi
+    được gì (vẫn 9/19 cắt cụt) vì `arguments` nhét cả mảng dòng bán vào, dài
+    không có giới hạn tự nhiên (05/08/2026).
+    """
+    m = re.search(r'"tool"\s*:\s*"([^"]+)"', raw or "")
+    return m.group(1) if m else None
 
 
 # ---------------------------------------------------------------------------
@@ -431,8 +484,8 @@ def main() -> None:
         rows = cap(load_jsonl(GENERATED_DIR / "eval_extraction.jsonl"))
         if rows:
             chats = [build_extraction_chat(r, Prompts) for r in rows]
-            outputs = generate(llm, chats, QuoteExtraction.model_json_schema(),
-                               max_tokens=256, temperature=0.0)
+            outputs, _finish = generate(llm, chats, QuoteExtraction.model_json_schema(),
+                                        max_tokens=256, temperature=0.0)
             result = score_extraction(rows, outputs)
             print(f"\n[extraction] n={result['n']}")
             in_thong_ke_parse(result["parse"])
@@ -474,8 +527,8 @@ def main() -> None:
                  {"role": "user", "content": f"YÊU CẦU: {r['task']}\nKẾ HOẠCH: {r['plan']}"}]
                 for r in rows
             ]
-            outputs = generate(llm, chats, build_workflow_schema(),
-                               max_tokens=2048, temperature=0.0)
+            outputs, _finish = generate(llm, chats, build_workflow_schema(),
+                                        max_tokens=2048, temperature=0.0)
             n_valid = 0
             for row, raw in zip(rows, outputs):
                 try:
@@ -508,9 +561,21 @@ def main() -> None:
                      "content": getattr(Prompts, name).format(context=r["context"])},
                     {"role": "user", "content": r["question"]},
                 ])
-            outputs = generate(llm, chats, None, max_tokens=1100, temperature=0.2)
-            result = score_narration(rows, outputs)
+            # 1100 -> 2048: ban fine-tune viet dai hon han, 7/27 cau bi cat cut
+            # giua chung. Cau dut giua mot con so bi cham diem thanh "bia so"
+            # (05/08/2026: "bia so 0006" thuc ra la manh vun).
+            outputs, finishes = generate(
+                llm, chats, None,
+                max_tokens=int(os.getenv("BENCH_NARR_MAX_TOKENS", "2048")),
+                temperature=0.2)
+            result = score_narration(rows, outputs, finishes)
             print(f"\n[narration] đạt {result['pass_rate'] * 100:.0f}% (n={result['n']})")
+            if result["n_cat_cut"]:
+                print(f"    trong đó {result['n_cat_cut']} ca CẮT CỤT (chạm trần token)"
+                      f" — sửa bằng nới trần, không phải bằng train lại")
+                if result["pass_rate_do_duoc"] is not None:
+                    print(f"    trên phần đo được: "
+                          f"{result['pass_rate_do_duoc'] * 100:.0f}%")
             for kind, rate in sorted(result["by_kind"].items()):
                 print(f"    {kind:10s} {rate * 100:5.1f}%")
             for _id, reason in result["failures"][:10]:
@@ -541,7 +606,7 @@ def main() -> None:
             # ca, và vì cắt cụt cũng làm `json.loads` hỏng nên nó bị tính thành
             # "model chọn None" — điểm chọn tool tụt thảm mà không phải lỗi model
             # (đo được 05/08/2026 ở CẢ baseline lẫn bản fine-tune).
-            outputs = generate(
+            outputs, _finish = generate(
                 llm, chats,
                 build_decision_schema([t["name"] for t in tool_defs]),
                 max_tokens=int(os.getenv("BENCH_AGENT_MAX_TOKENS", "2048")),
@@ -550,6 +615,9 @@ def main() -> None:
             result = score_agent(rows, outputs)
             print(f"\n[agentic] n={result['n']}")
             in_thong_ke_parse(result["parse"])
+            if result["cuu_tu_json_cut"]:
+                print(f"    (đã moi lại tên tool từ {result['cuu_tu_json_cut']} JSON bị"
+                      f" cắt cụt — model ĐÃ chọn, chỉ chưa viết xong tham số)")
             if result["tool_choice_rate"] is not None:
                 print(f"  chọn đúng tool  {result['tool_choice_rate'] * 100:5.1f}%")
             if result["ask_back_rate"] is not None:
