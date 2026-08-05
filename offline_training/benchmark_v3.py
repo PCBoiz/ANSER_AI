@@ -375,6 +375,19 @@ def generate(llm, chats: list[list[dict]], json_schema: dict | None,
         for chat in chats
     ]
     outputs = llm.generate(prompts, params)
+
+    # CẮT CỤT vì chạm trần token là chuyện KHÁC HẲN với sinh ra rác, nhưng cả
+    # hai đều làm `json.loads` hỏng rồi thành dict rỗng — nhìn số cuối cùng
+    # không phân biệt được. Buổi đo 05/08/2026: agentic 47% đầu ra không đọc
+    # được, mẫu thô là JSON hoàn toàn hợp lệ nhưng đứt giữa chừng
+    # (`"discount": 0, ` rồi hết) — tức trần 700 token quá chật, không phải
+    # model dở. vLLM có sẵn `finish_reason`, chỉ là trước đây ta vứt đi.
+    n_trunc = sum(1 for o in outputs if o.outputs[0].finish_reason == "length")
+    if n_trunc:
+        print(f"  ⚠ {n_trunc}/{len(outputs)} đầu ra bị CẮT CỤT vì chạm trần "
+              f"{max_tokens} token — JSON đứt giữa chừng sẽ tính là lỗi đọc. "
+              f"Nới trần rồi đo lại.")
+
     return [o.outputs[0].text.strip() for o in outputs]
 
 
@@ -439,13 +452,13 @@ def main() -> None:
             followup_rate = result["ready_by_kind"].get("followup")
             if followup_rate is not None and followup_rate < followup_min:
                 gate_fail.append(
-                    f"extraction followup {followup_rate:.2f} < {followup_min} "
+                    f"extraction followup {followup_rate:.4f} < {followup_min} "
                     "(hội thoại nhiều lượt chưa dùng được)"
                 )
             if result["field_avg"] < field_min:
-                gate_fail.append(f"extraction field_avg {result['field_avg']:.2f} < {field_min}")
+                gate_fail.append(f"extraction field_avg {result['field_avg']:.4f} < {field_min}")
             if result["ready_rate"] < ready_min:
-                gate_fail.append(f"extraction ready_rate {result['ready_rate']:.2f} < {ready_min}")
+                gate_fail.append(f"extraction ready_rate {result['ready_rate']:.4f} < {ready_min}")
         else:
             print("\n[extraction] ⚠ thiếu eval_extraction.jsonl — bỏ qua")
 
@@ -476,7 +489,7 @@ def main() -> None:
             print(f"\n[n8n] hợp lệ {n_valid}/{len(rows)} ({rate * 100:.0f}%)")
             n8n_min = float(os.getenv("N8N_VALID_MIN", "0.90"))
             if rate < n8n_min:
-                gate_fail.append(f"n8n valid_rate {rate:.2f} < {n8n_min}")
+                gate_fail.append(f"n8n valid_rate {rate:.4f} < {n8n_min}")
         else:
             print("\n[n8n] ⚠ thiếu eval_n8n.jsonl — bỏ qua")
 
@@ -504,7 +517,7 @@ def main() -> None:
                 print(f"  ✗ {_id}: {reason}")
             narr_min = float(os.getenv("NARR_MIN", "0.90"))
             if result["pass_rate"] < narr_min:
-                gate_fail.append(f"narration pass_rate {result['pass_rate']:.2f} < {narr_min}")
+                gate_fail.append(f"narration pass_rate {result['pass_rate']:.4f} < {narr_min}")
         else:
             print("\n[narration] ⚠ thiếu eval_narration.jsonl — bỏ qua")
 
@@ -522,10 +535,17 @@ def main() -> None:
                  {"role": "user", "content": r["question"]}]
                 for r in rows
             ]
+            # 700 -> 2048: quyết định agentic phải nhét CẢ THAM SỐ vào `arguments`,
+            # mà tham số của `report` hay `carrier_selection` là nguyên mảng dòng
+            # bán / danh sách nhà xe. Trần 700 cắt cụt JSON giữa chừng ở ~45% số
+            # ca, và vì cắt cụt cũng làm `json.loads` hỏng nên nó bị tính thành
+            # "model chọn None" — điểm chọn tool tụt thảm mà không phải lỗi model
+            # (đo được 05/08/2026 ở CẢ baseline lẫn bản fine-tune).
             outputs = generate(
                 llm, chats,
                 build_decision_schema([t["name"] for t in tool_defs]),
-                max_tokens=700, temperature=0.0,
+                max_tokens=int(os.getenv("BENCH_AGENT_MAX_TOKENS", "2048")),
+                temperature=0.0,
             )
             result = score_agent(rows, outputs)
             print(f"\n[agentic] n={result['n']}")
@@ -542,10 +562,10 @@ def main() -> None:
             ask_min = float(os.getenv("AGENT_ASKBACK_MIN", "0.75"))
             if result["tool_choice_rate"] is not None and result["tool_choice_rate"] < tool_min:
                 gate_fail.append(
-                    f"agentic tool_choice {result['tool_choice_rate']:.2f} < {tool_min}")
+                    f"agentic tool_choice {result['tool_choice_rate']:.4f} < {tool_min}")
             if result["ask_back_rate"] is not None and result["ask_back_rate"] < ask_min:
                 gate_fail.append(
-                    f"agentic ask_back {result['ask_back_rate']:.2f} < {ask_min} "
+                    f"agentic ask_back {result['ask_back_rate']:.4f} < {ask_min} "
                     "(goi tool voi tham so bia)")
         else:
             print("\n[agentic] ⚠ thiếu eval_agent.jsonl — bỏ qua")
