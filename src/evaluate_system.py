@@ -81,7 +81,8 @@ def load_test_data(filepath: str, limit: int):
 
     with open(filepath, 'r', encoding='utf-8') as f:
         for line in f:
-            if not line.strip(): continue
+            if not line.strip():
+                continue
             data = json.loads(line)
             # The format is: system (0), user (1), assistant (2)
             user_msg = data['messages'][1]['content']
@@ -135,7 +136,7 @@ def evaluate_pipeline():
         start_time = time.time()
 
         # Routing & Planning
-        decision = manager.analyze_task(test['prompt'])
+        manager.analyze_task(test['prompt'])
         plan = manager.plan_or_ask(test['prompt'])
 
         # Generation
@@ -171,7 +172,8 @@ def evaluate_pipeline():
         metrics["total_runs"] += 1
         metrics["total_latency_sec"] += latency
         metrics["total_approx_tokens"] += approx_tokens
-        if is_valid: metrics["valid_json_count"] += 1
+        if is_valid:
+            metrics["valid_json_count"] += 1
         metrics["total_business_score"] += score
 
         print(f"   ⏱️  Performance: {latency:.2f}s | {tps:.1f} Tokens/Sec")

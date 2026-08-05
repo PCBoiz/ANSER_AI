@@ -62,7 +62,14 @@ class MCPServer:
 
         for item in items:
             price = float(item.get("price", 0) or 0)
-            qty = int(item.get("qty", 1) or 1)
+            # `int(qty or 1)` có hai lỗi trong một dòng:
+            #  - qty = 0 (dòng huỷ trên hoá đơn nhà xe) bị biến thành 1 -> tính
+            #    tiền cho một dòng lẽ ra không tính.
+            #  - int(2.5) = 2 -> dầu nhờn bán theo lít bị cắt cụt, tính THIẾU
+            #    tiền, mà tính thiếu thì không bên nào kêu.
+            # Khuyết/None mới là "không ghi số lượng" và mới mặc định thành 1.
+            qty_raw = item.get("qty", 1)
+            qty = 1.0 if qty_raw is None else float(qty_raw)
             base = price * qty
 
             is_reduced = item.get("is_reduced_vat")

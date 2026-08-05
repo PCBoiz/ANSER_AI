@@ -161,7 +161,7 @@ Yêu cầu nghiệp vụ trực tiếp từ chủ dự án: *"hôm nay 25 nghìn
 ### 4.2. Chống mục ruỗng
 
 - Xoá code chết thay vì để lại. `RetailChatResponse`/`ProductExtraction` từng bị đánh dấu dead code — kiểm tra trước khi thêm schema mới.
-- [`src/archive/`](src/archive/) không nằm trong luồng chạy. Không import từ đó vào code production.
+- `src/archive/` **đã xoá** (05/08/2026): 15 script thời ProjectA_Backup/Make.com, trỏ vào đường dẫn Drive không còn tồn tại, không nơi nào import, và chiếm 215/252 lỗi lint của cả repo. Lấy lại bằng `git show 306a16c:src/archive/<file>` nếu cần đối chiếu.
 - Sửa code là sửa tài liệu **trong cùng PR**. ARCHITECTURE.md v1.0 lệch khỏi code nhiều tháng và đã dẫn tới quyết định sai (chọn model theo A100 trong khi code chạy L4).
 
 ---

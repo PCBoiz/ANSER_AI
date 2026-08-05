@@ -44,7 +44,7 @@ OUT_FILE  = ROOT / "src" / "data" / "distillation_v2.jsonl"
 
 # ── Load seeds ────────────────────────────────────────────────────────────────
 def load_seeds() -> list[dict]:
-    return [json.loads(l) for l in SEED_FILE.read_text(encoding="utf-8").splitlines() if l.strip()]
+    return [json.loads(d) for d in SEED_FILE.read_text(encoding="utf-8").splitlines() if d.strip()]
 
 # ── Resume: tìm prompts đã xử lý ─────────────────────────────────────────────
 def load_done_prompts() -> set[str]:
@@ -172,7 +172,7 @@ async def main():
     # ── Final report ──────────────────────────────────────────────────────────
     total_time = time.time() - t_start
     final_entries = [
-        json.loads(l) for l in OUT_FILE.read_text(encoding="utf-8").splitlines() if l.strip()
+        json.loads(d) for d in OUT_FILE.read_text(encoding="utf-8").splitlines() if d.strip()
     ]
     think_lens = []
     for e in final_entries:

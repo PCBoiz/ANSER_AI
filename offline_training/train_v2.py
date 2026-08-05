@@ -27,7 +27,7 @@ print(f"GPU  : {gpu}")
 print(f"VRAM : {vram:.1f} GB")
 
 assert DATA_FILE.exists(), f"Thiếu {DATA_FILE} — chạy merge_all.py trước"
-n_samples = sum(1 for l in DATA_FILE.read_text(encoding="utf-8").splitlines() if l.strip())
+n_samples = sum(1 for d in DATA_FILE.read_text(encoding="utf-8").splitlines() if d.strip())
 print(f"Data : {n_samples} mẫu\n")
 
 # ── 2. Tải mô hình gốc ──────────────────────────────────────────────────
@@ -70,8 +70,8 @@ model.print_trainable_parameters()
 print()
 
 # ── 4. Chuẩn bị dataset ─────────────────────────────────────────────────
-data = [json.loads(l) for l in
-        DATA_FILE.read_text(encoding="utf-8").splitlines() if l.strip()]
+data = [json.loads(d) for d in
+        DATA_FILE.read_text(encoding="utf-8").splitlines() if d.strip()]
 
 texts = [tokenizer.apply_chat_template(
              d["messages"], tokenize=False, add_generation_prompt=False)
@@ -86,7 +86,7 @@ print(f"  Phân vị 95 : {p95:,}")
 print(f"  Tối đa     : {max(lengths):,}")
 
 MAX_LEN = 4096
-n_truncated = sum(1 for l in lengths if l > MAX_LEN)
+n_truncated = sum(1 for n in lengths if n > MAX_LEN)
 if n_truncated:
     print(f"  ⚠ {n_truncated/len(lengths)*100:.0f}% mẫu vượt {MAX_LEN} token, sẽ bị cắt")
 print()

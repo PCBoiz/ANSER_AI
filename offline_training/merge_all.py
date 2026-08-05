@@ -162,8 +162,6 @@ def main():
         if e > s:
             lens.append(e - s)
 
-    src_count = Counter(m["_source"] for m in merged)
-
     print(f"\n{'='*58}")
     print("  MERGE — train_retail_v2.jsonl")
     print(f"{'='*58}")

@@ -14,7 +14,11 @@ async def generate_teacher_data():
     In LOCAL mode, uses mock data. In COLAB mode, replace mock block with
     actual httpx calls via HttpClientPool.
     """
-    DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY", "mock-key")
+    # Khoá đọc từ env khi nào thật sự gọi API (xem docstring: bản này chạy mock).
+    # KHÔNG gán sẵn vào biến — AGENTS.md §1: từng có 3 script archive nhúng thẳng
+    # chuỗi Neon Postgres, nhân bản thành 12 file qua các bản backup rồi lên
+    # GitHub public.
+    os.getenv("DEEPSEEK_API_KEY", "mock-key")
 
     prompts = [
         "Explain the VAT reduction under Decree 72/2024/NĐ-CP for software products.",

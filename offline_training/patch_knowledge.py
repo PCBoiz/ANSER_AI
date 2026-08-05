@@ -110,8 +110,8 @@ def main():
     if "logger" not in src.split("class ")[0]:
         lines = src.split("\n")
         # Chèn logger sau khối import
-        for i, l in enumerate(lines):
-            if l.startswith("class ") or l.startswith("def "):
+        for i, dong in enumerate(lines):
+            if dong.startswith("class ") or dong.startswith("def "):
                 lines.insert(i, 'logger = logging.getLogger("projecta.knowledge")\n')
                 break
         src = "\n".join(lines)

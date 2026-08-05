@@ -45,7 +45,7 @@ OUT_FILE = ROOT / "src" / "data" / "distillation_v2_test.jsonl"
 
 # ── Chọn 20 prompts đại diện từ seed_prompts.jsonl ───────────────────────────
 def pick_test_prompts(seed_file: Path, n_per_domain: int) -> list[dict]:
-    seeds = [json.loads(l) for l in seed_file.read_text(encoding="utf-8").splitlines() if l.strip()]
+    seeds = [json.loads(d) for d in seed_file.read_text(encoding="utf-8").splitlines() if d.strip()]
     selected = []
     from collections import defaultdict
     by_domain = defaultdict(list)
@@ -116,7 +116,6 @@ def quality_report(entries: list[dict]):
     print("═"*55)
 
     think_lens = [e["_meta"]["reasoning_chars"] for e in entries]
-    ans_lens   = [e["_meta"]["answer_chars"]    for e in entries]
     in_tok     = sum(e["_meta"]["input_tokens"]  for e in entries)
     out_tok    = sum(e["_meta"]["output_tokens"] for e in entries)
     cost       = (in_tok / 1_000_000) * 0.55 + (out_tok / 1_000_000) * 2.19

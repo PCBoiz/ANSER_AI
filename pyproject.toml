@@ -13,6 +13,11 @@ ignore = ["E501"]
 "offline_training/*.py" = ["E402"]
 # Router phải import SAU khi tạo app (routes đọc runtime của dependencies) — E402 chủ đích
 "src/api/main.py" = ["E402"]
+# Notebook: ô đầu là `!pip install`, import buộc phải nằm sau — E402 là bản chất
+# của notebook, không phải nợ kỹ thuật.
+"offline_training/*.ipynb" = ["E402"]
+# Script đánh giá độc lập: sys.path.insert TRƯỚC khi import src — E402 chủ đích
+"src/evaluate_system.py" = ["E402"]
 
 [tool.pytest.ini_options]
 pythonpath = ["."]
