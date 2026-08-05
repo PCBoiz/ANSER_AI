@@ -78,6 +78,50 @@ def _norm(value) -> str | None:
     return strip_diacritics(str(value)).lower().strip()
 
 
+def parse_outputs(outputs: list[str], nhan: str) -> tuple[list[dict], dict]:
+    """
+    Đọc JSON model sinh ra, ĐẾM RIÊNG số lần không đọc được.
+
+    Trước đây mỗi chỗ chấm điểm tự làm `try: json.loads / except: {}`, nên đầu ra
+    HỎNG và đầu ra SAI GIÁ TRỊ trông y hệt nhau trong báo cáo: cả hai đều ra dict
+    rỗng rồi thành `miss` ở mọi trường. Số cuối cùng vì thế không phân biệt được
+    "model kém" với "khung đo hỏng" — mà đó là ranh giới giữa việc đi train thêm
+    và việc đi sửa code (04/08/2026).
+
+    Trả về (danh sách dict, thống kê) — thống kê có mẫu đầu ra thô để nhìn tận mắt.
+    """
+    parsed: list[dict] = []
+    fail = 0
+    mau: list[str] = []
+    for raw in outputs:
+        try:
+            obj = json.loads(raw)
+        except Exception:
+            obj = None
+        if isinstance(obj, dict):
+            parsed.append(obj)
+        else:
+            parsed.append({})
+            fail += 1
+            if len(mau) < 2:
+                mau.append((raw or "")[:300])
+    return parsed, {"nhan": nhan, "n": len(outputs), "parse_fail": fail, "mau": mau}
+
+
+def in_thong_ke_parse(tk: dict) -> None:
+    """In cảnh báo khi có đầu ra không đọc được. Im lặng khi mọi thứ ổn."""
+    if not tk["parse_fail"]:
+        return
+    ty_le = tk["parse_fail"] / max(tk["n"], 1) * 100
+    print(f"  ⚠ {tk['parse_fail']}/{tk['n']} ({ty_le:.0f}%) đầu ra KHÔNG đọc được thành JSON.")
+    if ty_le >= 50:
+        print("    Tỷ lệ này nghĩa là KHUNG ĐO đang hỏng, không phải model kém —")
+        print("    mọi trường sẽ bị tính là 'miss' và điểm gần như bằng 0.")
+    for i, m in enumerate(tk["mau"], 1):
+        print(f"    mẫu {i}: {m!r}")
+
+
+
 def score_extraction(rows: list[dict], outputs: list[str]) -> dict:
     """
     rows: eval_extraction.jsonl. outputs: JSON model sinh (cùng thứ tự).
@@ -95,11 +139,8 @@ def score_extraction(rows: list[dict], outputs: list[str]) -> dict:
     n_ready = 0
     by_kind: dict[str, list[bool]] = {"single": [], "followup": []}
 
-    for row, raw in zip(rows, outputs):
-        try:
-            pred = json.loads(raw)
-        except Exception:
-            pred = {}
+    preds, tk_parse = parse_outputs(outputs, "extraction")
+    for row, pred in zip(rows, preds):
         gt = row["ground_truth"]
         ready = True
         for field in fields:
@@ -128,6 +169,7 @@ def score_extraction(rows: list[dict], outputs: list[str]) -> dict:
             kind: round(sum(v) / len(v), 4) for kind, v in by_kind.items() if v
         },
         "counts": {f: dict(c) for f, c in counts.items()},
+        "parse": tk_parse,
     }
 
 
@@ -143,11 +185,8 @@ def score_agent(rows: list[dict], outputs: list[str]) -> dict:
     n_tool = n_tool_ok = n_ask = n_ask_ok = 0
     failures = []
 
-    for row, raw in zip(rows, outputs):
-        try:
-            decision = json.loads(raw)
-        except Exception:
-            decision = {}
+    decisions, tk_parse = parse_outputs(outputs, "agentic")
+    for row, decision in zip(rows, decisions):
         chose = decision.get("tool")
         answered = bool(decision.get("answer"))
 
@@ -171,6 +210,7 @@ def score_agent(rows: list[dict], outputs: list[str]) -> dict:
         "tool_choice_rate": n_tool_ok / n_tool if n_tool else None,
         "ask_back_rate": n_ask_ok / n_ask if n_ask else None,
         "failures": failures,
+        "parse": tk_parse,
     }
 
 
@@ -251,6 +291,50 @@ def build_llm(model_path: str):
     )
 
 
+
+def smoke_test_guided(llm) -> None:
+    """
+    Kiem RANG BUOC GIAI MA chay duoc, TRUOC khi dot 40 phut do.
+
+    Neu guided decoding im lang khong ap dung, moi nhanh can JSON deu ra dau ra
+    khong doc duoc, moi truong thanh `miss`, va bao cao hien diem gan 0 - trong
+    y het mot model do. Buoi do 04/08/2026 dung nhu the: narration (van xuoi,
+    khong can JSON) dat 89%, con extraction va agentic gan nhu bang 0.
+
+    Ba giay o day doi lay viec khong phai doan sau bon muoi phut.
+    """
+    schema = {
+        "type": "object",
+        "properties": {"ten": {"type": "string"}, "so": {"type": "integer"}},
+        "required": ["ten", "so"],
+    }
+    raw = generate(
+        llm,
+        [[{"role": "user", "content": "Tra ve JSON: ten='xe tai', so=5"}]],
+        schema, max_tokens=64, temperature=0.0,
+    )[0]
+    try:
+        obj = json.loads(raw)
+        ok = isinstance(obj, dict) and "ten" in obj and "so" in obj
+    except Exception:
+        ok = False
+
+    trang_thai = "✓ CHẠY" if ok else "✗ KHÔNG CHẠY"
+    print(f"\n[chốt chặn] ràng buộc JSON: {trang_thai}")
+    if not ok:
+        print(f"    đầu ra thô: {raw[:200]!r}")
+        raise SystemExit(
+            "Ràng buộc giải mã JSON KHÔNG hoạt động — đo tiếp là vô nghĩa: mọi "
+            "nhánh cần JSON sẽ ra 0 và trông y hệt một model dở.\n\n"
+            "Kiểm theo thứ tự:\n"
+            "  1. vLLM có GuidedDecodingParams không (bản 0.8.5 thì có)\n"
+            "  2. backend structured output — thử lùi về engine V0: VLLM_USE_V1=0\n"
+            "  3. lược đồ có kiểu mà xgrammar chưa đỡ được không\n\n"
+            "Bỏ qua chốt này: BENCH_SKIP_GUIDED_CHECK=1 (KHÔNG khuyến nghị)"
+        )
+
+
+
 def build_extraction_chat(row: dict, prompts) -> list[dict]:
     """
     Dựng hội thoại cho một ca eval — kèm lịch sử nếu là câu nối tiếp.
@@ -325,6 +409,8 @@ def main() -> None:
 
     llm = build_llm(args.model)
     print(f"\n{'=' * 60}\n  BENCHMARK V3 — {args.model}\n{'=' * 60}")
+    if os.getenv("BENCH_SKIP_GUIDED_CHECK", "") != "1":
+        smoke_test_guided(llm)
     gate_fail = []
 
     # ---- 1. extraction -----------------------------------------------------
@@ -336,6 +422,7 @@ def main() -> None:
                                max_tokens=256, temperature=0.0)
             result = score_extraction(rows, outputs)
             print(f"\n[extraction] n={result['n']}")
+            in_thong_ke_parse(result["parse"])
             for field, acc in result["per_field"].items():
                 extra = {k: v for k, v in result["counts"][field].items() if k != "correct"}
                 print(f"  {field:15s} {acc * 100:5.1f}%  {extra if extra else ''}")
@@ -442,6 +529,7 @@ def main() -> None:
             )
             result = score_agent(rows, outputs)
             print(f"\n[agentic] n={result['n']}")
+            in_thong_ke_parse(result["parse"])
             if result["tool_choice_rate"] is not None:
                 print(f"  chọn đúng tool  {result['tool_choice_rate'] * 100:5.1f}%")
             if result["ask_back_rate"] is not None:
