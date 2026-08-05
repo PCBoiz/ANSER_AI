@@ -74,7 +74,9 @@ src/
 │   ├── main.py            # app factory, lifespan, CORS, middleware request-id
 │   ├── dependencies.py    # RuntimeState (lazy-load + async lock), auth, clean_output
 │   └── routes/
-│       ├── chat.py        # POST /chat  — 4 nhánh: TECHNICAL/DATA_INTERNAL/RETRIEVAL/GENERAL
+│       ├── chat.py        # POST /chat  — vòng agentic (tool do luật chọn) + 6 nhánh router
+│       ├── knowledge.py   # POST/GET/DELETE /knowledge/documents, POST /knowledge/search
+│       ├── tools.py       # /tools/* tất định + manifest + MCP bọc REST
 │       └── documents.py   # POST /upload, /ocr
 ├── agents/
 │   ├── base.py            # proxy → ModelEngine
@@ -107,12 +109,15 @@ flowchart LR
     A[Body] -->|POST /chat| B[chat_endpoint]
     B -->|trả task_id ngay| A
     B -->|BackgroundTasks| C[process_chat]
-    C --> D[SemanticRouter]
+    C --> P{plan_tools: luật có khớp?}
+    P -->|có, và không phải LOGISTICS/TECHNICAL| K[AgenticLoop<br/>tool do LUẬT chọn]
+    P -->|không| D[SemanticRouter]
     D -->|TECHNICAL| E[CoderAgent → JSON]
     D -->|DATA_INTERNAL| F[SaasAPI → SQL]
-    D -->|RETRIEVAL| G[KnowledgeBase RAG]
+    D -->|RETRIEVAL| G[KnowledgeBase RAG<br/>→ web chỉ khi hỏi luật]
     D -->|GENERAL| H[LLM văn xuôi]
-    E & F & G & H --> I[clean_output]
+    E & F & G & H & K --> Z[guard_answer: neo số liệu]
+    Z --> I[clean_output]
     I -->|webhook| A
     I --> J[(TASK_REGISTRY in-memory)]
     A -->|GET /api/v1/task/id| J
@@ -591,6 +596,32 @@ Router chọn cứng một nhánh → gọi LLM đúng một lần → trả l�
 [`agents/agentic.py`](src/agents/agentic.py) bổ sung vòng *suy nghĩ → gọi tool → quan sát*: danh mục tool dẫn xuất từ manifest `/tools` (P4), `build_decision_schema()` đưa vào guided_json với `oneOf` gọi-tool/trả-lời để grammar **không cho** model vừa gọi tool vừa tuyên bố đáp án. Trần `max_steps`, chặn gọi lặp đúng tham số, tool lỗi đi vào observation thay vì làm sập vòng, chạm trần thì **nói thật là chưa xong** chứ không bịa kết luận.
 
 Lớp **MCP bọc REST** (`/mcp/tools/list`, `/mcp/tools/call`) dịch đúng manifest đó sang hình dạng MCP cho n8n MCP Client Tool — không định nghĩa lại tool lần nào.
+
+> **Đính chính 05/08/2026.** Mục này viết "đã sửa" trong khi `AgenticLoop` **chưa từng được dựng ở production**: grep cả repo chỉ ra nó ở `agentic.py`, trong test, và trong `make_agent_traces.py` (sinh dữ liệu train). `/chat` vẫn là bảng rẽ nhánh cứng, mỗi nhánh gọi LLM một lần. Con số "model chọn tool đúng 26–33%" trong benchmark vì vậy đo một khâu chưa phục vụ ai. Xem §11.14.
+
+### 11.14. ✅ ĐÃ SỬA (05/08/2026) — nối vòng agentic vào /chat, và bỏ luôn việc model chọn tool
+
+Hai việc trong một, vì làm riêng thì việc thứ nhất chỉ đưa khâu yếu nhất vào đường phục vụ.
+
+**Chọn tool bằng luật.** [`core/tool_planner.py`](src/core/tool_planner.py) ánh xạ ý định → tên tool. *"Có nên nhập thêm hàng không"* luôn ứng với `forecast_reorder`; không có ngữ cảnh nào làm nó thành tool khác. Đây là bảng tra, không phải việc cần model. Kế hoạch được ép ở tầng **sampling**: còn bước thì enum `tool` thu về đúng một tên, hết kế hoạch thì schema thu tiếp về chỉ còn `answer`. Chọn sai tool không còn là thứ model *có thể* làm, chứ không phải thứ ta dặn nó đừng làm.
+
+Ranh giới P1 dịch thêm một nấc — model còn đúng hai việc: điền tham số cho tool đã chọn sẵn, và viết câu trả lời từ kết quả tool.
+
+**Dữ liệu đầu vào cũng phải tất định.** Quan trọng hơn cả bảng luật. `report` cần dòng bán hàng, `inventory_audit` cần bảng tồn kho — model không có. Bảo nó điền `arguments` là mời nó bịa ra doanh thu rồi hệ thống tính toán tử tế trên số bịa, cho ra báo cáo sai mà trông hoàn toàn bình thường. Tệ hơn nữa: chốt chặn neo số liệu chỉ đối chiếu **câu trả lời** với **kết quả tool**, nên số bịa lọt vào từ đầu vào thì mọi con số sau đó đều "có nguồn". `data_provider` bơm dữ liệu từ nguồn thật và **ghi đè**; chưa có nguồn thì vòng lặp dừng và nói thẳng.
+
+`LOGISTICS` và `TECHNICAL` đứng ngoài: cả hai đã có luồng struct riêng và đang chạy được.
+
+### 11.15. ✅ ĐÃ SỬA (05/08/2026) — nhánh RETRIEVAL chưa từng gọi được kho tri thức
+
+`chat.py` gọi `kb.search(user_msg, top_k=2)` trong khi chữ ký là `search(workspace_id, query, top_k)`. Lời gọi ném `TypeError`, rơi vào `except Exception` ngay dưới, ghi một dòng warning rồi **im lặng chuyển sang tra web**. Kho tài liệu không có mặt ở đường phục vụ, và triệu chứng duy nhất là "câu trả lời hơi chung chung".
+
+Không test đơn vị nào của `KnowledgeBase` bắt được: bản thân `search()` luôn đúng, chỗ hỏng nằm ở **lời gọi**. [`tests/test_chat_routing.py`](tests/test_chat_routing.py) kiểm đúng mối nối đó, với KB giả bị khoá vào chữ ký thật.
+
+Ba thứ đi kèm:
+
+- **Phạm vi tách khỏi `store_id`.** Hợp đồng và bảng giá cước là của cả công ty. Lấy kho đang chọn làm khoá thì tài liệu nạp lúc đứng ở kho A vô hình khi hỏi lúc đứng ở kho B — không lỗi, không cảnh báo, giao diện vẫn liệt kê đủ. `KB_WORKSPACE_ID` (Brain) khớp `BRAIN_KB_WORKSPACE` (Body), cùng mặc định `"default"`. Tra không ra mà kho có tài liệu dưới phạm vi khác → log cảnh báo nêu đích danh.
+- **Tra web chỉ cho câu kiến thức công khai** ([`core/retrieval_policy.py`](src/core/retrieval_policy.py)). Trả một bài viết trên mạng cho *"chính sách công nợ bên mình thế nào"* là trình bày thông tin của công ty khác như thể là quy định của họ: nghe hợp lý, không dấu hiệu nghi ngờ, người đọc đang cần ra quyết định. Dấu hiệu nội bộ **thắng** dấu hiệu luật.
+- **Câu thú nhận không biết là hằng số**, không nhờ model diễn đạt — để nó khỏi biến thành một câu nghe như đang biết.
 
 ### 11.11. ✅ ĐÃ SỬA (28/07/2026) — xAI có dữ liệu giải thích nhưng không có đường ra
 

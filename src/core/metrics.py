@@ -89,6 +89,10 @@ class TurnMetric:
     workflow_valid: Optional[bool] = None    # TECHNICAL: sinh được JSON hợp lệ
     workflow_retried: Optional[bool] = None  # TECHNICAL: có phải retry không
     tool_calls: Optional[int] = None         # vòng agentic: số tool đã gọi
+    tool_plan: Optional[str] = None          # vòng agentic: kế hoạch tool tất định
+    # RETRIEVAL: kho tài liệu không có gì -> có được tra web thay không. Đếm được
+    # cái này mới biết bao nhiêu câu hỏi nội bộ đang bị bỏ trống vì thiếu tài liệu.
+    web_fallback: Optional[bool] = None
     # Chốt chặn neo số liệu đã chặn câu trả lời vì lý do gì ("bịa số" /
     # "lộ nội bộ"). Đếm được cái này mới biết model bịa bao nhiêu LÚC CHẠY THẬT
     # — trước đây chỉ biết con số lúc benchmark, trên tập eval 27 câu.

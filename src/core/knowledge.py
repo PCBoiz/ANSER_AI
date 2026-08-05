@@ -442,6 +442,20 @@ class KnowledgeBase:
             entry["chunks"] += 1
         return sorted(theo_nguon.values(), key=lambda d: d["source"])
 
+    def workspaces(self) -> list[str]:
+        """
+        Các phạm vi đang thực sự có tài liệu.
+
+        Dùng để CHẨN ĐOÁN, không dùng để phục vụ: khi tra không ra gì, biết được
+        "kho rỗng thật" hay "tài liệu nằm dưới một khoá khác" là khác biệt giữa
+        một câu trả lời và nhiều ngày mò mẫm.
+        """
+        got = self.collection.get()
+        return sorted({
+            ws for meta in (got.get("metadatas") or [])
+            if (ws := meta.get("workspace_id"))
+        })
+
     # -- đọc ----------------------------------------------------------------
 
     def _bm25_for(self, workspace_id: str) -> tuple[Any, list[tuple[str, dict[str, Any]]]]:

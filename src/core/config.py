@@ -72,6 +72,17 @@ class Config:
         self.embedding_model_id = os.getenv("KB_EMBEDDER_ID", "BAAI/bge-m3")
         self.reranker_model_id  = os.getenv("KB_RERANKER_ID", "namdp-ptit/ViRanker")
 
+        # --- RAG: phạm vi kho tri thức ---
+        # Hợp đồng, bảng giá cước, chính sách công nợ là của CẢ CÔNG TY, không
+        # của riêng kho hàng nào. Nếu lấy `store_id` (kho đang chọn) làm khoá thì
+        # tài liệu nạp lúc đứng ở kho A sẽ vô hình khi hỏi lúc đứng ở kho B —
+        # và biểu hiện duy nhất là "không tìm thấy", không có lỗi nào cả.
+        #
+        # Nên khoá phạm vi tách hẳn khỏi `store_id`. Body dùng đúng giá trị này
+        # ở đường nạp tài liệu; hai bên cùng mặc định "default" nên không cấu
+        # hình gì thì vẫn khớp nhau.
+        self.kb_workspace_id = os.getenv("KB_WORKSPACE_ID", "default").strip() or "default"
+
         # =================================================================
         #  vLLM CONFIG
         # -----------------------------------------------------------------

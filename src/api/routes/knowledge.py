@@ -35,7 +35,15 @@ logger = logging.getLogger("projecta.api.knowledge")
 router = APIRouter(prefix="/knowledge")
 
 
-def _kb():
+async def _kb():
+    """
+    Kho tri thức, khởi tạo LƯỜI nếu chưa có.
+
+    Bản đầu chỉ đọc `runtime.kb` mà không gọi `ensure_text_runtime()`, nên `kb`
+    không bao giờ được dựng và mọi endpoint ở đây trả 503 — trong khi thư viện
+    đã cài đủ và `kb_error` rỗng. Không có gì cho thấy vì sao (05/08/2026).
+    """
+    await runtime.ensure_text_runtime()
     kb = getattr(runtime, "kb", None)
     if kb is None:
         raise HTTPException(
@@ -85,7 +93,7 @@ async def upload_document(
     except RuntimeError as exc:  # thiếu thư viện — lỗi cài đặt, không phải lỗi file
         raise HTTPException(status_code=503, detail=str(exc))
 
-    kb = _kb()
+    kb = await _kb()
     try:
         res = kb.add_document(
             workspace_id.strip(),
@@ -119,7 +127,7 @@ async def list_documents(
     require_api_token(x_api_token)
     if not workspace_id.strip():
         raise HTTPException(status_code=422, detail="Thiếu workspace_id.")
-    return {"documents": _kb().list_documents(workspace_id.strip())}
+    return {"documents": (await _kb()).list_documents(workspace_id.strip())}
 
 
 @router.delete("/documents")
@@ -132,7 +140,7 @@ async def delete_document(
     require_api_token(x_api_token)
     if not workspace_id.strip() or not source.strip():
         raise HTTPException(status_code=422, detail="Thiếu workspace_id hoặc source.")
-    n = _kb().delete_document(workspace_id.strip(), source.strip())
+    n = (await _kb()).delete_document(workspace_id.strip(), source.strip())
     if n == 0:
         raise HTTPException(status_code=404, detail=f"Không có tài liệu tên {source!r}.")
     return {"source": source, "deleted_chunks": n}
@@ -167,7 +175,7 @@ async def search(req: SearchRequest, x_api_token: Optional[str] = Header(None)):
         except ValueError:
             raise HTTPException(status_code=422, detail="on_date phải dạng YYYY-MM-DD.")
 
-    passages = _kb().search(req.workspace_id.strip(), req.query, req.top_k, on_date=on)
+    passages = (await _kb()).search(req.workspace_id.strip(), req.query, req.top_k, on_date=on)
     return {
         "passages": [
             {

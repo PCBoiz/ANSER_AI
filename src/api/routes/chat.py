@@ -34,9 +34,12 @@ from src.api.dependencies import (
     web_search_fallback,
 )
 from src.core import metrics
+from src.core.config import Config
 from src.core.engine import TASK_REGISTRY
 from src.core.grounding import guard_answer
+from src.core.retrieval_policy import KHONG_CO_TAI_LIEU, decide_web_fallback
 from src.core.schemas import RetailChatResponse
+from src.core.tool_planner import plan_tools
 from src.core.utils import extract_json_block
 from src.core.workflow_schema import validate_workflow
 
@@ -61,6 +64,44 @@ def _get_saas():
         from src.core.saas_api import SaasAPI
         _saas = SaasAPI()
     return _saas
+
+
+def _kb_workspace() -> str:
+    """
+    Khoá phạm vi kho tri thức — CỐ TÌNH không phải `store_id`.
+
+    Hợp đồng và bảng giá cước là của cả công ty. Lấy kho đang chọn làm khoá thì
+    tài liệu nạp lúc đứng ở kho A trở nên vô hình khi hỏi lúc đứng ở kho B, mà
+    biểu hiện duy nhất là "không tìm thấy" — không lỗi, không cảnh báo.
+    """
+    return Config().kb_workspace_id
+
+
+def _canh_bao_lech_pham_vi(kb_ws: str, request_id: str) -> None:
+    """
+    Tra không ra gì mà kho lại CÓ tài liệu dưới phạm vi khác -> nói to lên.
+
+    Đây đúng là kiểu hỏng không để lại dấu vết: khách nạp 30 tài liệu, giao diện
+    hiện đủ 30, chat vẫn trả lời "chưa tìm thấy tài liệu nào". Không lỗi, không
+    ngoại lệ, chỉ là hai bên dùng hai khoá khác nhau. Một dòng log ở đây biến
+    nhiều ngày mò mẫm thành một câu trả lời.
+    """
+    kb = getattr(runtime, "kb", None)
+    liet_ke = getattr(kb, "workspaces", None)
+    if not callable(liet_ke):
+        return
+    try:
+        khac = [w for w in liet_ke() if w != kb_ws]
+    except Exception:
+        return
+    if khac:
+        logger.warning(
+            "Kho tri thức KHÔNG có tài liệu nào dưới phạm vi %r, nhưng có dưới %s. "
+            "Đường nạp và đường tra đang dùng hai khoá khác nhau — kiểm tra "
+            "KB_WORKSPACE_ID (Brain) và BRAIN_KB_WORKSPACE (Body).",
+            kb_ws, khac,
+            extra={"request_id": request_id},
+        )
 
 
 def _load_history(user_id) -> list[dict]:
@@ -110,6 +151,44 @@ _extract_json_block = extract_json_block
 _validate_workflow = validate_workflow
 
 
+async def _fetch_report_lines(store_id, request_id: str):
+    """
+    Dòng bán hàng + chi phí THÔ từ hệ thống bán hàng.
+
+    Trả (sales, expenses, thông_báo_lỗi). Tách riêng khỏi `_build_report_context`
+    vì vòng agentic cần chính những dòng thô này làm `arguments` cho tool
+    `report`, còn nhánh REPORT cần bản đã tính. Một nguồn, hai chỗ dùng (P4).
+    """
+    saas = _get_saas()
+    fetch = getattr(saas, "get_report_lines", None)
+    if fetch is None:
+        return None, None, (
+            "Tôi chưa nối được với dữ liệu bán hàng để dựng báo cáo. "
+            "Cần bên hệ thống bán hàng mở API xuất dòng bán + chi phí theo kỳ "
+            "(hoặc đưa file MISA xuất ra) thì tôi tính được ngay."
+        )
+    try:
+        raw = fetch(workspace_id=store_id) or {}
+        sales = list(raw.get("sales") or [])
+        expenses = list(raw.get("expenses") or [])
+    except Exception as exc:
+        logger.warning(
+            "REPORT: không lấy được dữ liệu: %s", exc,
+            extra={"request_id": request_id},
+        )
+        return None, None, (
+            "Tôi chưa lấy được số liệu bán hàng để dựng báo cáo. "
+            "Thử lại sau ít phút hoặc báo quản trị viên kiểm tra kết nối."
+        )
+
+    if not sales:
+        return None, None, (
+            "Chưa có dòng bán hàng nào trong dữ liệu nên tôi chưa dựng được "
+            "báo cáo. Kiểm tra giúp tôi kỳ cần xem đã có dữ liệu chưa."
+        )
+    return sales, expenses, None
+
+
 async def _build_report_context(store_id, request_id: str):
     """
     Lấy số liệu bán hàng/chi phí rồi cho engine TẤT ĐỊNH tính (P1).
@@ -120,36 +199,98 @@ async def _build_report_context(store_id, request_id: str):
     """
     from src.core import reporting as rp
 
-    saas = _get_saas()
-    fetch = getattr(saas, "get_report_lines", None)
-    if fetch is None:
-        return None, (
-            "Tôi chưa nối được với dữ liệu bán hàng để dựng báo cáo. "
-            "Cần bên hệ thống bán hàng mở API xuất dòng bán + chi phí theo kỳ "
-            "(hoặc đưa file MISA xuất ra) thì tôi tính được ngay."
-        )
-    try:
-        raw = fetch(workspace_id=store_id) or {}
-        sales = [rp.SaleLine(**s) for s in raw.get("sales", [])]
-        expenses = [rp.ExpenseLine(**e) for e in raw.get("expenses", [])]
-    except Exception as exc:
-        logger.warning(
-            "REPORT: không lấy được dữ liệu: %s", exc,
-            extra={"request_id": request_id},
-        )
-        return None, (
-            "Tôi chưa lấy được số liệu bán hàng để dựng báo cáo. "
-            "Thử lại sau ít phút hoặc báo quản trị viên kiểm tra kết nối."
-        )
+    sales, expenses, err = await _fetch_report_lines(store_id, request_id)
+    if err:
+        return None, err
 
-    if not sales:
-        return None, (
-            "Chưa có dòng bán hàng nào trong dữ liệu nên tôi chưa dựng được "
-            "báo cáo. Kiểm tra giúp tôi kỳ cần xem đã có dữ liệu chưa."
-        )
-
-    report = rp.build_report(rp.ReportRequest(sales=sales, expenses=expenses))
+    report = rp.build_report(rp.ReportRequest(
+        sales=[rp.SaleLine(**s) for s in sales],
+        expenses=[rp.ExpenseLine(**e) for e in expenses],
+    ))
     return json.dumps(report, ensure_ascii=False), None
+
+
+# Tool cần dữ liệu hệ thống mà hiện chưa có nguồn. Câu chữ nói rõ NGƯỜI DÙNG
+# phải làm gì, không phải "lỗi hệ thống" — với khách 4-5 người thì việc cần làm
+# thường là xuất một file từ phần mềm kế toán rồi tải lên.
+_CHUA_CO_NGUON = {
+    "inventory_audit": (
+        "Tôi chưa có bảng tổng hợp tồn kho để soi. Bạn xuất bảng Tổng hợp "
+        "Nhập-Xuất-Tồn từ phần mềm kế toán (MISA/Fast/Bravo) ra file Excel rồi "
+        "tải lên mục Tồn kho — tôi soi ngay và chỉ ra từng dòng nghi sai."
+    ),
+    "forecast_reorder": (
+        "Tôi chưa có lịch sử bán theo kỳ của mặt hàng nên chưa dự báo được. "
+        "Cần số lượng bán từng tháng của ít nhất 6 tháng gần đây, kèm tồn hiện "
+        "tại và thời gian đặt hàng về, thì tôi tính được điểm cần đặt lại."
+    ),
+    "carrier_selection": (
+        "Tôi chưa có danh sách nhà xe kèm giá chào cho chuyến này. Bạn cho tôi "
+        "biết các nhà xe đang cân nhắc và giá mỗi bên báo, tôi xếp hạng theo "
+        "giá, khoảng cách bãi, công nợ, tỷ lệ đúng hẹn."
+    ),
+}
+
+
+async def _provide_tool_data(name: str, args: dict, store_id, request_id: str):
+    """
+    Bơm dữ liệu hệ thống vào `arguments` TRƯỚC khi tool chạy.
+
+    Trả (arguments, thiếu_gì|None). Đây là hàng rào chống bịa DỮ LIỆU ĐẦU VÀO:
+    chốt chặn neo số liệu chỉ soi được câu trả lời so với kết quả tool, nên nếu
+    model tự nghĩ ra doanh thu rồi đưa vào tool, mọi con số sau đó đều "có
+    nguồn" và đi lọt hết. Ghi đè, không hợp nhất — số của model không được
+    quyền sống sót cạnh số thật.
+    """
+    if name == "report":
+        sales, expenses, err = await _fetch_report_lines(store_id, request_id)
+        if err:
+            return args, err
+        return {**args, "sales": sales, "expenses": expenses}, None
+
+    thieu = _CHUA_CO_NGUON.get(name)
+    if thieu:
+        return args, thieu
+
+    # `vat` và `quote`: tham số đến từ chính lời người dùng ("đơn hàng 3 triệu
+    # rưỡi, thuế 8%"), không có dữ liệu hệ thống nào để bơm vào.
+    return args, None
+
+
+async def _run_agentic(user_msg, plan, store_id, history, request_id, metric):
+    """
+    Vòng agentic với TOOL ĐÃ ĐƯỢC CHỌN SẴN bằng luật.
+
+    Trả (câu_trả_lời, dữ_liệu_neo). Dữ liệu neo là kết quả tool — mọi con số
+    trong câu trả lời phải có ở đó, và chốt chặn ở cuối `process_chat` kiểm
+    đúng điều đó.
+    """
+    from src.agents.agentic import AgenticLoop
+    from src.api.routes.tools import get_tool_defs, run_tool
+
+    async def provider(ten: str, args: dict):
+        return await _provide_tool_data(ten, args, store_id, request_id)
+
+    out = await AgenticLoop(
+        runtime.manager,
+        get_tool_defs(),
+        run_tool,
+        planner=lambda q, names: list(plan),
+        data_provider=provider,
+    ).run(user_msg, history=history)
+
+    metric.tool_calls = out.get("tool_calls")
+    metric.tool_plan = ",".join(plan)
+    metric.asked_back = bool(out.get("data_missing"))
+    logger.info(
+        "Agentic: kế hoạch=%s, đã gọi %s tool, chạm trần=%s",
+        plan, out.get("tool_calls"), out.get("hit_limit"),
+        extra={"request_id": request_id},
+    )
+
+    quan_sat = out.get("observations") or []
+    neo = json.dumps(quan_sat, ensure_ascii=False, default=str) if quan_sat else ""
+    return out["answer"], neo
 
 
 # Khoá nhận biết một lượt cũ có khối giải thích được. Engine nào cũng trả
@@ -330,12 +471,30 @@ async def chat_endpoint(
         grounding_ctx = ""
 
         # ------------------------------------------------------------------
+        # VÒNG AGENTIC — tool do LUẬT chọn, không phải model
+        # ------------------------------------------------------------------
+        # Chạy TRƯỚC bảng rẽ nhánh vì nó cắt ngang các nhánh cũ: "tháng này lãi
+        # bao nhiêu, mặt hàng nào lãi nhất, có nên nhập thêm không" là ba bước
+        # nối tiếp, kiến trúc một-lần-gọi của các nhánh dưới không làm được.
+        #
+        # LOGISTICS và TECHNICAL đứng ngoài: cả hai đã có luồng struct riêng
+        # (trích xuất báo giá -> n8n; sinh workflow -> validate), đều tất định
+        # và đều đang chạy được. Không đụng vào thứ đang chạy được.
+        from src.api.routes.tools import get_tool_defs
+
+        plan = plan_tools(user_msg, [t["name"] for t in get_tool_defs()])
+        if plan and cat not in ("LOGISTICS", "TECHNICAL"):
+            resp, grounding_ctx = await _run_agentic(
+                user_msg, plan, store_id, history, request_id, metric
+            )
+
+        # ------------------------------------------------------------------
         # LOGISTICS — trích xuất yêu cầu báo giá -> kích hoạt workflow n8n
         # ------------------------------------------------------------------
         # Brain CHỈ làm: (1) tiếng Việt tự do -> struct có schema, (2) trả lời
         # xác nhận. Toàn bộ đọc Sheet + tính giá + nháp + duyệt nằm bên n8n +
         # /tools (luồng logistics_quote_request -> logistics_quote_approve).
-        if cat == "LOGISTICS":
+        elif cat == "LOGISTICS":
             resp = await _handle_logistics_quote(user_msg, request_id, history=history)
             metric.asked_back = "tôi cần thêm" in resp.lower()
 
@@ -454,19 +613,29 @@ async def chat_endpoint(
         # RETRIEVAL — RAG tài liệu nội bộ, fallback web
         # ------------------------------------------------------------------
         elif cat == "RETRIEVAL":
+            # Lời gọi cũ là `kb.search(user_msg, top_k=2)`, trong khi chữ ký là
+            # `search(workspace_id, query, top_k)`. Nó ném TypeError, rơi đúng
+            # vào `except Exception` ngay dưới, ghi một dòng warning rồi im lặng
+            # nhảy sang tra web. Nghĩa là kho tài liệu CHƯA TỪNG được dùng ở
+            # đường phục vụ, và không có triệu chứng nào ngoài "câu trả lời hơi
+            # chung chung" (sửa 05/08/2026).
             context_docs = ""
             found_internal = False
+            kb_ws = _kb_workspace()
 
             if runtime.kb:
                 try:
-                    results = runtime.kb.search(user_msg, top_k=2)
-                    if results:
-                        context_docs = f"[TÀI LIỆU NỘI BỘ]\n{results}"
+                    passages = runtime.kb.search(kb_ws, user_msg, top_k=2)
+                    if passages:
+                        from src.core.knowledge import format_for_prompt
+                        context_docs = f"[TÀI LIỆU NỘI BỘ]\n{format_for_prompt(passages)}"
                         found_internal = True
                         logger.info(
-                            "Tìm thấy tài liệu nội bộ",
+                            "Tìm thấy %d đoạn tài liệu nội bộ", len(passages),
                             extra={"request_id": request_id},
                         )
+                    else:
+                        _canh_bao_lech_pham_vi(kb_ws, request_id)
                 except Exception as exc:
                     logger.warning(
                         "KB search lỗi: %s", exc,
@@ -474,18 +643,32 @@ async def chat_endpoint(
                     )
 
             if not found_internal:
-                web_results = web_search_fallback(user_msg)
-                if web_results:
-                    context_docs = f"[KẾT QUẢ TÌM KIẾM]\n{web_results}"
+                # Không thấy trong tài liệu thì KHÔNG mặc nhiên tra web. Trả một
+                # bài viết trên mạng cho câu "chính sách công nợ bên mình thế
+                # nào" là loại sai tệ nhất: nghe hợp lý, không dấu hiệu nghi ngờ,
+                # người đọc đang cần ra quyết định.
+                quyet = decide_web_fallback(user_msg)
+                metric.web_fallback = quyet.allow
+                logger.info(
+                    "RETRIEVAL: web=%s (%s)", quyet.allow, quyet.reason,
+                    extra={"request_id": request_id},
+                )
+                if quyet.allow:
+                    web_results = web_search_fallback(user_msg)
+                    context_docs = (
+                        f"[KẾT QUẢ TÌM KIẾM]\n{web_results}" if web_results else ""
+                    )
                 else:
-                    # Không có tài liệu -> để trống, prompt sẽ bảo model
-                    # dùng kiến thức sẵn có thay vì than phiền thiếu context
-                    context_docs = ""
+                    # Câu tất định — đây là lúc hệ thống thú nhận không biết, và
+                    # câu thú nhận đó không được nhờ model diễn đạt lại.
+                    resp = KHONG_CO_TAI_LIEU
+                    metric.asked_back = True
 
-            grounding_ctx = context_docs
-            resp = await runtime.manager.answer_retrieval(
-                user_msg, context=context_docs, history=history
-            )
+            if not resp:
+                grounding_ctx = context_docs
+                resp = await runtime.manager.answer_retrieval(
+                    user_msg, context=context_docs, history=history
+                )
 
         # ------------------------------------------------------------------
         # GENERAL — hội thoại, tính toán, giải thích
