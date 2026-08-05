@@ -147,6 +147,65 @@ def test_bang_luat_cham_ca_ca_hoi_lai():
     assert score_planner(rows)["tool_rate"] == 1.0
 
 
+def test_cham_duoc_tren_DUNG_hinh_dang_file_that():
+    """
+    REGRESSION. `eval_agent.jsonl` chỉ ghi `_id / question / ask_back /
+    expected_tool` — KHÔNG có `tool`. Bản đầu của `score_planner` đọc
+    `row["tool"]` nên mọi dòng ra None, trượt sạch, `tool_rate` = 0.0, và cổng
+    chặn đánh trượt cả buổi đo trong khi bảng luật không hề sai.
+
+    Hàng thật, chép đúng khoá mà `make_agent_traces.py` ghi ra.
+    """
+    rows = [
+        {"_id": "AG0001", "question": "quý này lãi hay lỗ",
+         "ask_back": False, "expected_tool": "report"},
+        {"_id": "AG0002", "question": "có nên nhập thêm hàng không",
+         "ask_back": False, "expected_tool": "forecast_reorder"},
+    ]
+    kq = score_planner(rows)
+    assert kq["tool_rate"] == 1.0, "phải chấm được bằng `expected_tool`"
+    assert kq["n_cham"] == 2
+
+
+def test_dong_khong_co_dap_an_thi_BO_QUA_chu_khong_tinh_truot():
+    """
+    File cũ trên Drive: ca hỏi lại có `expected_tool = None` và không có `tool`.
+    Đánh trượt những dòng đó là đổ lỗi cho bảng luật vì một chuyện của bộ sinh
+    dữ liệu — và làm cổng chặn nổ oan.
+    """
+    rows = [
+        {"_id": "AG0003", "question": "quý này lãi hay lỗ",
+         "ask_back": False, "expected_tool": "report"},
+        {"_id": "AG0004", "question": "làm báo cáo giúp tôi",
+         "ask_back": True, "expected_tool": None},          # không có đáp án
+    ]
+    kq = score_planner(rows)
+    assert kq["n"] == 2 and kq["n_cham"] == 1
+    assert kq["tool_rate"] == 1.0
+    assert kq["failures"] == []
+
+
+def test_khong_co_dap_an_nao_thi_bao_None_chu_khong_bao_0():
+    """0.0 nghĩa là "bảng luật sai hết"; None nghĩa là "không đo được". Khác nhau."""
+    rows = [{"_id": "X", "question": "quý này lãi hay lỗ", "ask_back": True,
+             "expected_tool": None}]
+    assert score_planner(rows)["tool_rate"] is None
+
+
+def test_bo_sinh_du_lieu_ghi_du_khoa_cho_bo_cham():
+    """
+    Chống lệch giữa bộ SINH và bộ CHẤM. Hai file, hai người sửa, không có gì nối
+    chúng lại ngoài test này.
+    """
+    import inspect
+
+    from offline_training import make_agent_traces
+
+    src = inspect.getsource(make_agent_traces)
+    for khoa in ('"_id"', '"question"', '"ask_back"', '"expected_tool"', '"tool"'):
+        assert khoa in src, f"make_agent_traces.py không còn ghi {khoa}"
+
+
 def test_thieu_du_kien_ma_goi_tool_van_bi_bat_du_json_cat_cut():
     """Lỗi nguy hiểm nhất — gọi tool với tham số bịa — không được lọt."""
     rows = [{"_id": "AG0010", "ask_back": True, "expected_tool": None}]

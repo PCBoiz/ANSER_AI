@@ -182,36 +182,51 @@ def score_planner(rows: list[dict]) -> dict:
     đây mới là chỗ "chọn đúng tool" được quyết định. Đo tách hẳn ra vì nó là mã
     tất định: sai thì sửa được bằng một dòng regex, không phải huấn luyện lại.
 
-    Ground truth dùng `tool` chứ không dùng `expected_tool`: ca HỎI LẠI có
-    `expected_tool = None` (model không được gọi tool), nhưng bảng luật vẫn phải
-    nhận ra ý định — chính vì đã lên kế hoạch mà thiếu tham số nên model mới
-    hỏi lại được.
+    GROUND TRUTH — chỗ này đã sai một lần, đọc kỹ.
+
+    `eval_agent.jsonl` chỉ ghi `_id / question / ask_back / expected_tool`, KHÔNG
+    có trường `tool`. Bản đầu của hàm này đọc `row["tool"]` nên mọi dòng đều ra
+    None, trượt sạch, `tool_rate` = 0.0, và cổng chặn đánh trượt cả buổi đo —
+    trong khi bảng luật không hề sai (bắt được 06/08/2026, trước khi kịp chạy).
+
+    Ca HỎI LẠI có `expected_tool = None` (model không được gọi tool), nhưng bảng
+    luật VẪN phải nhận ra ý định: chính vì đã lên kế hoạch mà thiếu tham số nên
+    model mới hỏi lại được. Bản `eval_agent.jsonl` sinh từ 06/08 có thêm `tool`
+    để chấm được cả nhóm này; file cũ trên Drive thì không, và những dòng đó bị
+    BỎ QUA chứ không tính là trượt — đánh trượt vì thiếu dữ liệu chấm là đổ lỗi
+    cho bảng luật vì một chuyện của bộ sinh dữ liệu.
     """
     from src.api.routes.tools import get_tool_defs
     from src.core.tool_planner import plan_tools
 
     names = [t["name"] for t in get_tool_defs()]
-    n_ok = n_co_ke_hoach = 0
+    n_ok = n_co_ke_hoach = n_cham = 0
     failures = []
 
     for row in rows:
-        mong_doi = row.get("tool")
         plan = plan_tools(row.get("question", ""), names)
         if plan:
             n_co_ke_hoach += 1
-            if mong_doi in plan:
-                n_ok += 1
-            else:
-                failures.append((row["_id"], f"kế hoạch {plan}, đúng phải có {mong_doi!r}"))
-        else:
+
+        mong_doi = row.get("expected_tool") or row.get("tool")
+        if not mong_doi:
+            continue                      # không có đáp án -> không chấm dòng này
+        n_cham += 1
+
+        if not plan:
             # Không luật nào khớp -> câu đi tiếp vào nhánh router cũ. Vẫn trả lời
             # được, nhưng không dùng tool tất định — nên tính là trượt.
             failures.append((row["_id"], f"không luật nào khớp (cần {mong_doi!r})"))
+        elif mong_doi in plan:
+            n_ok += 1
+        else:
+            failures.append((row["_id"], f"kế hoạch {plan}, đúng phải có {mong_doi!r}"))
 
     n = len(rows)
     return {
         "n": n,
-        "tool_rate": n_ok / n if n else None,
+        "n_cham": n_cham,
+        "tool_rate": n_ok / n_cham if n_cham else None,
         "coverage": n_co_ke_hoach / n if n else None,
         "failures": failures,
     }
@@ -711,7 +726,15 @@ def main() -> None:
             # ---- 4a. BẢNG LUẬT (tất định, không tốn GPU) -------------------
             kh = score_planner(rows)
             print(f"\n[bảng luật chọn tool] n={kh['n']}   — mã tất định, không có model")
-            print(f"  chọn đúng tool  {kh['tool_rate'] * 100:5.1f}%")
+            if kh["tool_rate"] is None:
+                print("  ⚠ không dòng nào có đáp án để chấm — `eval_agent.jsonl` "
+                      "thiếu cả `expected_tool` lẫn `tool`?")
+            else:
+                bo_qua = kh["n"] - kh["n_cham"]
+                print(f"  chọn đúng tool  {kh['tool_rate'] * 100:5.1f}%"
+                      f"   (chấm {kh['n_cham']}/{kh['n']} dòng"
+                      + (f", bỏ qua {bo_qua} ca hỏi lại của bản dữ liệu cũ)"
+                         if bo_qua else ")"))
             print(f"  có kế hoạch     {kh['coverage'] * 100:5.1f}%"
                   "  (không khớp luật nào -> rơi về nhánh router cũ)")
             for _id, reason in kh["failures"][:10]:

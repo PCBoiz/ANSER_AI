@@ -347,7 +347,15 @@ async def process_eval_row(client, semaphore, row: dict, out_path: Path,
                     "_id": row["_id"],
                     "question": question,
                     "ask_back": row["ask_back"],
+                    # `expected_tool` là thứ MODEL phải làm: ca hỏi lại thì nó
+                    # KHÔNG được gọi tool nào, nên để None.
                     "expected_tool": None if row["ask_back"] else row["tool"],
+                    # `tool` là ý định THẬT của câu hỏi, giữ nguyên cả ở ca hỏi
+                    # lại. Bảng luật tất định phải nhận ra ý định kể cả khi thiếu
+                    # dữ kiện — chính vì đã lên kế hoạch mà thiếu tham số nên
+                    # model mới hỏi lại được. Thiếu trường này thì `score_planner`
+                    # không có đáp án để chấm nhóm hỏi lại (thêm 06/08/2026).
+                    "tool": row["tool"],
                 })
                 stats["ok"] += 1
                 return

@@ -39,12 +39,15 @@ và cần làm gì. Đó không phải lỗi cần điều tra.
 Số trong hai báo cáo cũ không còn mô tả đúng hệ này: chúng đo trên khung đã hỏng
 và trên kiến trúc "model tự chọn tool" đã bỏ.
 
-```bash
-# Colab, sau khi Restart runtime và chạy cell 1.2 -> 3.1 -> 3.1b
-!cd /content/ANSER_AI && git pull
-!cd /content/ANSER_AI && python offline_training/benchmark_v3.py \
-    --model $AWQ_DIR --report /content/tuned_report.txt
+Không cần sửa gì trong notebook: cell 1.2 `git clone` lại từ GitHub mỗi phiên,
+nên mọi thay đổi trong `benchmark_v3.py` tự tới nơi. Chạy đúng thứ tự cell là đủ:
+
 ```
+Restart runtime  ->  1.2  ->  3.1  ->  3.1b  ->  3.2 (baseline)  ->  3.3 (bản tinh chỉnh)
+```
+
+Cell 3.1b tự kiểm giúp: đủ shard AWQ, tokenizer đúng, có đủ 4 file eval, và
+**mã đang chạy có phải bản mới không**. Đỏ ở bước nào thì nó nói rõ bước đó.
 
 **Biết mình đang chạy đúng bản mới:** trong phút đầu phải thấy hai dòng chốt chặn
 
