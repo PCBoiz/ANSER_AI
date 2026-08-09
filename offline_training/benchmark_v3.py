@@ -30,6 +30,7 @@ import re
 import sys
 from collections import Counter
 from pathlib import Path
+from typing import Any
 
 # ---------------------------------------------------------------------------
 # TẮT TENSORFLOW — PHẢI đặt trước mọi import chạm tới transformers
@@ -72,6 +73,19 @@ REQUIRED_FIELDS = ("origin", "destination", "vehicle_type")
 # ---------------------------------------------------------------------------
 # Chấm điểm (thuần, test được không cần GPU)
 # ---------------------------------------------------------------------------
+
+def _ma_dong(rows: list[dict]) -> list[str]:
+    """
+    Mã định danh từng câu, để `compare_runs` ghép hai lần chạy THEO ID chứ không
+    theo vị trí — ghép theo vị trí là sai ngay khi một lần chạy dùng
+    `--max-samples`, và sai kiểu im lặng.
+
+    Không phải bộ eval nào cũng có `_id` (một số bộ cũ thì không), nên lùi về
+    số thứ tự. Khi đó việc ghép quay lại theo vị trí — vẫn dùng được, nhưng
+    chỉ đúng nếu hai lần chạy dùng cùng một bộ câu hỏi nguyên vẹn.
+    """
+    return [str(r.get("_id") or f"#{i}") for i, r in enumerate(rows)]
+
 
 def _norm(value) -> str | None:
     if value in (None, ""):
@@ -140,6 +154,10 @@ def score_extraction(rows: list[dict], outputs: list[str]) -> dict:
     n_ready = 0
     by_kind: dict[str, list[bool]] = {"single": [], "followup": []}
 
+    # Kết quả TỪNG CÂU — thứ cho phép so baseline với bản tinh chỉnh theo cặp.
+    # Điểm trung bình giấu hoàn toàn chuyện "bản mới sửa 8 câu nhưng làm hỏng 3".
+    per_row: list[bool] = []
+
     preds, tk_parse = parse_outputs(outputs, "extraction")
     for row, pred in zip(rows, preds):
         gt = row["ground_truth"]
@@ -157,12 +175,16 @@ def score_extraction(rows: list[dict], outputs: list[str]) -> dict:
             if field in REQUIRED_FIELDS and gt_v != pred_v:
                 ready = False
         n_ready += ready
+        per_row.append(ready)
         by_kind.setdefault(row.get("kind", "single"), []).append(ready)
 
     n = max(len(rows), 1)
     per_field = {f: counts[f]["correct"] / n for f in fields}
     return {
         "n": len(rows),
+        "n_ready": n_ready,
+        "per_row": per_row,
+        "row_ids": _ma_dong(rows),
         "per_field": per_field,
         "field_avg": sum(per_field.values()) / len(fields),
         "ready_rate": n_ready / n,
@@ -172,6 +194,32 @@ def score_extraction(rows: list[dict], outputs: list[str]) -> dict:
         "counts": {f: dict(c) for f, c in counts.items()},
         "parse": tk_parse,
     }
+
+
+def chan(gate_fail: list, nhan: str, k: int, n: int, nguong: float,
+         them: str = "") -> None:
+    """
+    Chấm một cổng chặn và IN KÈM khoảng tin cậy.
+
+    Vì sao không in mỗi tỷ lệ: bộ eval có 27–100 câu. `84.8%` trên n=27 có
+    khoảng tin cậy 95% rộng ~27 điểm, nên hai lần chạy lệch nhau 5 điểm gần như
+    chắc chắn là nhiễu lấy mẫu chứ không phải model đổi. In con số trần là làm
+    ra vẻ chính xác hơn thực tế, và dẫn tới hai quyết định sai ngược nhau:
+    đi sửa một model không có vấn đề, hoặc ship một bản thật sự kém hơn.
+
+    Vẫn chặn theo ĐIỂM ước lượng — chặn theo cận dưới sẽ làm mọi cổng đỏ trên
+    bộ eval nhỏ, và một cổng lúc nào cũng đỏ thì bị tắt. Nhưng khi khoảng vắt
+    qua ngưỡng thì nói thẳng là chưa kết luận được.
+    """
+    from offline_training.stats import cong_chan, wilson
+
+    kq = wilson(k, n)
+    qua, ghi_chu = cong_chan(kq, nguong)
+    print(f"  {nhan:16s} {kq}   (ngưỡng {nguong:.0%}){them}")
+    if ghi_chu:
+        print(f"       {ghi_chu}")
+    if not qua:
+        gate_fail.append(f"{nhan} {kq.ty_le:.4f} < {nguong}")
 
 
 def score_planner(rows: list[dict]) -> dict:
@@ -202,6 +250,8 @@ def score_planner(rows: list[dict]) -> dict:
     names = [t["name"] for t in get_tool_defs()]
     n_ok = n_co_ke_hoach = n_cham = 0
     failures = []
+    per_row: list[bool] = []
+    cham_ids: list[str] = []
 
     for row in rows:
         plan = plan_tools(row.get("question", ""), names)
@@ -212,6 +262,8 @@ def score_planner(rows: list[dict]) -> dict:
         if not mong_doi:
             continue                      # không có đáp án -> không chấm dòng này
         n_cham += 1
+        cham_ids.append(str(row.get("_id") or f"#{len(per_row)}"))
+        per_row.append(bool(plan) and mong_doi in plan)
 
         if not plan:
             # Không luật nào khớp -> câu đi tiếp vào nhánh router cũ. Vẫn trả lời
@@ -226,6 +278,9 @@ def score_planner(rows: list[dict]) -> dict:
     return {
         "n": n,
         "n_cham": n_cham,
+        "n_ok": n_ok,
+        "per_row": per_row,
+        "row_ids": cham_ids,
         "tool_rate": n_ok / n_cham if n_cham else None,
         "coverage": n_co_ke_hoach / n if n else None,
         "failures": failures,
@@ -265,6 +320,7 @@ def score_agent(rows: list[dict], outputs: list[str]) -> dict:
     n_ask = n_ask_ok = n_goi = n_goi_ok = n_arg = n_arg_ok = 0
     failures = []
     n_cuu = 0
+    per_row: list[bool] = []
 
     decisions, tk_parse = parse_outputs(outputs, "agentic")
     for row, decision, raw in zip(rows, decisions, outputs):
@@ -281,19 +337,24 @@ def score_agent(rows: list[dict], outputs: list[str]) -> dict:
 
         if row.get("ask_back"):
             n_ask += 1
-            if answered and not chose:
-                n_ask_ok += 1
-            else:
+            dung = bool(answered and not chose)
+            n_ask_ok += dung
+            per_row.append(dung)
+            if not dung:
                 failures.append((row["_id"], f"thiếu dữ kiện mà vẫn gọi tool {chose!r}"))
             continue
 
         n_goi += 1
         if not chose:
             failures.append((row["_id"], "không gọi tool nào dù đủ dữ kiện"))
+            per_row.append(False)
             continue
         n_goi_ok += 1
 
         if needs_system_data(chose):
+            # Tham số do hệ thống bơm — không chấm. Gọi được tool là xong việc
+            # của model ở dòng này.
+            per_row.append(True)
             continue
         n_arg += 1
         loi = _kiem_tham_so(chose, decision.get("arguments") or {})
@@ -301,9 +362,14 @@ def score_agent(rows: list[dict], outputs: list[str]) -> dict:
             n_arg_ok += 1
         else:
             failures.append((row["_id"], f"tham số {chose} không hợp lệ: {loi}"))
+        per_row.append(loi is None)
 
     return {
         "n": len(rows),
+        "per_row": per_row,
+        "row_ids": _ma_dong(rows),
+        "n_ask": n_ask, "n_ask_ok": n_ask_ok,
+        "n_goi": n_goi, "n_goi_ok": n_goi_ok, "n_arg_ok": n_arg_ok,
         "call_rate": n_goi_ok / n_goi if n_goi else None,
         "ask_back_rate": n_ask_ok / n_ask if n_ask else None,
         "arg_fill_rate": n_arg_ok / n_arg if n_arg else None,
@@ -330,6 +396,7 @@ def score_narration(rows: list[dict], outputs: list[str],
     """
     n_pass, failures = 0, []
     by_kind: dict[str, list[bool]] = {}
+    per_row: list[bool] = []
     n_cut = 0
     finishes = finishes or [""] * len(outputs)
 
@@ -349,11 +416,15 @@ def score_narration(rows: list[dict], outputs: list[str],
             failures.append((row["_id"], f"[{kind}] lộ nội bộ: {leaks}"))
             passed = False
         n_pass += passed
+        per_row.append(passed)
         by_kind.setdefault(kind, []).append(passed)
 
     n = max(len(rows), 1)
     return {
         "n": len(rows),
+        "n_pass": n_pass,
+        "per_row": per_row,
+        "row_ids": _ma_dong(rows),
         "pass_rate": n_pass / n,
         # Tỷ lệ trên phần ĐO ĐƯỢC: bỏ ca cắt cụt ra khỏi mẫu số. Đây mới là con
         # số nói về kỷ luật số liệu của model.
@@ -577,6 +648,9 @@ def main() -> None:
                         help="chỉ đo, không exit 1 (dùng cho baseline)")
     parser.add_argument("--skip", nargs="*", default=[],
                         choices=["extraction", "n8n", "narration", "agent"])
+    parser.add_argument("--json", dest="json_out", default="",
+                        help="ghi kết quả TỪNG CÂU ra file JSON, để so hai bản "
+                             "theo cặp bằng compare_runs.py")
     args = parser.parse_args()
 
     _stage_catalog_dir()          # catalog node cho validate_workflow
@@ -599,6 +673,11 @@ def main() -> None:
     if os.getenv("BENCH_SKIP_GUIDED_CHECK", "") != "1":
         smoke_test_guided(llm)
     gate_fail = []
+    # Kết quả TỪNG CÂU, ghi ra JSON để so baseline với bản tinh chỉnh THEO CẶP.
+    # Hai bản chạy trên cùng bộ câu hỏi, nên so từng câu mạnh hơn hẳn so hai số
+    # trung bình — và trả lời được câu mà số trung bình giấu: bản mới làm hỏng
+    # câu nào trước đó vốn đúng.
+    ket_qua_chay: dict[str, Any] = {}
 
     # ---- 1. extraction -----------------------------------------------------
     if "extraction" not in args.skip:
@@ -614,8 +693,6 @@ def main() -> None:
                 extra = {k: v for k, v in result["counts"][field].items() if k != "correct"}
                 print(f"  {field:15s} {acc * 100:5.1f}%  {extra if extra else ''}")
             print(f"  {'TB các trường':15s} {result['field_avg'] * 100:5.1f}%")
-            print(f"  {'sẵn sàng báo giá':15s} {result['ready_rate'] * 100:5.1f}%"
-                  " (3 trường bắt buộc đều đúng)")
             for kind, rate in result["ready_by_kind"].items():
                 label = "câu nối tiếp" if kind == "followup" else "câu một lượt"
                 print(f"    {label:14s} {rate * 100:5.1f}%")
@@ -631,8 +708,9 @@ def main() -> None:
                 )
             if result["field_avg"] < field_min:
                 gate_fail.append(f"extraction field_avg {result['field_avg']:.4f} < {field_min}")
-            if result["ready_rate"] < ready_min:
-                gate_fail.append(f"extraction ready_rate {result['ready_rate']:.4f} < {ready_min}")
+            chan(gate_fail, "sẵn sàng báo giá", result["n_ready"], result["n"], ready_min,
+                 them="  (3 trường bắt buộc đều đúng)")
+            ket_qua_chay["extraction"] = result
         else:
             print("\n[extraction] ⚠ thiếu eval_extraction.jsonl — bỏ qua")
 
@@ -661,6 +739,7 @@ def main() -> None:
                     print(f"  ✗ {row['_id']}: {why}")
             rate = n_valid / len(rows)
             print(f"\n[n8n] hợp lệ {n_valid}/{len(rows)} ({rate * 100:.0f}%)")
+            ket_qua_chay["n8n"] = result
             n8n_min = float(os.getenv("N8N_VALID_MIN", "0.90"))
             if rate < n8n_min:
                 gate_fail.append(f"n8n valid_rate {rate:.4f} < {n8n_min}")
@@ -701,6 +780,7 @@ def main() -> None:
                 print(f"    {kind:10s} {rate * 100:5.1f}%")
             for _id, reason in result["failures"][:10]:
                 print(f"  ✗ {_id}: {reason}")
+            ket_qua_chay["narration"] = result
             narr_min = float(os.getenv("NARR_MIN", "0.90"))
             if result["pass_rate"] < narr_min:
                 gate_fail.append(f"narration pass_rate {result['pass_rate']:.4f} < {narr_min}")
@@ -740,6 +820,7 @@ def main() -> None:
             for _id, reason in kh["failures"][:10]:
                 print(f"  ✗ {_id}: {reason}")
 
+            ket_qua_chay["bang_luat"] = kh
             plan_min = float(os.getenv("PLANNER_TOOL_MIN", "0.90"))
             if kh["tool_rate"] is not None and kh["tool_rate"] < plan_min:
                 gate_fail.append(
@@ -802,6 +883,7 @@ def main() -> None:
             for _id, reason in result["failures"][:10]:
                 print(f"  ✗ {_id}: {reason}")
 
+            ket_qua_chay["agentic"] = result
             ask_min = float(os.getenv("AGENT_ASKBACK_MIN", "0.75"))
             arg_min = float(os.getenv("AGENT_ARG_MIN", "0.80"))
             if result["ask_back_rate"] is not None and result["ask_back_rate"] < ask_min:
@@ -813,6 +895,24 @@ def main() -> None:
                     f"agentic arg_fill {result['arg_fill_rate']:.4f} < {arg_min}")
         else:
             print("\n[agentic] ⚠ thiếu eval_agent.jsonl — bỏ qua")
+
+    # ---- Ghi kết quả từng câu ----------------------------------------------
+    if args.json_out:
+        # Bỏ `failures`/`parse` khỏi file: chúng là chuỗi để người đọc, còn file
+        # này để MÁY so hai lần chạy. Giữ lại chỉ làm file phình và làm `diff`
+        # giữa hai bản đầy nhiễu.
+        gon = {
+            muc: {k: v for k, v in kq.items() if k not in ("failures", "parse")}
+            for muc, kq in ket_qua_chay.items()
+        }
+        Path(args.json_out).write_text(
+            json.dumps({"model": args.model, "sections": gon},
+                       ensure_ascii=False, indent=1),
+            encoding="utf-8",
+        )
+        print(f"\nĐã ghi kết quả từng câu: {args.json_out}")
+        print("  So hai bản:  python -m offline_training.compare_runs "
+              "baseline.json tuned.json")
 
     # ---- Cổng chặn ---------------------------------------------------------
     print(f"\n{'=' * 60}")

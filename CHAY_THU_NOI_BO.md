@@ -82,6 +82,21 @@ và một mục **hoàn toàn mới**, chạy trước khi model được gọi:
   có kế hoạch      xx.x%
 ```
 
+**Ghi kết quả từng câu để so hai bản:**
+
+```bash
+# 3.2 baseline
+!python offline_training/benchmark_v3.py --model Qwen/Qwen3-8B --no-gate     --json /content/baseline.json 2>&1 | tee /content/baseline_report.txt
+# 3.3 bản tinh chỉnh
+!python offline_training/benchmark_v3.py --model $AWQ_DIR     --json /content/tuned.json 2>&1 | tee /content/tuned_report.txt
+# so THEO CẶP
+!python -m offline_training.compare_runs /content/baseline.json /content/tuned.json
+```
+
+Bước cuối trả lời câu mà hai file .txt không trả lời được: **bản mới làm hỏng
+câu nào mà baseline vốn trả lời đúng?** Điểm trung bình tăng vẫn có thể che một
+vùng thoái lui — 70% → 70% có thể là "hỏng 3, sửa 3".
+
 **Đọc kết quả:**
 
 - `bảng luật` thấp → sửa regex trong `src/core/tool_planner.py`. Đây là mã tất

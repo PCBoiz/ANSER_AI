@@ -284,3 +284,54 @@ def test_JSON_khong_phai_object_cung_tinh_la_hong():
     preds, tk = parse_outputs(["[1, 2]", '"chuỗi"'], "thử")
     assert tk["parse_fail"] == 2
     assert preds == [{}, {}]
+
+
+# ---------------------------------------------------------------------------
+# Kết quả từng câu — nền cho việc so hai bản theo cặp
+# ---------------------------------------------------------------------------
+
+def test_moi_scorer_tra_ve_ket_qua_tung_cau():
+    """
+    Không có `per_row` thì `compare_runs` không so được, và ta quay lại cảnh
+    nhìn hai con số trung bình — thứ giấu hoàn toàn vùng thoái lui.
+    """
+    rows = [
+        {"_id": "AG1", "question": "quý này lãi hay lỗ", "tool": "report"},
+        {"_id": "AG2", "question": "xin chào", "tool": "report"},
+    ]
+    kq = score_planner(rows)
+    assert kq["per_row"] == [True, False]
+    assert kq["row_ids"] == ["AG1", "AG2"]
+
+
+def test_per_row_dai_bang_so_cau_da_cham():
+    rows = [{"_id": "P1", "question": "quý này lãi hay lỗ", "expected_tool": "report"},
+            {"_id": "P2", "question": "làm báo cáo", "expected_tool": None}]
+    kq = score_planner(rows)
+    assert len(kq["per_row"]) == len(kq["row_ids"]) == kq["n_cham"] == 1
+
+
+def test_thieu__id_thi_lui_ve_so_thu_tu_chu_khong_no():
+    """Bộ eval cũ không có `_id`. Ném KeyError ở đây là chặn cả buổi đo."""
+    rows = [{"question": "quý này lãi hay lỗ", "tool": "report"}]
+    assert score_planner(rows)["row_ids"] == ["#0"]
+
+
+def test_agent_per_row_khop_voi_row_ids():
+    rows = [
+        {"_id": "A1", "ask_back": True},
+        {"_id": "A2", "tool": "vat"},
+    ]
+    kq = score_agent(rows, [
+        '{"thought": "thiếu số", "answer": "Đơn bao nhiêu tiền ạ?"}',
+        '{"thought": "x", "tool": "vat", "arguments": '
+        '{"items": [{"name": "A", "price": 1, "qty": 1}], "stated_total": 1}}',
+    ])
+    assert kq["per_row"] == [True, True]
+    assert len(kq["row_ids"]) == len(kq["per_row"]) == 2
+
+
+def test_agent_per_row_bat_duoc_ca_hong():
+    rows = [{"_id": "A1", "ask_back": True}]
+    kq = score_agent(rows, ['{"thought": "x", "tool": "report", "arguments": {}}'])
+    assert kq["per_row"] == [False], "gọi tool khi thiếu dữ kiện = trượt"
