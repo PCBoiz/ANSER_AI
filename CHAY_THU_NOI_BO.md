@@ -24,9 +24,27 @@ Dữ liệu thật của Hoàng Phát chưa về. Nghĩa là:
 | | Dự báo đặt hàng lại | chưa có lịch sử bán theo kỳ |
 | | Xếp hạng nhà xe | chưa có danh sách nhà xe + giá chào |
 | | Đọc ảnh hoá đơn cước | chưa tải model VLM |
+| | **Tra cứu hàng hoá / doanh số nội bộ** | **lỗi đã biết — xem dưới** |
 
-Bốn dòng cuối **trả lời đúng như thiết kế**: một câu tiếng Việt nói rõ thiếu gì
+Năm dòng cuối **trả lời đúng như thiết kế**: một câu tiếng Việt nói rõ thiếu gì
 và cần làm gì. Đó không phải lỗi cần điều tra.
+
+> ### ⚠ Một lỗi ĐÃ BIẾT — đừng mất thời gian điều tra
+>
+> Hỏi *"còn bao nhiêu dầu AW46"* hay *"doanh thu hôm nay bao nhiêu"* sẽ trả về
+> **"Lỗi hệ thống khi tìm sản phẩm"**. Trông y hệt sự cố kết nối database, nhưng
+> không phải.
+>
+> Khối `SCHEMA MAP` trong `src/core/saas_api.py` ánh xạ tên bảng/cột của Body, và
+> **4 trên 8 định danh không tồn tại**: `stock_quantity` (Body có `stock`),
+> `workspace_id` (Body có `warehouse_id`), bảng `sales` (Body có
+> `sales_invoices`), `amount` (Body có `total`).
+>
+> **Chưa sửa có chủ đích:** lược đồ Body đang được thiết kế lại
+> (`ANSER_Logistics/ERD_PHAN_HOI_VA_LUOC_DO.md`), sửa bây giờ là sửa hai lần.
+>
+> Thấy câu trả lời đó thì ghi vào loại **"sai cấu hình"**, không phải "model trả
+> lời kém".
 
 > Đây cũng là lý do đừng đánh giá "hệ thống trả lời kém" trong buổi này. Phần
 > lớn câu hỏi nghiệp vụ sẽ dừng ở "chưa có dữ liệu" — thứ cần đánh giá là nó

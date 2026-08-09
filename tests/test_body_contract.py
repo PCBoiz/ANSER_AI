@@ -188,7 +188,11 @@ def test_chat_tra_task_id_chu_KHONG_tra_cau_tra_loi():
     resp = client.post("/chat", json={
         "user_id": USER_UUID, "store_id": WAREHOUSE_UUID, "message": "xin chào",
     })
-    assert resp.status_code == 200, resp.text
+    assert resp.status_code == 200, (
+        f"/chat trả {resp.status_code}: {resp.text[:200]}\n"
+        "503 ở đây nghĩa là text runtime chưa dựng được — kiểm ENV=LOCAL và "
+        "phụ thuộc của ModelEngine, không phải lỗi hợp đồng với Body."
+    )
     body = resp.json()
     assert "task_id" in body, "Body dựa vào task_id để biết đường hỏi kết quả"
     assert body["status"] == "processing"
@@ -205,13 +209,21 @@ def test_vong_doi_task_chay_duoc_den_cuoi():
         "user_id": USER_UUID, "store_id": WAREHOUSE_UUID, "message": "doanh thu quý này",
     }).json()["task_id"]
 
-    for _ in range(40):
+    # Ngân sách 15 giây, không phải 2. Lần `/chat` ĐẦU TIÊN trong cả bộ test phải
+    # dựng runtime lười (engine + memory + kho tri thức); dưới tải thì 2 giây
+    # không đủ, và test đỏ chập chờn theo thứ tự chạy. Một test lúc xanh lúc đỏ
+    # còn hại hơn không có test — người ta học được cách chạy lại cho tới khi xanh.
+    han = time.monotonic() + 15.0
+    state = {"status": "chưa hỏi lần nào"}
+    while time.monotonic() < han:
         state = client.get(f"/api/v1/task/{task_id}").json()
-        if state["status"] in ("completed", "failed"):
+        if state.get("status") in ("completed", "failed"):
             break
         time.sleep(0.05)
 
-    assert state["status"] in ("completed", "failed"), "task treo mãi không kết thúc"
+    assert state.get("status") in ("completed", "failed"), (
+        f"task chưa kết thúc sau 15 giây (trạng thái cuối: {state.get('status')!r})"
+    )
     if state["status"] == "completed":
         # Body đọc result.answer — thiếu trường này là bong bóng chat trống.
         assert "answer" in (state.get("result") or {})

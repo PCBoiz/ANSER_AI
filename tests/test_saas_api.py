@@ -11,8 +11,31 @@ triệu chứng.
 `mcp_server` cũng đã tưởng là ổn cho tới khi viết test và lòi ra hai lỗi tính
 sai tiền.
 
-Test dùng SQLite trong bộ nhớ với ĐÚNG tên bảng/cột mà SCHEMA MAP khai báo. Nhờ
-vậy, đổi tên cột trong khối hằng số mà quên đổi bên Body sẽ làm test đỏ.
+GIỚI HẠN CỦA CHÍNH FILE NÀY — đọc trước khi tin nó
+--------------------------------------------------
+Test dựng bảng SQLite TỪ CHÍNH khối SCHEMA MAP, nên nó chỉ kiểm được rằng SQL
+khớp với hằng số — KHÔNG kiểm được hằng số có khớp với Body thật hay không. Hai
+đầu của phép kiểm lấy từ cùng một nguồn, nên nó tự nhất quán mà không nối gì với
+thực tế.
+
+Bản đầu của docstring này khẳng định ngược lại ("đổi tên cột mà quên đổi bên Body
+sẽ làm test đỏ"). Sai, và sai theo hướng nguy hiểm: nó mời người đọc tin vào một
+hàng rào không tồn tại.
+
+Đối chiếu ngày 10/08/2026 cho thấy **4 trên 8 định danh không tồn tại bên Body**:
+
+    P_STOCK      'stock_quantity'  ->  Body có 'stock'
+    P_WORKSPACE  'workspace_id'    ->  Body có 'warehouse_id'
+    SALES_TABLE  'sales'           ->  Body có 'sales_invoices'
+    S_AMOUNT     'amount'          ->  Body có 'total'
+
+Nghĩa là nhánh DATA_INTERNAL chưa từng chạy được với database thật: mọi truy vấn
+ném lỗi, bị `except SQLAlchemyError` bắt, và trả ra "Lỗi hệ thống khi tìm sản
+phẩm" — trông y hệt một sự cố kết nối.
+
+CHƯA sửa có chủ đích: lược đồ Body đang được thiết kế lại (xem
+`ANSER_Logistics/ERD_PHAN_HOI_VA_LUOC_DO.md`), sửa bây giờ là sửa hai lần. Sửa
+kèm một bài kiểm đọc thẳng `schema.ts` của Body — đó mới là hàng rào thật.
 """
 
 from __future__ import annotations
