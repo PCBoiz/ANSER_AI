@@ -392,6 +392,7 @@ def audit_inventory(
     warehouse: str = "",
     period_start: Optional[str] = None,
     period_end: Optional[str] = None,
+    allow_zero_value: bool = False,
 ) -> dict[str, Any]:
     """
     Chạy toàn bộ kiểm tra trên một bảng TỔNG HỢP TỒN KHO.
@@ -399,6 +400,20 @@ def audit_inventory(
     Trả dict có cấu trúc để nhánh REPORT diễn giải — cùng hình dạng quy ước với
     reporting.build_report (`summary` / `explain` / `warnings`) nên model đã học
     nhánh đó đọc được ngay, không cần train thêm.
+
+    `allow_zero_value=True` cho KHO KHUYẾN MẠI và các kho tương tự
+    ------------------------------------------------------------
+    Chạy trên bản xuất MISA THẬT của Hoàng Phát (10/08/2026): kho KHUYẾN MẠI có
+    **29 trên 38 dòng** bị gắn cờ "có số lượng nhưng không ghi nhận giá trị".
+    Với kho mà giá trị 0 là TRẠNG THÁI BÌNH THƯỜNG — hàng nhà cung cấp tặng kèm,
+    không mua nên không có giá vốn — đó không phải phát hiện, đó là tiếng ồn.
+
+    Và một bộ soi kêu ca gần như mọi dòng thì người dùng tắt nó đi; khi ấy nó
+    cũng không còn bắt được những lỗi thật nằm cùng bảng (chính kho này có một
+    ca tồn âm −115,2 lít).
+
+    CHỈ tắt phép kiểm giá-trị-bằng-0. Tồn âm, lệch cân đối, hàng chết… vẫn chạy:
+    kho khuyến mại được phép không có giá vốn, không được phép sai số học.
     """
     period_days = _period_days(period_start, period_end)
     findings: list[dict[str, Any]] = []
@@ -411,7 +426,11 @@ def audit_inventory(
         findings += _check_cost_drift(line)
         findings += _check_dead_and_slow(line, period_days)
         findings += _check_price_jump(line)
-        findings += _check_zero_value(line)
+        # CHỈ tắt đúng phép kiểm này. Dùng `continue` ở đây sẽ bỏ luôn phần thu
+        # thập phương pháp tính giá vốn ngay dưới, và `_check_method_consistency`
+        # mất dữ liệu mà không báo gì.
+        if not allow_zero_value:
+            findings += _check_zero_value(line)
 
         if (m := _costing_method(line)):
             methods.setdefault(m, []).append(line.code)

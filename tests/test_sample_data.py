@@ -117,3 +117,65 @@ def test_ghi_va_doc_lai_duoc_xlsx(tmp_path):
     kq = load_xlsx_bytes(BytesIO(path.read_bytes()).getvalue())
     assert kq.ok, kq.checks
     assert {d.code for d in kq.lines} == {d.code for d in DONG}
+
+
+# ---------------------------------------------------------------------------
+# Kho cho phép giá trị 0 — chống báo oan
+# ---------------------------------------------------------------------------
+
+def test_kho_cho_phep_gia_tri_0_thi_thoi_bao_oan(ket_qua):
+    """
+    Chạy trên bản xuất MISA THẬT: kho KHUYẾN MẠI có 29/38 dòng bị gắn cờ "có số
+    lượng nhưng không ghi nhận giá trị". Với kho mà giá trị 0 là trạng thái BÌNH
+    THƯỜNG (hàng nhà cung cấp tặng kèm), đó là tiếng ồn, không phải phát hiện.
+
+    Bộ soi kêu ca gần như mọi dòng thì người dùng tắt nó đi — và mất luôn những
+    lỗi thật nằm cùng bảng.
+    """
+    thuong = audit_inventory(ket_qua.lines, period_start="2026-01-01",
+                             period_end="2026-06-30")
+    kho_km = audit_inventory(ket_qua.lines, period_start="2026-01-01",
+                             period_end="2026-06-30", allow_zero_value=True)
+
+    def loai(kq):
+        return {f["kind"] for f in kq["findings"]}
+
+    assert "zero_valued_stock" in loai(thuong)
+    assert "zero_valued_stock" not in loai(kho_km)
+
+
+def test_tat_gia_tri_0_KHONG_lam_mat_cac_phep_kiem_khac(ket_qua):
+    """
+    Kho khuyến mại được phép không có giá vốn, KHÔNG được phép sai số học.
+    Chính kho đó trong dữ liệu thật có một ca tồn âm −115,2 lít.
+    """
+    thuong = audit_inventory(ket_qua.lines, period_start="2026-01-01",
+                             period_end="2026-06-30")
+    kho_km = audit_inventory(ket_qua.lines, period_start="2026-01-01",
+                             period_end="2026-06-30", allow_zero_value=True)
+
+    con_lai = {f["kind"] for f in thuong["findings"]} - {"zero_valued_stock"}
+    assert con_lai <= {f["kind"] for f in kho_km["findings"]}, (
+        "tắt phép kiểm giá-trị-0 đã nuốt mất phép kiểm khác"
+    )
+    # Cụ thể: tồn âm và lệch cân đối vẫn phải còn.
+    assert {"negative_stock", "balance_mismatch"} <= {f["kind"] for f in kho_km["findings"]}
+
+
+def test_phuong_phap_tinh_gia_von_van_duoc_thu_thap(ket_qua):
+    """
+    Regression: bản đầu dùng `continue` để bỏ phép kiểm giá-trị-0, và bỏ luôn
+    phần thu thập phương pháp tính giá vốn ngay dưới — `_check_method_consistency`
+    mất dữ liệu mà không báo gì.
+    """
+    from src.core.inventory import _costing_method
+
+    co_phuong_phap = any(_costing_method(d) for d in ket_qua.lines)
+    if not co_phuong_phap:
+        pytest.skip("bảng mẫu không có dòng nào suy ra được phương pháp tính giá vốn")
+
+    kq = audit_inventory(ket_qua.lines, period_start="2026-01-01",
+                         period_end="2026-06-30", allow_zero_value=True)
+    assert kq["explain"]["costing_methods_detected"], (
+        "mất dữ liệu phương pháp tính giá vốn khi tắt phép kiểm giá-trị-0"
+    )
