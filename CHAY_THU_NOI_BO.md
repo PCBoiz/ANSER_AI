@@ -85,11 +85,13 @@ và một mục **hoàn toàn mới**, chạy trước khi model được gọi:
 **Ghi kết quả từng câu để so hai bản:**
 
 ```bash
-# 3.2 baseline
-!python offline_training/benchmark_v3.py --model Qwen/Qwen3-8B --no-gate     --json /content/baseline.json 2>&1 | tee /content/baseline_report.txt
+# 3.2 baseline — thêm --json vào lệnh sẵn có
+!python offline_training/benchmark_v3.py --model Qwen/Qwen3-8B --no-gate --json /content/baseline.json 2>&1 | tee /content/baseline_report.txt
+
 # 3.3 bản tinh chỉnh
-!python offline_training/benchmark_v3.py --model $AWQ_DIR     --json /content/tuned.json 2>&1 | tee /content/tuned_report.txt
-# so THEO CẶP
+!python offline_training/benchmark_v3.py --model $AWQ_DIR --json /content/tuned.json 2>&1 | tee /content/tuned_report.txt
+
+# so THEO CẶP — bước mới
 !python -m offline_training.compare_runs /content/baseline.json /content/tuned.json
 ```
 
