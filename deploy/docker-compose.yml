@@ -21,6 +21,21 @@
 #
 # Embedder + reranker của RAG chạy CPU. Với vài trăm tài liệu thì thừa sức, và
 # đổi lại là không phải tranh VRAM với model sinh.
+#
+# ⚠️ FILE NÀY CHƯA TỪNG ĐƯỢC CHẠY (tính đến 13/08/2026).
+#
+# Ba chỗ mô tả kiến trúc mà code CHƯA làm tới. Ghi ra đây vì file compose đọc
+# như thể mọi thứ đã nối, và người triển khai sẽ tin nó:
+#
+#   1. `redis` — container chạy, nhưng KHÔNG code nào dùng. TASK_REGISTRY vẫn là
+#      OrderedDict trong RAM (src/core/engine.py). Restart là mất task đang chạy.
+#   2. `vllm-vision` — chưa có client HTTP cho vision. serving.py mới có đường
+#      text. Vision vẫn nạp thẳng trong tiến trình qua transformers.
+#   3. Vì (2), `brain` KHÔNG thật sự chạy được bằng CPU khi bật nhánh vision —
+#      nó vẫn cần GPU. Sơ đồ trên là đích đến, chưa phải hiện trạng.
+#
+# `tests/test_deploy_config.py` giữ danh sách này đồng bộ với code: nối xong cái
+# nào thì test đỏ, buộc phải sửa cả chú thích này.
 
 services:
   vllm-text:
@@ -108,7 +123,17 @@ services:
       ANSER_TEXT_WAIT_TIMEOUT_S: ${TEXT_WAIT_TIMEOUT_S:-20}
       REDIS_URL: redis://redis:6379/0
       DATABASE_URL: ${DATABASE_URL:-}
-      API_TOKEN: ${API_TOKEN:?thiếu API_TOKEN trong .env}
+      # TÊN BIẾN PHẢI LÀ API_AUTH_TOKEN — đó là tên `dependencies.py` đọc.
+      #
+      # Bản trước đặt `API_TOKEN`, và `require_api_token` bỏ qua mọi kiểm tra khi
+      # biến nó đọc rỗng. Hậu quả: triển khai đúng theo README vẫn dựng ra một
+      # Brain KHÔNG kiểm token nào, lại đưa thẳng ra Internet qua Cloudflare
+      # tunnel — trong khi người vận hành vừa bị `:?` bắt điền token nên đinh
+      # ninh là đã khoá. Phát hiện 13/08/2026 khi chạy test nội bộ qua HTTP thật.
+      #
+      # `tests/test_deploy_config.py` khoá lại chuyện này: nó đọc chính file
+      # compose và đối chiếu với tên biến mà code gọi os.getenv.
+      API_AUTH_TOKEN: ${API_TOKEN:?thiếu API_TOKEN trong .env}
       VLLM_API_KEY: ${VLLM_API_KEY:-}
     volumes:
       - ../src/data/docs:/app/src/data/docs:ro

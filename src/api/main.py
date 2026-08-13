@@ -12,7 +12,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from src.api.dependencies import RUNTIME_PROFILE, runtime
+from src.api.dependencies import API_AUTH_TOKEN, RUNTIME_PROFILE, runtime
 from src.core.serving import Overloaded
 
 logger = logging.getLogger("projecta.api")
@@ -103,6 +103,14 @@ async def health():
             "engine_error": runtime.engine_error,
             "kb_error": runtime.kb_error,
             "vision_error": runtime.vision_error,
+            # Trạng thái xác thực phải NHÌN THẤY ĐƯỢC từ ngoài.
+            #
+            # `require_api_token` bỏ qua mọi kiểm tra khi API_AUTH_TOKEN rỗng —
+            # hợp lý lúc chạy máy mình, nhưng nếu biến bị đặt sai tên lúc triển
+            # khai thì Brain mở toang mà không có dấu hiệu nào. Đúng chuyện đã
+            # xảy ra với compose ngày 13/08/2026. Một dòng ở /health biến lỗi
+            # câm thành lỗi nhìn ra ngay.
+            "auth_enabled": bool(API_AUTH_TOKEN),
             "load": load,
         }
     )
