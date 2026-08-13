@@ -170,11 +170,28 @@ class SemanticRouter:
         self,
         model_name="sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2",
         embedder=None,
+        tu_nap_embedder: bool = True,
     ):
+        """
+        `tu_nap_embedder=False` — chạy CHẾ ĐỘ TỪ KHOÁ, không nạp model.
+
+        Dùng cho test. Trước đây không có cách nào tắt, nên hành vi của router
+        trong test phụ thuộc vào việc máy đó có cài `sentence_transformers` hay
+        không: máy CI không có thì test kiểm đường từ khoá, máy dev có thì test
+        kiểm đường ngữ nghĩa. Cùng một dòng assert, hai thứ được kiểm — và không
+        chỗ nào nói ra.
+
+        Tệ hơn: nạp model thật lúc import làm cả phiên pytest thỉnh thoảng đổ
+        bằng access violation trong torch (Windows, Python 3.14), giết luôn
+        những test chưa kịp chạy mà không báo là chúng chưa chạy.
+        """
         # Tái sử dụng embedder của KnowledgeBase để khỏi nạp trùng MiniLM lên VRAM.
         if embedder is not None:
             self.embedder = embedder
             logger.info("SemanticRouter dùng chung embedder có sẵn")
+        elif not tu_nap_embedder:
+            self.embedder = None
+            logger.info("SemanticRouter: tắt tự nạp embedder -> chế độ từ khoá")
         else:
             self.embedder = self._try_load_embedder(model_name)
 

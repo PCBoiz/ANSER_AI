@@ -23,7 +23,19 @@ from src.core import reporting as rp
 from src.core.engine import MAX_HISTORY_TURNS, sanitize_history
 
 client = TestClient(app)
-ROUTER = SemanticRouter()
+
+# CHẾ ĐỘ TỪ KHOÁ, cố ý. Ba lý do, theo thứ tự quan trọng:
+#
+#  1. Không tắt thì hành vi của test phụ thuộc máy: máy có sentence_transformers
+#     kiểm đường ngữ nghĩa, máy không có kiểm đường từ khoá. Cùng dòng assert,
+#     hai thứ được kiểm, không chỗ nào nói ra.
+#  2. Nạp model thật lúc import khiến cả phiên pytest thỉnh thoảng đổ bằng
+#     access violation trong torch (Windows + Python 3.14) — giết cả những test
+#     chưa kịp chạy, mà không báo là chúng chưa chạy.
+#  3. Cả 9 ca định tuyến dưới đây đều đạt ở chế độ từ khoá (đã kiểm 13/08/2026).
+#     Đường ngữ nghĩa là lớp DỰ PHÒNG cho câu không khớp từ khoá nào; đo nó cần
+#     bộ câu hỏi thật, không phải 9 câu viết tay.
+ROUTER = SemanticRouter(tu_nap_embedder=False)
 
 
 # ===========================================================================

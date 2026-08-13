@@ -15,7 +15,10 @@ from src.core.schemas import QUOTE_REQUIRED_FIELDS, QuoteExtraction
 # Router — câu logistics phải vào đúng nhánh ngay từ lớp từ khoá
 # ===========================================================================
 
-ROUTER = SemanticRouter()   # ENV dev không có torch -> chạy chế độ từ khoá, đủ cho test
+# Chế độ từ khoá, ÉP TƯỜNG MINH. Chú thích cũ ghi "ENV dev không có torch nên
+# chạy chế độ từ khoá" — đúng trên máy CI, sai trên máy có torch: ở đó test này
+# âm thầm kiểm đường ngữ nghĩa thay vì đường từ khoá mà tiêu đề mục nói tới.
+ROUTER = SemanticRouter(tu_nap_embedder=False)
 
 
 @pytest.mark.parametrize("query", [
