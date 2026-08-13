@@ -1,0 +1,1652 @@
+[
+ [
+  "DANH SÁCH HÀNG HÓA, DỊCH VỤ",
+  null,
+  null,
+  null,
+  null,
+  null,
+  null,
+  null
+ ],
+ [
+  null,
+  null,
+  null,
+  null,
+  null,
+  null,
+  null,
+  null
+ ],
+ [
+  "STT",
+  "Mã",
+  "Tên",
+  "Giảm 2% thuế suất thuế GTGT",
+  "Nhóm VTHH",
+  "Đơn vị tính chính",
+  "Số lượng tồn",
+  "Giá trị tồn"
+ ],
+ [
+  1,
+  "CPMH",
+  "Chi phí mua hàng",
+  "Chưa xác định",
+  "",
+  "",
+  0,
+  0
+ ],
+ [
+  2,
+  "DV00001",
+  "Cước vận chuyển hàng từ Hà Nội đến Huế BKS 50H-06578",
+  "Chưa xác định",
+  "DV",
+  "Chuyến",
+  0,
+  0
+ ],
+ [
+  3,
+  "KM00001",
+  "Dầu nhớt động cơ xe máy 4 kỳ SJ 20W-40 (0.8Lx24).KM",
+  "Chưa xác định",
+  "",
+  "Lít",
+  1432,
+  0
+ ],
+ [
+  4,
+  "KM00002",
+  "Dầu nhớt động cơ diesel 4 kỳ SAE 20W-50 CF-4 (18L).KM",
+  "Chưa xác định",
+  "",
+  "Lít",
+  1260,
+  0
+ ],
+ [
+  5,
+  "KM00003",
+  "Dầu nhớt động cơ xe ga 4 kỳ SJ/MB 20W-40 (0.8Lx24).KM",
+  "Chưa xác định",
+  "",
+  "Lít",
+  598.8,
+  0
+ ],
+ [
+  6,
+  "KM00004",
+  "Dầu nhớt động cơ diesel 4 kỳ SAE 15W-40 CI -4 (18L).KM",
+  "Chưa xác định",
+  "",
+  "Lít",
+  394,
+  0
+ ],
+ [
+  7,
+  "KM00005",
+  "Dầu nhớt bán tổng hợp động cơ ô tô 4 kỳ SP/CF SAE 5W-30 (4Lx6).KM",
+  "Chưa xác định",
+  "",
+  "Lít",
+  960,
+  0
+ ],
+ [
+  8,
+  "KM00006",
+  "Dầu nhớt động cơ diesel 4 kỳ SAE 15W-40 CF -4 (18L).KM",
+  "Chưa xác định",
+  "",
+  "Lít",
+  642,
+  0
+ ],
+ [
+  9,
+  "KM00007",
+  "Dầu nhớt động cơ ô tô 4 kỳ SP/CF SAE 15W-40 (4Lx6).KM",
+  "Chưa xác định",
+  "",
+  "Lít",
+  744,
+  0
+ ],
+ [
+  10,
+  "KM00008",
+  "Dầu nhớt bán tổng hợp động cơ 4 kỳ SL, JASO MB SAE 10W-40 (0.8Lx24). KM",
+  "Chưa xác định",
+  "",
+  "Lít",
+  172.8,
+  0
+ ],
+ [
+  11,
+  "KM00009",
+  "Dầu truyền động ENEOS Gear GL 590 (18L).KM",
+  "Chưa xác định",
+  "",
+  "Lít",
+  432,
+  0
+ ],
+ [
+  12,
+  "KM00010",
+  "Dầu nhớt động cơ diesel 4 kỳ SAE 20W-50 CI-4 (18L).KM",
+  "Chưa xác định",
+  "",
+  "Lít",
+  162,
+  0
+ ],
+ [
+  13,
+  "KM00011",
+  "Dầu nhớt tổng hợp động cơ ô tô 4 kỳ SP/CF SAE 5W-40 (4Lx6).KM",
+  "Chưa xác định",
+  "",
+  "Lít",
+  72,
+  0
+ ],
+ [
+  14,
+  "KM00012",
+  "Quạt điện ENEOS",
+  "Chưa xác định",
+  "",
+  "Cái",
+  54,
+  0
+ ],
+ [
+  15,
+  "KM00013",
+  "Găng tay vải ENEOS",
+  "Chưa xác định",
+  "",
+  "Cái",
+  48,
+  0
+ ],
+ [
+  16,
+  "KM00014",
+  "Dầu nhớt động cơ ô tô 4 kỳ tổng hợp toàn phần SP/CF SAE 5W-30 ( 4Lx6).KM",
+  "Chưa xác định",
+  "",
+  "Lít",
+  24,
+  0
+ ],
+ [
+  17,
+  "KM00015",
+  "Dầu nhớt động cơ Diesel 4 kỳ SAE 15W40 CI/SL (can 5 lít).KM",
+  "Chưa xác định",
+  "",
+  "Lít",
+  80,
+  0
+ ],
+ [
+  18,
+  "KM00016",
+  "Dầu nhớt động cơ 4 kỳ SJ-40 (0.8Lx24).KM",
+  "Chưa xác định",
+  "",
+  "Lít",
+  172.8,
+  0
+ ],
+ [
+  19,
+  "KM00017",
+  "Dầu động cơ 4 kỳ SJ/MB 20W40 (0,8X24).KM",
+  "Chưa xác định",
+  "",
+  "Lít",
+  19.2,
+  0
+ ],
+ [
+  20,
+  "KM00018",
+  "Dầu nhớt động cơ Diesel 4 kỳ SAE 15W-40 CI-4/SL (18L).KM",
+  "Chưa xác định",
+  "",
+  "Lít",
+  450,
+  0
+ ],
+ [
+  21,
+  "KM00019",
+  "Bộ bàn ghế ENEOS ( gồm 1 bàn , 4 ghế)",
+  "Chưa xác định",
+  "",
+  "Bộ",
+  14,
+  0
+ ],
+ [
+  22,
+  "KM00020",
+  "Dầu nhớt động cơ diesel 4 kỳ SAE 20W-50 CF-4 (25L).KM",
+  "Chưa xác định",
+  "",
+  "Lít",
+  314,
+  0
+ ],
+ [
+  23,
+  "KM00021",
+  "Áo khoác ENEOS",
+  "Chưa xác định",
+  "",
+  "Cái",
+  11,
+  0
+ ],
+ [
+  24,
+  "KM00022",
+  "Dầu truyền động ENEOS GEAR OIL GL-5 80W-90 (0.12Lx12).KM",
+  "Chưa xác định",
+  "",
+  "Lít",
+  17.28,
+  0
+ ],
+ [
+  25,
+  "KM00023",
+  "Bình giữ nhiệt",
+  "Chưa xác định",
+  "",
+  "Cái",
+  8,
+  0
+ ],
+ [
+  26,
+  "KM00024",
+  "Túi đeo chéo ENEOS",
+  "Chưa xác định",
+  "",
+  "Cái",
+  8,
+  0
+ ],
+ [
+  27,
+  "KM00025",
+  "Bia 333",
+  "Chưa xác định",
+  "",
+  "Thùng",
+  15,
+  0
+ ],
+ [
+  28,
+  "KM00026",
+  "Áo phông ENEOS",
+  "Chưa xác định",
+  "",
+  "Cái",
+  59,
+  0
+ ],
+ [
+  29,
+  "KM00027",
+  "Clarion MVF501 (Camera lùi)",
+  "Chưa xác định",
+  "",
+  "Cái",
+  1,
+  0
+ ],
+ [
+  30,
+  "KM00028",
+  "Dầu nhớt động cơ Diesel 4 kỳ chất lượng cao Eneos CD SAE 20W-50 (18L)",
+  "Chưa xác định",
+  "HH",
+  "Lít",
+  36,
+  0
+ ],
+ [
+  31,
+  "KM00029",
+  "Dung dịch làm sạch buồng đốt động cơ ô tô ( ENEOS Deposit Cleaner) ( 180ml*20) DC1-00001.KM",
+  "Chưa xác định",
+  "HH",
+  "Chai",
+  0,
+  0
+ ],
+ [
+  32,
+  "KM00031",
+  "Dầu nhớt động cơ ô tô 4 kỳ tổng hợp toàn phần SP/CF SAE 0W-20 (4Lx6).KM",
+  "Chưa xác định",
+  "HH",
+  "Lít",
+  24,
+  0
+ ],
+ [
+  33,
+  "KM00032",
+  "Áo mưa Eneos",
+  "Chưa xác định",
+  "HH",
+  "Cái",
+  14,
+  0
+ ],
+ [
+  34,
+  "KM00033",
+  "Dầu nhớt động cơ 4 kỳ SL, JASO MA2 20W-40 (800mlx24)",
+  "Chưa xác định",
+  "HH",
+  "Lít",
+  38.4,
+  0
+ ],
+ [
+  35,
+  "KM00034",
+  "Dầu nhớt động cơ xe ga 4 kỳ SL, JASO MB 20W-40 (0.8Lx24).KM",
+  "Chưa xác định",
+  "HH",
+  "Lít",
+  38.4,
+  0
+ ],
+ [
+  36,
+  "KM00035",
+  "Dầu nhớt động cơ Diesel 4 kỳ SAE 20W-50 CI-4/SL (18L).KM",
+  "Chưa xác định",
+  "HH",
+  "Lít",
+  198,
+  0
+ ],
+ [
+  37,
+  "KM00036",
+  "Dầu ô tô Eneos DEO CI-4/SL 20W50 (Can 5 lít).KM",
+  "Chưa xác định",
+  "HH",
+  "Lít",
+  20,
+  0
+ ],
+ [
+  38,
+  "KM00037",
+  "Dầu nhớt bán tổng hợp động cơ 4 kỳ SL, JASO MA2 SAE 10W-40 (0.8Lx24).KM",
+  "Chưa xác định",
+  "HH",
+  "Lít",
+  0,
+  0
+ ],
+ [
+  39,
+  "KM00038",
+  "Mũ vải ENEOS",
+  "Chưa xác định",
+  "HH",
+  "Cái",
+  31,
+  0
+ ],
+ [
+  40,
+  "KM00039",
+  "Xô đá ENEOS",
+  "Chưa xác định",
+  "HH",
+  "Cái",
+  4,
+  0
+ ],
+ [
+  41,
+  "VT00001",
+  "Dầu nhớt động cơ 4 kỳ SJ-40 (0.8Lx24)",
+  "Chưa xác định",
+  "",
+  "Lít",
+  7451.4,
+  480425169
+ ],
+ [
+  42,
+  "VT00002",
+  "Dầu nhớt động cơ 4 kỳ SJ/MB 20W-40 (0.8Lx24)",
+  "Chưa xác định",
+  "",
+  "Lít",
+  6525.2,
+  487046683
+ ],
+ [
+  43,
+  "VT00003",
+  "Dầu nhớt động cơ 4 kỳ SL, JASO MA2 20W-40 (800mlx24)",
+  "Chưa xác định",
+  "",
+  "Lít",
+  1329.6,
+  111928535
+ ],
+ [
+  44,
+  "VT00004",
+  "Dầu nhớt động cơ ô tô 4 kỳ SP/CF SAE 15W-40 (4Lx6)",
+  "Chưa xác định",
+  "",
+  "Lít",
+  2182,
+  143556885
+ ],
+ [
+  45,
+  "VT00005",
+  "Dầu nhớt động cơ ô tô 4 kỳ SP/CF SAE 10W-40 (4Lx6)",
+  "Chưa xác định",
+  "",
+  "Lít",
+  2392,
+  161173285
+ ],
+ [
+  46,
+  "VT00006",
+  "Dầu nhớt bán tổng hợp động cơ ô tô 4 kỳ SP/CF SAE 5W-30 (4Lx6)",
+  "Chưa xác định",
+  "",
+  "Lít",
+  1532,
+  118863581
+ ],
+ [
+  47,
+  "VT00007",
+  "Dầu nhớt động cơ 4 kỳ SJ 20W-40 (0.8Lx24)",
+  "Chưa xác định",
+  "",
+  "Lít",
+  4989.6,
+  348811983
+ ],
+ [
+  48,
+  "VT00008",
+  "Dầu nhớt động cơ diesel 4 kỳ SAE 15w-40 CF-4 (18L)",
+  "Chưa xác định",
+  "",
+  "Lít",
+  463.2,
+  26270578
+ ],
+ [
+  49,
+  "VT00009",
+  "Dầu nhớt động cơ xe máy SJ 20W-40 (1Lx24)",
+  "Chưa xác định",
+  "",
+  "Lít",
+  768,
+  45408459
+ ],
+ [
+  50,
+  "VT00010",
+  "Dầu động cơ 4 kỳ SL/MB 10W40 (0,8X24)",
+  "Chưa xác định",
+  "",
+  "Lít",
+  64.7,
+  5334381
+ ],
+ [
+  51,
+  "VT00011",
+  "Dầu nhớt động cơ diesel 4 kỳ SAE 20W-50 CF-4 (18L)",
+  "Chưa xác định",
+  "",
+  "Lít",
+  726,
+  43183390
+ ],
+ [
+  52,
+  "VT00012",
+  "Dầu thủy lực ENEOS Super Hyrando 68 (200L)",
+  "Chưa xác định",
+  "",
+  "Lít",
+  318,
+  15945887
+ ],
+ [
+  53,
+  "VT00013",
+  "Dầu nhớt động cơ diesel 4 kỳ SAE 20W-50 CI-4 (18L)",
+  "Chưa xác định",
+  "",
+  "Lít",
+  1375,
+  96854222
+ ],
+ [
+  54,
+  "VT00014",
+  "Dầu truyền động ENEOS Gear GL5-90 (18L)",
+  "Chưa xác định",
+  "",
+  "Lít",
+  477.5,
+  34588489
+ ],
+ [
+  55,
+  "VT00015",
+  "Dầu nhớt động cơ 4 kỳ SL, JASO MB 20W-40 (1L/24)",
+  "Chưa xác định",
+  "",
+  "Lít",
+  312,
+  21700615
+ ],
+ [
+  56,
+  "VT00016",
+  "Dầu nhớt động cơ diesel 4 kỳ SAE 20W-50 CF-4 (25L)",
+  "Chưa xác định",
+  "",
+  "Lít",
+  752,
+  44668207
+ ],
+ [
+  57,
+  "VT00017",
+  "Dầu nhớt động cơ diesel 4 kỳ SAE 20W-50 CF-4 (200L)",
+  "Chưa xác định",
+  "",
+  "Lít",
+  1536,
+  92655431
+ ],
+ [
+  58,
+  "VT00018",
+  "Dầu nhớt động cơ ô tô 4 kỳ tổng hợp toàn phần SP/CF SAE 5W-30 ( 4Lx6)",
+  "Chưa xác định",
+  "",
+  "Lít",
+  1194,
+  127310250
+ ],
+ [
+  59,
+  "VT00019",
+  "Dầu nhớt tổng hợp động cơ ô tô 4 kỳ SP/CF SAE 5W-40 (4Lx6)",
+  "Chưa xác định",
+  "",
+  "Lít",
+  184,
+  21010369
+ ],
+ [
+  60,
+  "VT00020",
+  "Dầu động cơ Eneos 20w-50 CF-4 (25L)",
+  "Chưa xác định",
+  "",
+  "Lít",
+  174,
+  9591634
+ ],
+ [
+  61,
+  "VT00022",
+  "Dầu nhớt bán tổng hợp 4 kỳ S, JASO MB SAE 10W-40 (1LX24)",
+  "Chưa xác định",
+  "",
+  "Lít",
+  240.2,
+  18647662
+ ],
+ [
+  62,
+  "VT00023",
+  "Dầu nhớt động cơ diesel 4 kỳ SAE 15W-40 CF -4 (200L)",
+  "Chưa xác định",
+  "",
+  "Lít",
+  364,
+  21899291
+ ],
+ [
+  63,
+  "VT00024",
+  "Dầu thủy lực ENEOS Super Hyrando 68 (18L)",
+  "Chưa xác định",
+  "",
+  "Lít",
+  48,
+  2874004
+ ],
+ [
+  64,
+  "VT00025",
+  "Dầu nhớt động cơ Diesel 4 kỳ SAE 15w40 CI4/SL (Can 5 lít)",
+  "Chưa xác định",
+  "",
+  "Lít",
+  235,
+  21336219
+ ],
+ [
+  65,
+  "VT00026",
+  "Dầu nhớt động cơ 4 kỳ SJ/MB 20W-40 (0.8Lx24)",
+  "Chưa xác định",
+  "",
+  "Lít",
+  370.8,
+  26923521
+ ],
+ [
+  66,
+  "VT00028",
+  "Mỡ bôi trơn đa năng chịu nhiệt 130 độ C, hiệu AYP",
+  "Chưa xác định",
+  "",
+  "kg",
+  8,
+  293298
+ ],
+ [
+  67,
+  "VT00029",
+  "Dầu nhớt bán tổng hợp động cơ 4 kỳ SL, JASO MA2 10W-40(0.8Lx24)",
+  "Chưa xác định",
+  "",
+  "Lít",
+  225.6,
+  17996798
+ ],
+ [
+  68,
+  "VT00030",
+  "Dầu bánh răng ô tô/CX Delo Gear EP5 80W90 (18L)",
+  "Chưa xác định",
+  "",
+  "Lít",
+  72,
+  3817971
+ ],
+ [
+  69,
+  "VT00031",
+  "Dầu thuỷ lực Eneos Super Hyrando 46 18L",
+  "Chưa xác định",
+  "",
+  "Lít",
+  162,
+  9720168
+ ],
+ [
+  70,
+  "VT00032",
+  "Mỡ bôi trơn đa năng chịu nhiệt 180 độ C, hiệu ANOPEC",
+  "Chưa xác định",
+  "",
+  "kg",
+  28,
+  1576400
+ ],
+ [
+  71,
+  "VT00033",
+  "Dầu nhớt động cơ diesel 4 kỳ SAE 20W-50 CI_x0002_4/DH-1 (18L)",
+  "Chưa xác định",
+  "",
+  "Lít",
+  55,
+  3510998
+ ],
+ [
+  72,
+  "VT00034",
+  "Dầu truyền động ENEOS GEAR OIL GL-5 80w-90 (0.12Lx12)",
+  "Chưa xác định",
+  "",
+  "Lít",
+  48.08,
+  7406409
+ ],
+ [
+  73,
+  "VT00036",
+  "Dầu hộp số tự động ATF Multi (1lx24)",
+  "Chưa xác định",
+  "",
+  "Lít",
+  144,
+  12756000
+ ],
+ [
+  74,
+  "VT00037",
+  "Dầu nhớt động cơ diesel 4 kỳ SAE 15W-40 CI -4/DH-1 (5Lx4)",
+  "Chưa xác định",
+  "",
+  "Lít",
+  20,
+  1446000
+ ],
+ [
+  75,
+  "VT00038",
+  "Dầu công nghiệp đa dụng ENEOS Super Mulpus DX46 (18L)/700V4402",
+  "Chưa xác định",
+  "",
+  "Lít",
+  18,
+  988000
+ ],
+ [
+  76,
+  "VT00039",
+  "Dầu động cơ Diesel 4 kỳ CI4 SAE 15W40 (18L)",
+  "Chưa xác định",
+  "",
+  "Lít",
+  -108,
+  0
+ ],
+ [
+  77,
+  "VT00040",
+  "Dầu hộp số tự động/CX Texamatic 1888 (18L)",
+  "Chưa xác định",
+  "",
+  "Lít",
+  18,
+  1164000
+ ],
+ [
+  78,
+  "VT00041",
+  "Dầu cắt gọt pha nước ENEOS UNISOLUBLE EM-V (18L)",
+  "Chưa xác định",
+  "",
+  "Lít",
+  18,
+  1486834
+ ],
+ [
+  79,
+  "VT00042",
+  "Dầu nhớt động cơ ô tô 4 kỳ SN/CF SAE 15w-40 (4lx6)",
+  "Chưa xác định",
+  "",
+  "Lít",
+  -16,
+  -1023583
+ ],
+ [
+  80,
+  "VT00043",
+  "Chế phẩm mỡ bôi trơn AUMAN Grease MP3 (400gr, 30chai/thùng)",
+  "Chưa xác định",
+  "",
+  "kg",
+  23.2,
+  1004707
+ ],
+ [
+  81,
+  "VT00044",
+  "Dầu nhớt động cơ diesel 4 kỳ SAE 15W-40 CI-4/DH-1 (25L)",
+  "Chưa xác định",
+  "",
+  "Lít",
+  11,
+  700920
+ ],
+ [
+  82,
+  "VT00045",
+  "Dầu truyền động ENEOS Gear GL 590 (200l)",
+  "Chưa xác định",
+  "",
+  "Lít",
+  174,
+  11284770
+ ],
+ [
+  83,
+  "VT00046",
+  "Dầu trợ lực Fluid Matic IID18(1L)",
+  "Chưa xác định",
+  "",
+  "Lít",
+  10,
+  954500
+ ],
+ [
+  84,
+  "VT00047",
+  "Dầu nhớt động cơ SN/CF 15W40",
+  "Chưa xác định",
+  "",
+  "Lít",
+  8,
+  550000
+ ],
+ [
+  85,
+  "VT00048",
+  "DẦU ĐỘNG CƠ MITSUBISHI THTP ACEA C3 5W30",
+  "Chưa xác định",
+  "",
+  "Lít",
+  7.4,
+  1591000
+ ],
+ [
+  86,
+  "VT00049",
+  "Dầu nhớt động cơ bán tổng hợp SN/CF 5W30",
+  "Chưa xác định",
+  "",
+  "Lít",
+  0,
+  0
+ ],
+ [
+  87,
+  "VT00050",
+  "Dầu động cơ Eneos CF4 15w40 (18l)",
+  "Chưa xác định",
+  "",
+  "Lít",
+  2,
+  108683
+ ],
+ [
+  88,
+  "VT00052",
+  "Dầu phanh Brake Fluid dot 4& Dot 5.1 (500ml)",
+  "Chưa xác định",
+  "",
+  "Lon",
+  2,
+  210000
+ ],
+ [
+  89,
+  "VT00053",
+  "LONG ĐEN ỐC XẢ DẦU",
+  "Chưa xác định",
+  "",
+  "Chiếc",
+  1,
+  15000
+ ],
+ [
+  90,
+  "VT00054",
+  "LỌC NHỚT",
+  "Chưa xác định",
+  "",
+  "Chiếc",
+  1,
+  274000
+ ],
+ [
+  91,
+  "VT00055",
+  "Lưới chống chuột",
+  "Chưa xác định",
+  "",
+  "Chiếc",
+  1,
+  350000
+ ],
+ [
+  92,
+  "VT00056",
+  "Mỡ 00 (15kg/thùng)",
+  "Chưa xác định",
+  "HH",
+  "Thùng",
+  0,
+  0
+ ],
+ [
+  93,
+  "VT00057",
+  "Dầu thủy lực Eneos Super Hyrando 32 (18L)",
+  "Chưa xác định",
+  "HH",
+  "Lít",
+  0,
+  0
+ ],
+ [
+  94,
+  "VT00058",
+  "Mỡ phấn chì HG (17kg)",
+  "Chưa xác định",
+  "HH",
+  "Xô",
+  2,
+  2424074
+ ],
+ [
+  95,
+  "VT00059",
+  "Dầu động cơ Diesel 4 kỳ CI4/SL SAE 15W40 (200L)",
+  "Chưa xác định",
+  "HH",
+  "Lít",
+  87,
+  5047479
+ ],
+ [
+  96,
+  "VT00060",
+  "Dầu chống gỉ dài hạn Antirust LS (20L)",
+  "Chưa xác định",
+  "HH",
+  "Lít",
+  0,
+  0
+ ],
+ [
+  97,
+  "VT00061",
+  "Chế phẩm mỡ bôi trơn AUMAN Lithium-EP NoT3 (15kg/ thùng)",
+  "Chưa xác định",
+  "HH",
+  "kg",
+  0,
+  0
+ ],
+ [
+  98,
+  "VT00062",
+  "Dung dịch làm sạch buồng đốt động cơ ô tô ( ENEOS Deposit Cleaner) 180ml",
+  "Chưa xác định",
+  "HH",
+  "Chai",
+  4,
+  720000
+ ],
+ [
+  99,
+  "VT00063",
+  "Nước làm mát động cơ Gly Coolant E30 4L",
+  "Chưa xác định",
+  "HH",
+  "Lít",
+  4,
+  154000
+ ],
+ [
+  100,
+  "VT00064",
+  "Nước làm mát GLY coolant E30 mầu xanh (200L)",
+  "Chưa xác định",
+  "HH",
+  "Lít",
+  0,
+  0
+ ],
+ [
+  101,
+  "VT00065",
+  "Dầu cầu GL5 85W140 (18L)",
+  "Chưa xác định",
+  "HH",
+  "Lít",
+  0,
+  0
+ ],
+ [
+  102,
+  "VT00066",
+  "Mỡ bôi trơn Sinopec Extreme Pressure ( EP) Lithium Grease NLGI 2 (180Kg/phuy)",
+  "Chưa xác định",
+  "HH",
+  "kg",
+  0,
+  0
+ ],
+ [
+  103,
+  "VT00067",
+  "Dầu thủy lực VHLUB H68",
+  "Chưa xác định",
+  "HH",
+  "Phuy",
+  0,
+  0
+ ],
+ [
+  104,
+  "VT00068",
+  "Dầu bánh răng công nghiệp Bonnoc TS 150 (18L)",
+  "Chưa xác định",
+  "HH",
+  "Lít",
+  0,
+  0
+ ],
+ [
+  105,
+  "VT00069",
+  "Dầu nhớt động cơ Diesel 4 kỳ chất lượng cao Eneos CD SAE 20W-50 (18L)",
+  "Chưa xác định",
+  "HH",
+  "Lít",
+  252,
+  13300028
+ ],
+ [
+  106,
+  "VT00070",
+  "Dầu Caltex Delo Gear EP4 SAE 90",
+  "Chưa xác định",
+  "HH",
+  "Lít",
+  0,
+  0
+ ],
+ [
+  107,
+  "VT00071",
+  "Dầu SHL FOUNTCUT 60N3",
+  "Chưa xác định",
+  "HH",
+  "Lít",
+  40,
+  2300000
+ ],
+ [
+  108,
+  "VT00072",
+  "Dung dịch làm sạch buồng đốt động cơ ô tô ( ENEOS Deposit Cleaner) ( 180ml*20) DC1-00001",
+  "Chưa xác định",
+  "HH",
+  "Chai",
+  0,
+  0
+ ],
+ [
+  109,
+  "VT00073",
+  "Dầu rãnh trượt Uniway XS32 20l/Can",
+  "Chưa xác định",
+  "HH",
+  "Lít",
+  0,
+  0
+ ],
+ [
+  110,
+  "VT00074",
+  "Dầu máy nén công nghệ cao Eneos Faircol RA 32 (Xô 18 lít)",
+  "Chưa xác định",
+  "HH",
+  "Lít",
+  0,
+  0
+ ],
+ [
+  111,
+  "VT00075",
+  "Dầu nhớt bán tổng hợp động cơ 4 kỳ SL, JASO MB SAE 10W-40 (0.8Lx24)",
+  "Chưa xác định",
+  "HH",
+  "Lít",
+  787.2,
+  57806617
+ ],
+ [
+  112,
+  "VT00076",
+  "Dầu nhớt động cơ Diesel 4 kỳ SAE 15W-40 CI-4/SL (25L).",
+  "Chưa xác định",
+  "HH",
+  "Lít",
+  50,
+  3186000
+ ],
+ [
+  113,
+  "VT00077",
+  "Dầu phanh Dot 4 & Dot 5.1.",
+  "Chưa xác định",
+  "HH",
+  "Lít",
+  0,
+  0
+ ],
+ [
+  114,
+  "VT00078",
+  "Mỡ Litium L3",
+  "Chưa xác định",
+  "HH",
+  "kg",
+  0,
+  0
+ ],
+ [
+  115,
+  "VT00079",
+  "Mỡ (Mobilux EP0-P16kg)",
+  "Chưa xác định",
+  "HH",
+  "kg",
+  48,
+  6026666
+ ],
+ [
+  116,
+  "VT00080",
+  "Chế phẩm mỡ bôi trơn AUMAN Lithium COMPLEX-EP3 HP-R (15kg/xô)",
+  "Chưa xác định",
+  "HH",
+  "Xô",
+  0,
+  0
+ ],
+ [
+  117,
+  "VT00081",
+  "Dầu nhớt động cơ ô tô 4 kỳ tổng hợp toàn phần SP/CF SAE 0W-20 (4Lx6)",
+  "Chưa xác định",
+  "HH",
+  "Lít",
+  72,
+  8613000
+ ],
+ [
+  118,
+  "VT00082",
+  "Dầu thuỷ lực Total Azolla ZS46",
+  "Chưa xác định",
+  "HH",
+  "Lít",
+  0,
+  0
+ ],
+ [
+  119,
+  "VT00083",
+  "Dầu máy nén khí Compressor S/R 46(200 lít)",
+  "Chưa xác định",
+  "HH",
+  "Lít",
+  0,
+  0
+ ],
+ [
+  120,
+  "VT00084",
+  "Dầu bánh răng công nghiệp Eneos Bonnoc TS 220 (Xô 18 lít)",
+  "Chưa xác định",
+  "HH",
+  "Lít",
+  72,
+  4467429
+ ],
+ [
+  121,
+  "VT00085",
+  "Dầu thủy lực Eneos Super Hyrando 32 (200L)",
+  "Chưa xác định",
+  "HH",
+  "Lít",
+  0,
+  0
+ ],
+ [
+  122,
+  "VT00087",
+  "Dầu nhờn Texamatic 1888",
+  "Chưa xác định",
+  "HH",
+  "Lít",
+  0,
+  0
+ ],
+ [
+  123,
+  "VT00088",
+  "Dầu truyền động Eneos Gear GL5 85W140 (200L)",
+  "Chưa xác định",
+  "HH",
+  "Lít",
+  0,
+  0
+ ],
+ [
+  124,
+  "VT00089",
+  "Dầu máy nén khí Compressor S/R 46 (18 lít)",
+  "Chưa xác định",
+  "HH",
+  "Lít",
+  18,
+  807988
+ ],
+ [
+  125,
+  "VT00090",
+  "Dầu TL AW68",
+  "Chưa xác định",
+  "HH",
+  "Lít",
+  0,
+  0
+ ],
+ [
+  126,
+  "VT00091",
+  "Hóa chất rửa xe không chạm SUPER MAFRASOL 25 Kg",
+  "Chưa xác định",
+  "HH",
+  "Can",
+  0,
+  0
+ ],
+ [
+  127,
+  "VT00092",
+  "Dầu nhớt động cơ Diesel 4 kỳ SAE 20W-50 CI-4/SL (18L)",
+  "Chưa xác định",
+  "HH",
+  "Lít",
+  324,
+  21024000
+ ],
+ [
+  128,
+  "VT00093",
+  "Dầu chổng gỉ Antirust Terami LS, 20 Lít",
+  "Chưa xác định",
+  "HH",
+  "Lít",
+  0,
+  0
+ ],
+ [
+  129,
+  "VT00094",
+  "Mỡ Mobilux EP 2 Pail 16KG:SG",
+  "Chưa xác định",
+  "HH",
+  "kg",
+  80,
+  9090909
+ ],
+ [
+  130,
+  "VT00095",
+  "Dầu Caltex Rando HD 46",
+  "Chưa xác định",
+  "HH",
+  "Lít",
+  0,
+  0
+ ],
+ [
+  131,
+  "VT00096",
+  "Dầu Caltex Delo 400 SLK 15W40",
+  "Chưa xác định",
+  "HH",
+  "Lít",
+  54,
+  4885784
+ ],
+ [
+  132,
+  "VT00097",
+  "Dầu nhờn (Tellus S2 MX46_20L)",
+  "Chưa xác định",
+  "HH",
+  "Lít",
+  0,
+  0
+ ],
+ [
+  133,
+  "VT00098",
+  "Dầu Caltex Regal HTO 32",
+  "Chưa xác định",
+  "HH",
+  "Lít",
+  60,
+  4200000
+ ],
+ [
+  134,
+  "VT00099",
+  "Mỡ MOBILGREASE XHP 222 PAIL 16KG:SG",
+  "Chưa xác định",
+  "HH",
+  "Xô",
+  0,
+  0
+ ],
+ [
+  135,
+  "VT00100",
+  "Dầu nhờn CRB 15W-40 CF-4 209L",
+  "Chưa xác định",
+  "HH",
+  "Lít",
+  0,
+  0
+ ],
+ [
+  136,
+  "VT00101",
+  "Dầu ô tô Eneos DEO CI-4/SL 20W50 (Can 5 lít)",
+  "Chưa xác định",
+  "HH",
+  "Lít",
+  160,
+  11568000
+ ],
+ [
+  137,
+  "VT00102",
+  "Dầu nhớt động cơ Diesel 4 kỳ SAE 20w50 CI4/SL (Phuy 200 lít)",
+  "Chưa xác định",
+  "HH",
+  "Lít",
+  1000,
+  61070000
+ ],
+ [
+  138,
+  "VT00103",
+  "Nước làm mát động cơ Gly formula màu xanh (20L)",
+  "Chưa xác định",
+  "HH",
+  "Lít",
+  0,
+  0
+ ],
+ [
+  139,
+  "VT00104",
+  "Mỡ Caltex Multifak EP3",
+  "Chưa xác định",
+  "HH",
+  "kg",
+  16,
+  1552000
+ ],
+ [
+  140,
+  "VT00105",
+  "Dầu Caltex Brake and Clutch Fluid Dot 3",
+  "Chưa xác định",
+  "HH",
+  "Lít",
+  2,
+  230000
+ ],
+ [
+  141,
+  "VT00106",
+  "Mỡ bôi trơn đa năng chịu nhiệt 130 độ C",
+  "Chưa xác định",
+  "HH",
+  "kg",
+  120,
+  4945001
+ ],
+ [
+  142,
+  "VT00107",
+  "Dầu bánh răng công nghiệp Eneos Bonnoc TS 220 (Phuy 200 lít)",
+  "Chưa xác định",
+  "HH",
+  "Lít",
+  200,
+  9991000
+ ],
+ [
+  143,
+  "VT00108",
+  "Mỡ cho máy công nghiệp Epnoc Grease AP(N)0 (Tuýp 400 gram)",
+  "Chưa xác định",
+  "HH",
+  "Tuýp",
+  0,
+  0
+ ],
+ [
+  144,
+  "VT00109",
+  "Dầu nhớt động cơ 4 kỳ SL, JASO MA2 20W-40 (1Lx24)",
+  "Chưa xác định",
+  "HH",
+  "Lít",
+  168,
+  11060000
+ ],
+ [
+  145,
+  "VT00110",
+  "Dầu thuỷ lực Total Azolla ZS32 - 208L",
+  "Chưa xác định",
+  "HH",
+  "Lít",
+  0,
+  0
+ ],
+ [
+  146,
+  "VT00111",
+  "Dầu nhờn bánh răng 90EP. GL4",
+  "Chưa xác định",
+  "HH",
+  "Lít",
+  0,
+  0
+ ],
+ [
+  147,
+  "VT00112",
+  "Mỡ bôi trơn Eneos Pyronoc Universal 00 (16kg)",
+  "Chưa xác định",
+  "HH",
+  "Xô",
+  0,
+  0
+ ],
+ [
+  148,
+  "VT00113",
+  "Dầu thuỷ lực Eneos Super Hyrando 46 200L",
+  "Chưa xác định",
+  "HH",
+  "Lít",
+  200,
+  9900000
+ ],
+ [
+  149,
+  "VT00114",
+  "Dầu thủy lực VG68",
+  "Chưa xác định",
+  "HH",
+  "Lít",
+  0,
+  0
+ ],
+ [
+  150,
+  "VT00115",
+  "Mỡ số 0",
+  "Chưa xác định",
+  "HH",
+  "Thùng",
+  4,
+  2520000
+ ],
+ [
+  151,
+  "VT00116",
+  "Dầu Caltex Delo Silver MG 15W40",
+  "Chưa xác định",
+  "HH",
+  "Lít",
+  0,
+  0
+ ],
+ [
+  152,
+  "VT00117",
+  "Dầu hộp số ô tô DELO GEAR EP4 90 (208 lít)",
+  "Chưa xác định",
+  "HH",
+  "Lít",
+  0,
+  0
+ ],
+ [
+  153,
+  "VT00118",
+  "Dầu bánh răng công nghiệp Bonnoc TS 150 (200L)",
+  "Chưa xác định",
+  "HH",
+  "Lít",
+  0,
+  0
+ ],
+ [
+  154,
+  "VT00119",
+  "Mỡ Litium L3 (180kg)",
+  "Chưa xác định",
+  "HH",
+  "kg",
+  0,
+  0
+ ],
+ [
+  155,
+  "VT00120",
+  "Mỡ Litium L3 (15kg)",
+  "Chưa xác định",
+  "HH",
+  "kg",
+  0,
+  0
+ ],
+ [
+  156,
+  "VT00121",
+  "Mỡ bôi trơn đa năng chịu nhiệt 380 độ C, hiệu ANOPEC (15kg/xô)",
+  "Chưa xác định",
+  "HH",
+  "Xô",
+  0,
+  0
+ ],
+ [
+  157,
+  "VT00122",
+  "Mỡ bôi trơn đa năng chịu nhiệt 130 độ C (MultiPurpose Grease NLGI: 3#), hiệu AYP (14kg/xô)",
+  "Chưa xác định",
+  "HH",
+  "Xô",
+  7,
+  3511773
+ ],
+ [
+  158,
+  "VT00123",
+  "Dầu thủy lực 68 X5 OIL (18L)",
+  "Chưa xác định",
+  "HH",
+  "Xô",
+  0,
+  0
+ ],
+ [
+  159,
+  "VT00124",
+  "Dầu phanh CX Brake Clutch Fld dot4 - 0,5 L",
+  "Chưa xác định",
+  "HH",
+  "Lít",
+  0.5,
+  120370
+ ],
+ [
+  160,
+  "VT00125",
+  "Dầu Mobilgear 600 XP 150, 20LT, PAIL",
+  "Chưa xác định",
+  "HH",
+  "Xô",
+  4,
+  7360000
+ ],
+ [
+  161,
+  "VT00126",
+  "Mỡ bôi trơn đa năng chịu nhiệt 130 độ C, hiệu ANP (14kg/xô)",
+  "Chưa xác định",
+  "HH",
+  "kg",
+  0,
+  0
+ ],
+ [
+  null,
+  null,
+  "Tổng",
+  null,
+  null,
+  null,
+  null,
+  2874073721
+ ]
+]
