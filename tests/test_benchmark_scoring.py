@@ -335,3 +335,49 @@ def test_agent_per_row_bat_duoc_ca_hong():
     rows = [{"_id": "A1", "ask_back": True}]
     kq = score_agent(rows, ['{"thought": "x", "tool": "report", "arguments": {}}'])
     assert kq["per_row"] == [False], "gọi tool khi thiếu dữ kiện = trượt"
+
+
+# ---------------------------------------------------------------------------
+# Cổng chặn KHÔNG được chặn trên mẫu quá ít
+# ---------------------------------------------------------------------------
+
+def test_cong_chan_KHONG_chan_khi_mau_qua_it():
+    """
+    Nhánh n8n có đúng 5 ca. 5/5 cho khoảng Wilson ~48%–100% — không phân biệt
+    nổi với 3/5. Chặn hay thả trên một con số như vậy đều là tung đồng xu, chỉ
+    khác là nó trông như một quyết định có căn cứ.
+    """
+    from offline_training.benchmark_v3 import N_TOI_THIEU_CHAN, chan
+
+    gate, yeu = [], []
+    chan(gate, "n8n hợp lệ", 1, 5, 0.90, yeu=yeu)      # 20% — trượt xa ngưỡng
+    assert gate == [], "n=5 mà vẫn chặn thì cổng phản ánh may rủi, không phản ánh model"
+    assert yeu and "n=5" in yeu[0]
+    assert N_TOI_THIEU_CHAN >= 20
+
+
+def test_cong_chan_VAN_chan_khi_du_mau():
+    from offline_training.benchmark_v3 import chan
+
+    gate, yeu = [], []
+    chan(gate, "extraction", 40, 100, 0.90, yeu=yeu)   # 40% trên n=100
+    assert len(gate) == 1, "đủ mẫu mà dưới ngưỡng thì phải chặn"
+    assert yeu == []
+
+
+def test_du_mau_va_dat_nguong_thi_khong_chan():
+    from offline_training.benchmark_v3 import chan
+
+    gate, yeu = [], []
+    chan(gate, "extraction", 95, 100, 0.90, yeu=yeu)
+    assert gate == [] and yeu == []
+
+
+def test_mau_it_van_IN_con_so_ra_de_doc(capsys):
+    """Không chặn KHÁC với không đo. Con số vẫn phải hiện, kèm lý do không chặn."""
+    from offline_training.benchmark_v3 import chan
+
+    chan([], "n8n hợp lệ", 5, 5, 0.90, yeu=[])
+    ra = capsys.readouterr().out
+    assert "n8n hợp lệ" in ra
+    assert "KHÔNG dùng làm cổng chặn" in ra

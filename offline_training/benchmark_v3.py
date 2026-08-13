@@ -196,8 +196,17 @@ def score_extraction(rows: list[dict], outputs: list[str]) -> dict:
     }
 
 
+# Dưới ngưỡng này thì con số KHÔNG kết luận được gì, nên không được phép chặn.
+#
+# 5/5 cho khoảng Wilson khoảng 48%–100%: không phân biệt nổi với 3/5. Chặn hay
+# thả trên một con số như vậy đều là tung đồng xu, chỉ khác là nó trông như một
+# quyết định có căn cứ. Ngưỡng 20 là mức mà khoảng bắt đầu hẹp đủ để phân biệt
+# "khoảng 90%" với "khoảng 70%".
+N_TOI_THIEU_CHAN = 20
+
+
 def chan(gate_fail: list, nhan: str, k: int, n: int, nguong: float,
-         them: str = "") -> None:
+         them: str = "", yeu: list | None = None) -> None:
     """
     Chấm một cổng chặn và IN KÈM khoảng tin cậy.
 
@@ -210,6 +219,10 @@ def chan(gate_fail: list, nhan: str, k: int, n: int, nguong: float,
     Vẫn chặn theo ĐIỂM ước lượng — chặn theo cận dưới sẽ làm mọi cổng đỏ trên
     bộ eval nhỏ, và một cổng lúc nào cũng đỏ thì bị tắt. Nhưng khi khoảng vắt
     qua ngưỡng thì nói thẳng là chưa kết luận được.
+
+    `n < N_TOI_THIEU_CHAN` -> IN nhưng KHÔNG chặn, và ghi vào `yeu` để phần tổng
+    kết nói ra. Nhánh n8n hiện chỉ có 5 ca; để nó chặn thì cổng phản ánh may rủi
+    của năm mẫu chứ không phản ánh model.
     """
     from offline_training.stats import cong_chan, wilson
 
@@ -218,6 +231,14 @@ def chan(gate_fail: list, nhan: str, k: int, n: int, nguong: float,
     print(f"  {nhan:16s} {kq}   (ngưỡng {nguong:.0%}){them}")
     if ghi_chu:
         print(f"       {ghi_chu}")
+
+    if n < N_TOI_THIEU_CHAN:
+        print(f"       n={n} < {N_TOI_THIEU_CHAN} — KHÔNG dùng làm cổng chặn, "
+              f"khoảng quá rộng để kết luận")
+        if yeu is not None:
+            yeu.append(f"{nhan}: n={n}, chưa đủ mẫu để kết luận")
+        return
+
     if not qua:
         gate_fail.append(f"{nhan} {kq.ty_le:.4f} < {nguong}")
 
@@ -673,6 +694,11 @@ def main() -> None:
     if os.getenv("BENCH_SKIP_GUIDED_CHECK", "") != "1":
         smoke_test_guided(llm)
     gate_fail = []
+    # Nhánh KHÔNG ĐO ĐƯỢC — thiếu file eval, hoặc có nhưng quá ít mẫu để kết
+    # luận. Phải gom lại và in ở tổng kết: một phiên đo bỏ qua ba trên bốn nhánh
+    # rồi in "✅ Qua mọi ngưỡng" là câu nói đúng chữ mà sai hoàn toàn về nghĩa.
+    khong_do_duoc: list[str] = []
+    mau_qua_it: list[str] = []
     # Kết quả TỪNG CÂU, ghi ra JSON để so baseline với bản tinh chỉnh THEO CẶP.
     # Hai bản chạy trên cùng bộ câu hỏi, nên so từng câu mạnh hơn hẳn so hai số
     # trung bình — và trả lời được câu mà số trung bình giấu: bản mới làm hỏng
@@ -713,6 +739,7 @@ def main() -> None:
             ket_qua_chay["extraction"] = result
         else:
             print("\n[extraction] ⚠ thiếu eval_extraction.jsonl — bỏ qua")
+            khong_do_duoc.append("extraction — thiếu eval_extraction.jsonl")
 
     # ---- 2. n8n ------------------------------------------------------------
     if "n8n" not in args.skip:
@@ -741,10 +768,11 @@ def main() -> None:
             print(f"\n[n8n] hợp lệ {n_valid}/{len(rows)} ({rate * 100:.0f}%)")
             ket_qua_chay["n8n"] = result
             n8n_min = float(os.getenv("N8N_VALID_MIN", "0.90"))
-            if rate < n8n_min:
-                gate_fail.append(f"n8n valid_rate {rate:.4f} < {n8n_min}")
+            chan(gate_fail, "n8n hợp lệ", n_valid, len(rows), n8n_min,
+                 yeu=mau_qua_it)
         else:
             print("\n[n8n] ⚠ thiếu eval_n8n.jsonl — bỏ qua")
+            khong_do_duoc.append("n8n — thiếu eval_n8n.jsonl")
 
     # ---- 3. narration ------------------------------------------------------
     if "narration" not in args.skip:
@@ -786,6 +814,7 @@ def main() -> None:
                 gate_fail.append(f"narration pass_rate {result['pass_rate']:.4f} < {narr_min}")
         else:
             print("\n[narration] ⚠ thiếu eval_narration.jsonl — bỏ qua")
+            khong_do_duoc.append("narration — thiếu eval_narration.jsonl")
 
     # ---- 4. agentic --------------------------------------------------------
     if "agent" not in args.skip:
@@ -895,6 +924,7 @@ def main() -> None:
                     f"agentic arg_fill {result['arg_fill_rate']:.4f} < {arg_min}")
         else:
             print("\n[agentic] ⚠ thiếu eval_agent.jsonl — bỏ qua")
+            khong_do_duoc.append("agentic — thiếu eval_agent.jsonl")
 
     # ---- Ghi kết quả từng câu ----------------------------------------------
     if args.json_out:
@@ -916,6 +946,21 @@ def main() -> None:
 
     # ---- Cổng chặn ---------------------------------------------------------
     print(f"\n{'=' * 60}")
+
+    # In TRƯỚC kết luận. Một phiên bỏ qua ba trên bốn nhánh rồi in "Qua mọi
+    # ngưỡng" là câu đúng chữ mà sai hoàn toàn về nghĩa — và đó chính là câu
+    # người ta chụp màn hình gửi đi.
+    if khong_do_duoc:
+        print("⚠ KHÔNG ĐO ĐƯỢC (thiếu dữ liệu, không phải model đạt):")
+        for x in khong_do_duoc:
+            print(f"   {x}")
+    if mau_qua_it:
+        print("⚠ ĐO ĐƯỢC NHƯNG KHÔNG KẾT LUẬN ĐƯỢC (mẫu quá ít, không dùng làm cổng):")
+        for x in mau_qua_it:
+            print(f"   {x}")
+    if khong_do_duoc or mau_qua_it:
+        print("-" * 60)
+
     if gate_fail and not args.no_gate:
         print("❌ DƯỚI NGƯỠNG:")
         for reason in gate_fail:
@@ -925,6 +970,9 @@ def main() -> None:
         print("⚠ Dưới ngưỡng (--no-gate nên không chặn):")
         for reason in gate_fail:
             print(f"   {reason}")
+    elif khong_do_duoc or mau_qua_it:
+        print("✅ Qua mọi ngưỡng ĐO ĐƯỢC — nhưng xem hai mục ⚠ ở trên trước khi "
+              "kết luận là model đạt")
     else:
         print("✅ Qua mọi ngưỡng")
 

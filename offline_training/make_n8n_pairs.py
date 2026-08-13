@@ -30,7 +30,18 @@ sys.path.insert(0, str(ROOT))
 from offline_training.dgen_common import GENERATED_DIR, load_jsonl  # noqa: F401
 
 TEMPLATE_DIRS = [ROOT / "data" / "n8n_templates", ROOT / "workflows" / "logistics"]
-N_EVAL = 5           # số template giữ lại làm benchmark, không vào tập train
+# Toàn bộ template vào TẬP TRAIN. Bộ eval n8n nay do `make_n8n_eval.py` sinh
+# riêng, không cắt khỏi đây nữa.
+#
+# Vì sao đổi: cắt 5 trên 32 template làm eval khiến CẢ HAI đầu quá nhỏ. n=5 cho
+# khoảng Wilson ~48%–100% — model hoàn hảo và model tung đồng xu ra hai con số
+# không phân biệt được. Mà muốn n đủ để chặn (>=20) thì tập train còn 12 mẫu.
+# Không có cách chia nào cứu được 32 template.
+#
+# Thoát ra được vì chỗ chấm điểm n8n KHÔNG dùng đáp án mẫu: nó chạy
+# `validate_workflow()` trên đầu ra của model. Bộ eval chỉ cần ĐỀ BÀI, mà đề bài
+# thì viết mới được. Nhờ vậy train tăng 25 -> 30 và eval tăng 5 -> 34.
+N_EVAL = 0
 MAX_NODES = 12       # khớp maxItems của build_workflow_schema()
 MAX_ANSWER_CHARS = 7_000   # vượt là vượt ngân sách sequence khi train
 
@@ -170,13 +181,16 @@ def main() -> None:
             }
             f.write(json.dumps(entry, ensure_ascii=False) + "\n")
 
-    eval_path = GENERATED_DIR / "eval_n8n.jsonl"
-    with open(eval_path, "w", encoding="utf-8") as f:
-        for p in eval_pairs:
-            f.write(json.dumps(p, ensure_ascii=False) + "\n")
+    # KHÔNG ghi eval_n8n.jsonl ở đây nữa — `make_n8n_eval.py` sở hữu file đó.
+    # Ghi đè nó là xoá 34 đề bằng 0 đề, và benchmark sẽ lặng lẽ bỏ qua cả nhánh.
+    if eval_pairs:
+        raise AssertionError(
+            f"N_EVAL={N_EVAL} nhưng vẫn tách ra {len(eval_pairs)} dòng eval — "
+            "kiểm lại, file eval_n8n.jsonl không được ghi từ đây."
+        )
 
     print(f"✓ {train_path} — {len(train_pairs)} cặp train")
-    print(f"✓ {eval_path} — {len(eval_pairs)} template giữ làm benchmark")
+    print("  eval n8n do make_n8n_eval.py sinh riêng (không cắt khỏi tập train)")
     if skipped:
         print(f"\nBỏ qua {len(skipped)} template:")
         for stem, reason in skipped:
