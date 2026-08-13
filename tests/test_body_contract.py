@@ -172,6 +172,128 @@ def test_inventory_gia_tri_null_van_doc_duoc():
 
 
 # ---------------------------------------------------------------------------
+# Công nợ / thuế suất / đối chiếu hai kỳ — ba màn hình mới của Body
+# ---------------------------------------------------------------------------
+
+def test_partner_audit_nhan_dung_hinh_dang_body_gui():
+    """Payload đúng như `auditPartners()` trong brain.ts dựng ra."""
+    resp = client.post("/tools/partner-audit", json={
+        "customers": [
+            {"code": "KH00001", "name": "CÔNG TY CỔ PHẦN 479 HOÀ BÌNH",
+             "balance": 1_129_540_864, "tax_id": "2900325124"},
+            {"code": "KH00021", "name": "CÔNG TY TNHH THƯƠNG MẠI VÀ DỊCH VỤ PHƯƠNG",
+             "balance": -28_962_041, "tax_id": "0106172584"},
+        ],
+        "suppliers": [
+            {"code": "KH00021", "name": "CÔNG TY TNHH THƯƠNG MẠI VÀ DỊCH VỤ PHƯƠNG",
+             "balance": 0, "tax_id": "0106172584"},
+        ],
+        "cogs_per_day": 35_128_650,
+    })
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    kinds = {f["kind"] for f in body["findings"]}
+    assert "negative_receivable" in kinds
+    assert "partner_both_roles" in kinds
+    assert body["summary"]["tổng_phải_thu"] == 1_129_540_864
+    # Body hiển thị dòng này; mất nó là người đọc tưởng đã có phân tích tuổi nợ.
+    assert body["summary"]["không_phân_tích_được"]
+
+
+def test_partner_so_du_null_KHONG_bi_coi_la_0():
+    """Cùng nguyên tắc với giá vốn: chưa biết khác không."""
+    resp = client.post("/tools/partner-audit", json={
+        "customers": [{"code": "KH1", "name": "CÔNG TY A", "tax_id": "0109527605"}],
+    })
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["summary"]["tổng_phải_thu"] == 0
+    assert "negative_receivable" not in {f["kind"] for f in resp.json()["findings"]}
+
+
+def test_vat_catalog_nhan_dung_hinh_dang_body_gui():
+    resp = client.post("/tools/vat-catalog-audit", json={
+        "products": [
+            {"code": "VT00001", "name": "Dầu nhớt động cơ 4 kỳ SJ-40 (0.8Lx24)",
+             "vat_flag": "Chưa xác định", "group": "HH", "unit": "Lít"},
+            {"code": "KM00025", "name": "Bia 333", "vat_flag": "Chưa xác định"},
+        ],
+    })
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["summary"]["hiệu_lực_đến"] == "2026-12-31"
+    assert "174/2025" in body["summary"]["căn_cứ"]
+    kinds = {f["kind"] for f in body["findings"]}
+    assert "vat_reduction_missed" in kinds     # dầu nhớt -> 8%
+    assert "vat_rate_review" in kinds          # bia -> giữ 10%
+
+
+def test_period_diff_nhan_dung_hinh_dang_body_gui():
+    """Payload đúng như `comparePeriods()` dựng từ hai kết quả import."""
+    def ky(out_qty, out_value, closing_qty, closing_value, den):
+        return {
+            "warehouse": "KHO HÀNG HÓA",
+            "period_start": "2026-01-01", "period_end": den,
+            "lines": [{
+                "code": "VT00059", "name": "Diesel CI4/SL 15W40", "unit": "Lít",
+                "opening_qty": 87, "opening_value": 5_016_459,
+                "in_qty": 4400, "in_value": 254_755_000,
+                "out_qty": out_qty, "out_value": out_value,
+                "closing_qty": closing_qty, "closing_value": closing_value,
+            }],
+        }
+
+    resp = client.post("/tools/period-diff", json={
+        "truoc": ky(4508, 260_989_815, -21, -1_218_356, "2026-07-24"),
+        "sau": ky(4400, 254_723_980, 87, 5_047_479, "2026-08-11"),
+    })
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["warnings"] == []
+    assert body["summary"]["có_sửa_hồi_tố"] is True
+    assert body["findings"][0]["kind"] == "history_decreased"
+    assert body["findings"][0]["money_impact"] == 6_265_835
+
+
+def test_period_diff_tu_choi_so_thi_bao_bang_warnings_chu_khong_500():
+    """Body dựa vào `warnings` khác rỗng để hiện khối 'chưa kiểm được'."""
+    mot_ky = {"lines": [{"code": "A"}], "warehouse": "KHO A",
+              "period_start": "2026-01-01", "period_end": "2026-06-30"}
+    khac_kho = {**mot_ky, "warehouse": "KHO B", "period_end": "2026-08-11"}
+    resp = client.post("/tools/period-diff", json={"truoc": mot_ky, "sau": khac_kho})
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["findings"] == []
+    assert body["warnings"] and body["summary"]["so_sánh_được"] is False
+
+
+def test_moi_phat_hien_deu_cung_hinh_dang_du_den_tu_tool_nao():
+    """
+    Body dùng MỘT component `FindingList` cho cả bốn lớp kiểm. Lệch một trường
+    ở bất kỳ tool nào là màn hình đó hiện ra ô trống mà không báo lỗi gì.
+    """
+    truong = {"kind", "severity", "code", "product", "unit", "title",
+              "evidence", "money_impact", "suggestion"}
+
+    goi = [
+        ("/tools/inventory-audit",
+         {"lines": [{"code": "A", "opening_qty": 0, "in_qty": 0, "out_qty": 5,
+                     "closing_qty": -5, "closing_value": -100.0,
+                     "opening_value": 0.0, "in_value": 0.0, "out_value": 100.0}]}),
+        ("/tools/partner-audit",
+         {"customers": [{"code": "K", "name": "CÔNG TY A", "balance": -5_000,
+                         "tax_id": "0109527604"}]}),
+        ("/tools/vat-catalog-audit",
+         {"products": [{"code": "P", "name": "Dầu nhớt động cơ",
+                        "vat_flag": "Chưa xác định"}]}),
+    ]
+    for path, payload in goi:
+        body = client.post(path, json=payload).json()
+        assert body["findings"], f"{path} không trả phát hiện nào để kiểm hình dạng"
+        for f in body["findings"]:
+            assert set(f) == truong, f"{path} lệch trường: {set(f) ^ truong}"
+
+
+# ---------------------------------------------------------------------------
 # /chat — BẤT ĐỒNG BỘ. Đây là chỗ Body suýt hỏng im lặng.
 # ---------------------------------------------------------------------------
 

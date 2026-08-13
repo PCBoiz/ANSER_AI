@@ -1,15 +1,28 @@
 """
 MCPServer — lớp tính toán tài chính DETERMINISTIC (KHÔNG dùng LLM).
 
-Tính VAT theo Nghị định 72/2024/NĐ-CP và đối chiếu tổng hóa đơn bằng code thuần.
-Nguyên tắc deterministic-first: mọi số tiền dùng cho sổ sách phải đi qua đây;
-không tin số do LLM/VLM sinh ra mà không tính lại.
+Tính VAT và đối chiếu tổng hóa đơn bằng code thuần. Nguyên tắc
+deterministic-first: mọi số tiền dùng cho sổ sách phải đi qua đây; không tin số
+do LLM/VLM sinh ra mà không tính lại.
+
+MODULE NÀY CHỈ TÍNH, KHÔNG QUYẾT ĐỊNH DIỆN THUẾ
+-----------------------------------------------
+`is_reduced` là ĐẦU VÀO, không phải thứ suy ra ở đây. Việc một mặt hàng có
+thuộc diện giảm hay không là câu hỏi pháp lý theo từng mã hàng — thuộc về
+`src/core/vat_catalog.py`, nơi có bảng tra kèm căn cứ và biết trả lời "chưa
+xác định". Nhét bảng tra vào đây sẽ tạo bản sao thứ hai rồi để nó trôi khỏi bản
+gốc mỗi lần luật đổi (P4).
 """
 from decimal import ROUND_HALF_UP, Decimal
 
-# Thuế suất GTGT (VAT)
+# Thuế suất GTGT (VAT).
+#
+# Mức giảm 2% hiện hành theo Nghị quyết 204/2025/QH15 và Nghị định
+# 174/2025/NĐ-CP, áp dụng 01/7/2025 → 31/12/2026. Trước đó là Nghị định
+# 180/2024/NĐ-CP (và 72/2024 trước nữa) — hai bản đó có danh mục LOẠI TRỪ khác
+# hẳn bản hiện hành, nên đừng dùng lại căn cứ cũ cho hoá đơn của năm 2026.
 VAT_STANDARD = 0.10   # mức chuẩn (mặc định)
-VAT_REDUCED = 0.08    # mức giảm theo NĐ 72/2024
+VAT_REDUCED = 0.08    # mức giảm 2%
 
 
 def _round_vnd(amount: float) -> int:
@@ -22,7 +35,8 @@ class MCPServer:
     def calculate_vat(base_price: float, is_reduced: bool = False) -> dict:
         """
         Tính VAT cho một khoản tiền trước thuế.
-        MẶC ĐỊNH 10% (mức chuẩn); chỉ 8% khi is_reduced=True (diện giảm theo NĐ 72/2024).
+        MẶC ĐỊNH 10% (mức chuẩn); chỉ 8% khi is_reduced=True. Diện giảm do
+        `vat_catalog.phan_loai_thue_suat` xác định, không suy ở đây.
         """
         tax_rate = VAT_REDUCED if is_reduced else VAT_STANDARD
         base = _round_vnd(base_price)

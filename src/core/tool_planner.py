@@ -98,6 +98,51 @@ _RULES: list[tuple[str, re.Pattern[str], bool]] = [
         False,
     ),
     (
+        # CỐ Ý không bắt "công nợ" trần — cùng lý do với `report` và "doanh thu".
+        # "quy định CÔNG NỢ thanh toán bao nhiêu ngày" và "chính sách CÔNG NỢ bên
+        # mình" là câu tra TÀI LIỆU NỘI BỘ, không phải yêu cầu phân tích số dư.
+        # Kéo chúng vào đây thì câu trả lời đúng ("30 ngày, theo quy định đã nạp")
+        # bị thay bằng "tôi chưa có danh sách công nợ" — đổi một câu trả lời được
+        # thành một câu từ chối.
+        "partner_audit",
+        re.compile(
+            r"(soi|rà soát|rà|kiểm tra|kiểm|đối chiếu|phân tích|thống kê|tổng hợp)"
+            r"\s+\S{0,15}\s*(công nợ|phải thu|phải trả)"
+            r"|tổng (công nợ|phải thu|phải trả)"
+            r"|(công nợ|phải thu|phải trả)\s+(hiện (tại|nay|giờ)|bây giờ|đang|còn lại)"
+            r"|(công nợ|phải thu|phải trả) (là )?bao nhiêu"
+            r"|khách (hàng )?nào (còn |đang )?nợ|ai (đang |còn )?nợ (mình|em|tôi|công ty)"
+            r"|nợ (quá hạn|khó đòi|lâu (chưa|không) trả)"
+            r"|thu hồi (công )?nợ|đòi nợ|khách nào nợ nhiều"
+            r"|dư nợ (của |khách)|vốn lưu động"
+            r"|(mã số thuế|mst)\s+\S{0,10}\s*(sai|trùng|không hợp lệ|kiểm)",
+            re.IGNORECASE,
+        ),
+        False,
+    ),
+    (
+        # Đặt TRƯỚC `vat` và viết chặt hơn hẳn: đây là câu về DANH MỤC hàng hoá
+        # ("mặt hàng nào 8%"), còn `vat` là tính thuế trên một số tiền cụ thể.
+        # Hai luật cùng khớp thì không sao — `_PIPELINE` cho cả hai chạy, và
+        # chúng trả lời hai nửa khác nhau của cùng một câu hỏi.
+        #
+        # Mọi nhánh đều buộc phải có TỪ CHỈ HÀNG HOÁ. Thiếu ràng buộc đó thì
+        # "doanh nghiệp nhỏ có được giảm thuế không" — một câu tra luật — bị kéo
+        # vào tool đối chiếu danh mục.
+        "vat_catalog_audit",
+        re.compile(
+            r"(thuế suất|thuế gtgt|vat)"
+            r".{0,25}(mặt hàng|hàng hoá|hàng hóa|danh mục|mã hàng|sản phẩm)"
+            r"|(mặt hàng|hàng hoá|hàng hóa|dầu nhớt|dầu nhờn|mã hàng|sản phẩm)"
+            r".{0,30}(được giảm|mấy phần trăm|bao nhiêu phần trăm|8%|10%)"
+            r"|8% hay 10%|10% hay 8%"
+            r"|gắn cờ thuế|cờ thuế|áp (sai |nhầm )?thuế suất"
+            r"|(soi|rà soát|rà|kiểm tra|đối chiếu).{0,15}(thuế suất|cờ thuế)",
+            re.IGNORECASE,
+        ),
+        False,
+    ),
+    (
         "vat",
         re.compile(r"thuế|vat|gtgt", re.IGNORECASE),
         True,   # phải có số tiền, nếu không thì là câu tra luật -> RETRIEVAL
@@ -107,7 +152,8 @@ _RULES: list[tuple[str, re.Pattern[str], bool]] = [
 # Thứ tự chạy cố định, KHÔNG theo thứ tự chữ trong câu hỏi. "Có nên nhập thêm
 # không, tháng này lãi bao nhiêu" phải chạy `report` trước `forecast_reorder`
 # giống hệt câu hỏi ngược lại — cùng một ý định thì cùng một đường đi.
-_PIPELINE = ["inventory_audit", "report", "forecast_reorder", "carrier_selection", "vat"]
+_PIPELINE = ["inventory_audit", "partner_audit", "vat_catalog_audit", "report",
+             "forecast_reorder", "carrier_selection", "vat"]
 
 # Trần số tool một câu hỏi được kích hoạt. `DEFAULT_MAX_STEPS` là 4 và bước cuối
 # phải dành cho việc viết câu trả lời.
@@ -127,6 +173,8 @@ SYSTEM_DATA_FIELDS: dict[str, tuple[str, ...]] = {
     "inventory_audit": ("lines",),
     "forecast_reorder": ("items",),
     "carrier_selection": ("carriers", "offers"),
+    "partner_audit": ("customers", "suppliers"),
+    "vat_catalog_audit": ("products",),
 }
 
 # Dẫn xuất, không viết tay lần hai (P4).

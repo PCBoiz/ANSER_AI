@@ -14,7 +14,7 @@ from src.core.tool_planner import (
 )
 
 TAT_CA = ["quote", "carrier_selection", "forecast_reorder", "vat", "report",
-          "inventory_audit"]
+          "inventory_audit", "partner_audit", "vat_catalog_audit"]
 
 
 def ke_hoach(cau: str) -> list[str]:
@@ -112,8 +112,70 @@ def test_khong_truyen_available_thi_khong_loc():
 def test_tool_can_du_lieu_he_thong():
     assert needs_system_data("report")
     assert needs_system_data("inventory_audit")
+    assert needs_system_data("partner_audit")
+    assert needs_system_data("vat_catalog_audit")
     # `vat` suy được từ chính lời người dùng nên KHÔNG cần bơm dữ liệu.
     assert not needs_system_data("vat")
+
+
+# --------------------------------------------------------------------------
+# partner_audit — phân biệt câu PHÂN TÍCH SỐ DƯ với câu TRA TÀI LIỆU
+# --------------------------------------------------------------------------
+
+def test_cau_phan_tich_cong_no_thi_khop():
+    for cau in [
+        "soi công nợ giúp tôi",
+        "rà soát công nợ khách hàng",
+        "tổng phải thu hiện tại",
+        "công nợ hiện tại bao nhiêu",
+        "khách nào còn nợ nhiều nhất",
+        "ai đang nợ mình",
+        "thu hồi công nợ thế nào",
+        "vốn lưu động đang kẹt bao nhiêu",
+    ]:
+        assert "partner_audit" in ke_hoach(cau), cau
+
+
+def test_cau_tra_TAI_LIEU_ve_cong_no_thi_KHONG_khop():
+    """
+    Hai câu này từng làm hỏng test định tuyến thật khi luật còn bắt 'công nợ'
+    trần. Chúng hỏi về QUY ĐỊNH đã nạp trong kho tài liệu, và câu trả lời đúng
+    là '30 ngày' — kéo vào tool phân tích số dư thì đổi thành 'tôi chưa có
+    danh sách công nợ'.
+    """
+    assert ke_hoach("quy định công nợ thanh toán bao nhiêu ngày") == []
+    assert ke_hoach("chính sách công nợ bên mình quy định thế nào") == []
+    assert ke_hoach("quy trình đối soát công nợ của công ty là gì") == []
+
+
+# --------------------------------------------------------------------------
+# vat_catalog_audit — phân biệt câu về DANH MỤC với câu tra LUẬT chung
+# --------------------------------------------------------------------------
+
+def test_cau_ve_thue_suat_mat_hang_thi_khop():
+    for cau in [
+        "dầu nhớt được giảm thuế còn mấy phần trăm",
+        "mặt hàng nào còn được giảm 8%",
+        "thuế suất của mã hàng này là bao nhiêu",
+        "hàng hóa bên mình 8% hay 10%",
+        "gắn cờ thuế cho danh mục chưa",
+        "rà soát thuế suất giúp tôi",
+    ]:
+        assert "vat_catalog_audit" in ke_hoach(cau), cau
+
+
+def test_cau_tra_LUAT_chung_ve_thue_thi_KHONG_khop_danh_muc():
+    """
+    Không có từ chỉ hàng hoá thì đây là câu tra luật — thuộc về RETRIEVAL, chứ
+    không phải tool đối chiếu danh mục của riêng doanh nghiệp này.
+    """
+    assert "vat_catalog_audit" not in ke_hoach("doanh nghiệp nhỏ có được giảm thuế không")
+    assert "vat_catalog_audit" not in ke_hoach("thuế thu nhập doanh nghiệp bao nhiêu phần trăm")
+
+
+def test_cau_TINH_thue_van_ve_vat_chu_khong_ve_danh_muc():
+    """`vat` tính trên một số tiền; `vat_catalog_audit` tra diện thuế của mã hàng."""
+    assert ke_hoach("tiền thuế của 5.000.000 đồng là bao nhiêu") == ["vat"]
 
 
 def test_moi_tool_can_du_lieu_deu_co_that_trong_manifest():

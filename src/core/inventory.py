@@ -49,6 +49,8 @@ from dataclasses import dataclass
 from datetime import date
 from typing import Any, Optional
 
+from src.core.findings import finding
+
 # --- Dung sai -------------------------------------------------------------
 # Phần mềm kế toán làm tròn đến đồng; đừng báo lỗi vì chênh 1 đồng.
 _QTY_TOL = 0.01
@@ -122,17 +124,13 @@ def _finding(
     money_impact: Optional[float] = None,
 ) -> dict[str, Any]:
     """Một phát hiện luôn kèm bằng chứng số để chủ DN đối chiếu tay được."""
-    return {
-        "kind": kind,
-        "severity": severity,
-        "code": line.code if line else None,
-        "product": line.label() if line else None,
-        "unit": line.unit if line else None,
-        "title": title,
-        "evidence": evidence,
-        "money_impact": None if money_impact is None else round(money_impact),
-        "suggestion": suggestion,
-    }
+    return finding(
+        kind, severity, title, evidence, suggestion,
+        code=line.code if line else None,
+        product=line.label() if line else None,
+        unit=line.unit if line else None,
+        money_impact=money_impact,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -172,19 +170,66 @@ def _check_balance(line: InventoryLine) -> list[dict[str, Any]]:
     return out
 
 
+def _don_gia_quy_doi(line: InventoryLine) -> tuple[Optional[float], str]:
+    """
+    Đơn giá đáng tin nhất để quy một số lượng ra tiền, kèm TÊN NGUỒN.
+
+    Trả kèm nguồn để người đọc báo cáo tự kiểm lại được — một con số tiền không
+    nói nó lấy đơn giá ở đâu thì không đối chiếu tay được.
+    """
+    for gia, nguon in (
+        (line.in_unit(), "giá nhập bình quân trong kỳ"),
+        (line.opening_unit(), "giá vốn tồn đầu kỳ"),
+        (line.out_unit(), "giá vốn bình quân đã xuất"),
+    ):
+        if gia is not None and gia > 0:
+            return gia, nguon
+    return None, ""
+
+
 def _check_negative(line: InventoryLine) -> list[dict[str, Any]]:
-    """Tồn cuối âm = đã xuất nhiều hơn số thực có. Luôn là lỗi thật."""
+    """
+    Tồn cuối âm = đã xuất nhiều hơn số thực có. Luôn là lỗi thật.
+
+    Hai kiểu âm khác nhau về hậu quả, nên phải nói khác nhau:
+
+    * giá trị cuối kỳ ÂM — phần xuất vượt đã được tính giá vốn, sổ treo một số
+      âm. Nhìn là thấy.
+    * giá trị cuối kỳ BẰNG 0 — phần xuất vượt được ghi giá vốn 0. Nguy hiểm hơn
+      hẳn vì báo cáo lãi lỗ trông vẫn bình thường, chỉ có lãi gộp cao lên đúng
+      bằng phần giá vốn bị bỏ. Bản trước trả money_impact=None cho đúng trường
+      hợp này (`if line.closing_value` coi 0.0 là rỗng), tức là im lặng ở chỗ
+      đáng nói nhất.
+    """
     if line.closing_qty >= -_QTY_TOL:
         return []
-    return [_finding(
-        "negative_stock", "cao", line,
-        "Tồn kho âm — xuất nhiều hơn số có",
-        {"đầu_kỳ": line.opening_qty, "nhập": line.in_qty, "xuất": line.out_qty,
-         "cuối_kỳ": line.closing_qty, "thiếu": round(abs(line.closing_qty), 2)},
-        "Thiếu phiếu nhập chưa vào sổ, hoặc sai quy đổi đơn vị (phuy/can → lít). "
-        "Đối chiếu phiếu nhập với nhà cung cấp trong kỳ.",
-        money_impact=abs(line.closing_value) if line.closing_value else None,
-    )]
+
+    thieu = abs(line.closing_qty)
+    bang_chung: dict[str, Any] = {
+        "đầu_kỳ": line.opening_qty, "nhập": line.in_qty, "xuất": line.out_qty,
+        "cuối_kỳ": line.closing_qty, "thiếu": round(thieu, 2),
+    }
+    goi_y = ("Thiếu phiếu nhập chưa vào sổ, hoặc sai quy đổi đơn vị (phuy/can → lít). "
+             "Đối chiếu phiếu nhập với nhà cung cấp trong kỳ.")
+    tieu_de = "Tồn kho âm — xuất nhiều hơn số có"
+    tien: Optional[float] = None
+
+    if line.closing_value is not None and line.closing_value < -_VALUE_TOL:
+        tien = abs(line.closing_value)
+    else:
+        don_gia, nguon = _don_gia_quy_doi(line)
+        if don_gia is not None:
+            tien = thieu * don_gia
+            bang_chung["đơn_giá_quy_đổi"] = round(don_gia)
+            bang_chung["nguồn_đơn_giá"] = nguon
+            tieu_de = "Tồn kho âm, phần xuất vượt chưa được ghi giá vốn"
+            goi_y = (
+                f"{thieu:g} {line.unit or 'đơn vị'} đã xuất nhưng sổ ghi giá vốn 0 — "
+                f"lãi gộp đang cao hơn thực tế khoảng {round(tien):,}đ. " + goi_y
+            )
+
+    return [_finding("negative_stock", "cao", line, tieu_de, bang_chung, goi_y,
+                     money_impact=tien)]
 
 
 def _check_value_sign(line: InventoryLine) -> list[dict[str, Any]]:

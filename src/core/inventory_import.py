@@ -26,12 +26,12 @@ Không lớp nào tự sửa dữ liệu. Lệch thì báo, để người quy�
 from __future__ import annotations
 
 import re
-import unicodedata
 from dataclasses import dataclass, field
 from io import BytesIO
 from typing import Any, Optional
 
 from src.core.inventory import InventoryLine
+from src.core.utils import bo_dau
 
 # Dung sai khi đối chiếu — kế toán làm tròn đến đồng.
 _VALUE_TOL = 2.0
@@ -54,11 +54,7 @@ _SUBS = {"so luong": "qty", "gia tri": "value", "don gia": "unit"}
 
 def _norm(value: Any) -> str:
     """Bỏ dấu, gộp khoảng trắng, hạ chữ thường — để so khớp tên cột."""
-    text = "" if value is None else str(value)
-    text = unicodedata.normalize("NFD", text)
-    text = "".join(c for c in text if unicodedata.category(c) != "Mn")
-    text = text.replace("đ", "d").replace("Đ", "D")
-    return re.sub(r"\s+", " ", text).strip().lower()
+    return bo_dau(value)
 
 
 def parse_vn_number(value: Any) -> Optional[float]:

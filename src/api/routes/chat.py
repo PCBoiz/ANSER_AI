@@ -229,6 +229,17 @@ _CHUA_CO_NGUON = {
         "biết các nhà xe đang cân nhắc và giá mỗi bên báo, tôi xếp hạng theo "
         "giá, khoảng cách bãi, công nợ, tỷ lệ đúng hẹn."
     ),
+    "partner_audit": (
+        "Tôi chưa có danh sách công nợ để soi. Bạn xuất Danh sách khách hàng "
+        "(và Danh sách nhà cung cấp) từ phần mềm kế toán ra file Excel rồi tải "
+        "lên — tôi chỉ ra ngay khách nào đang giữ nhiều tiền nhất, chỗ nào số dư "
+        "ngược dấu, và đối tác nào vừa mua vừa bán để bù trừ được."
+    ),
+    "vat_catalog_audit": (
+        "Tôi chưa có danh mục hàng hoá để đối chiếu thuế suất. Bạn xuất Danh "
+        "sách hàng hóa, dịch vụ từ phần mềm kế toán ra file Excel rồi tải lên — "
+        "tôi soát từng mã xem đang để 8% hay 10% có khớp Nghị định 174/2025 không."
+    ),
 }
 
 

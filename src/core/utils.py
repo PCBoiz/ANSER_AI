@@ -1,7 +1,27 @@
 import json
+import re
+import unicodedata
 from typing import Any, Optional
 
 import httpx
+
+
+def bo_dau(value: Any) -> str:
+    """
+    Bỏ dấu tiếng Việt, gộp khoảng trắng, hạ chữ thường.
+
+    Dùng để SO KHỚP (tên cột Excel, từ khoá trong tên hàng), không dùng để hiển
+    thị. 'Đơn giá BQ' và 'don gia bq' phải khớp nhau vì mỗi phần mềm kế toán đặt
+    tên cột một kiểu.
+
+    Nằm ở đây vì ba module nhập liệu đều cần: inventory_import, partner_import,
+    vat_catalog. Trước đó mỗi module giữ một bản y hệt.
+    """
+    text = "" if value is None else str(value)
+    text = unicodedata.normalize("NFD", text)
+    text = "".join(c for c in text if unicodedata.category(c) != "Mn")
+    text = text.replace("đ", "d").replace("Đ", "D")
+    return re.sub(r"\s+", " ", text).strip().lower()
 
 
 class HttpClientPool:

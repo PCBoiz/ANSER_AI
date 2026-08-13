@@ -38,12 +38,33 @@ from src.core import carrier_selection as cs
 from src.core import forecasting as fc
 from src.core import inventory as inv
 from src.core import inventory_import as inv_import
+from src.core import partner_import as pi
+from src.core import period_diff as pdiff
+from src.core import receivables as rcv
 from src.core import reporting as rp
+from src.core import vat_catalog as vc
 from src.core.mcp_server import MCPServer
 from src.core.pricing import PricingRule, Surcharge, compute_quote
 
 logger = logging.getLogger("projecta.api.tools")
 router = APIRouter(prefix="/tools")
+
+
+async def _doc_file(request: Request, file: UploadFile) -> bytes:
+    """
+    Đọc file tải lên vào bộ nhớ, chặn hai lần theo kích thước.
+
+    Kiểm `content-length` trước để từ chối sớm, rồi kiểm lại độ dài thật vì
+    header đó do client gửi và hoàn toàn có thể nói dối. File KHÔNG ghi ra đĩa:
+    sổ sách của khách không nằm lại trên máy Brain (P2 — Brain có thể đang chạy
+    trên GPU thuê).
+    """
+    if int(request.headers.get("content-length") or "0") > MAX_UPLOAD_BYTES:
+        raise HTTPException(status_code=413, detail="File quá lớn")
+    data = await file.read()
+    if len(data) > MAX_UPLOAD_BYTES:
+        raise HTTPException(status_code=413, detail="File quá lớn")
+    return data
 
 
 # ===========================================================================
@@ -123,7 +144,11 @@ class ForecastRequest(BaseModel):
 
 
 class VatRequest(BaseModel):
-    """POST /tools/vat — VAT NĐ 72/2024, bọc MCPServer sẵn có."""
+    """POST /tools/vat — tính lại tổng hoá đơn, bọc MCPServer sẵn có.
+
+    `is_reduced_vat` là đầu vào của tool này. Muốn biết một mã hàng có thuộc
+    diện giảm không thì hỏi `vat_catalog_audit` — nơi giữ bảng tra kèm căn cứ.
+    """
     items: list[dict]
     stated_total: float
     default_is_reduced: bool = False
@@ -175,6 +200,59 @@ class InventoryAuditRequest(BaseModel):
     warehouse: str = ""
     period_start: Optional[str] = Field(None, description="YYYY-MM-DD")
     period_end: Optional[str] = Field(None, description="YYYY-MM-DD")
+
+
+class PartnerIn(BaseModel):
+    """Một dòng DANH SÁCH KHÁCH HÀNG hoặc NHÀ CUNG CẤP."""
+    code: str
+    name: str = ""
+    address: str = ""
+    balance: Optional[float] = Field(
+        None, description="Số dư công nợ. Bỏ trống = CHƯA BIẾT, không phải 0"
+    )
+    tax_id: str = ""
+    phone: str = ""
+
+
+class PartnerAuditRequest(BaseModel):
+    """POST /tools/partner-audit — soi công nợ từ số dư đối tác."""
+    customers: list[PartnerIn] = []
+    suppliers: list[PartnerIn] = []
+    cogs_per_day: Optional[float] = Field(
+        None, gt=0,
+        description="Giá vốn bán ra mỗi ngày, để quy phải thu ra số ngày. "
+                    "Bỏ trống thì bỏ qua phép kiểm đó chứ không đoán.",
+    )
+
+
+class ProductIn(BaseModel):
+    """Một dòng DANH SÁCH HÀNG HÓA, DỊCH VỤ."""
+    code: str
+    name: str = ""
+    vat_flag: str = Field("", description="Cột 'Giảm 2% thuế suất thuế GTGT' của MISA")
+    group: str = ""
+    unit: str = ""
+    qty: Optional[float] = None
+    value: Optional[float] = None
+
+
+class VatCatalogRequest(BaseModel):
+    """POST /tools/vat-catalog-audit — đối chiếu cờ thuế với Nghị định 174/2025."""
+    products: list[ProductIn]
+
+
+class PeriodSideIn(BaseModel):
+    """Một lần xuất báo cáo tồn kho, kèm kỳ và kho của chính nó."""
+    lines: list[InventoryLineIn]
+    warehouse: str = ""
+    period_start: Optional[str] = Field(None, description="YYYY-MM-DD")
+    period_end: Optional[str] = Field(None, description="YYYY-MM-DD")
+
+
+class PeriodDiffRequest(BaseModel):
+    """POST /tools/period-diff — so hai lần xuất CÙNG một kỳ."""
+    truoc: PeriodSideIn = Field(..., description="Bản xuất SỚM hơn")
+    sau: PeriodSideIn = Field(..., description="Bản xuất MUỘN hơn")
 
 
 # ===========================================================================
@@ -337,13 +415,7 @@ async def tool_inventory_import(
     vì chúng vẫn cân đối với nhau ở cột bên cạnh.
     """
     require_api_token(x_api_token)
-
-    content_length = int(request.headers.get("content-length") or "0")
-    if content_length > MAX_UPLOAD_BYTES:
-        raise HTTPException(status_code=413, detail="File quá lớn")
-    data = await file.read()
-    if len(data) > MAX_UPLOAD_BYTES:
-        raise HTTPException(status_code=413, detail="File quá lớn")
+    data = await _doc_file(request, file)
 
     try:
         res = inv_import.load_xlsx_bytes(data, sheet=sheet)
@@ -403,6 +475,167 @@ async def tool_inventory_import(
     return payload
 
 
+@router.post("/partner-audit")
+async def tool_partner_audit(
+    req: PartnerAuditRequest, x_api_token: Optional[str] = Header(None)
+):
+    """
+    Soi công nợ từ số dư khách hàng và nhà cung cấp.
+
+    Với doanh nghiệp phân phối, tiền nằm ở khách thường NHIỀU HƠN tiền nằm ở
+    kho — số thật của khách đầu tiên: phải thu 3,96 tỷ so với tồn kho 2,87 tỷ.
+    Phần mềm kế toán trình bày công nợ dưới dạng danh sách, mà danh sách thì
+    không cho thấy hai khách đang giữ 56% số tiền chưa về.
+
+    Không tính được tuổi nợ vì số dư không kèm ngày hoá đơn; giới hạn đó được
+    ghi thẳng trong `summary.không_phân_tích_được`.
+    """
+    require_api_token(x_api_token)
+    try:
+        return rcv.audit_partners(
+            [pi.Partner(**p.model_dump(), role=pi.KHACH_HANG) for p in req.customers],
+            [pi.Partner(**p.model_dump(), role=pi.NHA_CUNG_CAP) for p in req.suppliers],
+            gia_von_moi_ngay=req.cogs_per_day,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+
+
+@router.post("/vat-catalog-audit")
+async def tool_vat_catalog_audit(
+    req: VatCatalogRequest, x_api_token: Optional[str] = Header(None)
+):
+    """
+    Đối chiếu cờ 'Giảm 2% thuế suất thuế GTGT' trong danh mục với quy định hiện hành.
+
+    Nghị định 174/2025/NĐ-CP đã bỏ 'sản phẩm dầu mỏ tinh chế' — trong đó có dầu
+    mỡ bôi trơn — khỏi danh mục KHÔNG được giảm, hiệu lực 01/7/2025 đến hết
+    31/12/2026. Nhiều năm trước nhóm này chịu 10%, nên thói quen cũ đang dẫn
+    tới thuế suất sai.
+
+    Tool ĐỀ XUẤT, không quyết định: mã nào bảng tra không chắc thì nói thẳng là
+    cần kế toán xác nhận, và mọi kết luận đều kèm căn cứ để kiểm lại.
+    """
+    require_api_token(x_api_token)
+    try:
+        return vc.audit_vat_catalog([vc.SanPham(**p.model_dump()) for p in req.products])
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+
+
+@router.post("/period-diff")
+async def tool_period_diff(
+    req: PeriodDiffRequest, x_api_token: Optional[str] = Header(None)
+):
+    """
+    So HAI lần xuất cùng một kỳ để tìm chứng từ bị sửa sau khi đã báo cáo.
+
+    CỐ Ý KHÔNG NẰM TRONG MANIFEST, cùng lý do với /tools/inventory-import: tool
+    này cần hai bản báo cáo của hai thời điểm khác nhau. Model trong vòng
+    agentic không có cách nào lấy được bản xuất tháng trước — đưa vào manifest
+    là quảng cáo một tool mà mọi lần gọi đều thiếu dữ liệu.
+
+    Đường đi của nó là Body -> Brain: người dùng chọn hai file đã tải lên.
+    """
+    require_api_token(x_api_token)
+
+    def _dung(side: PeriodSideIn) -> inv_import.ParseResult:
+        return inv_import.ParseResult(
+            lines=[inv.InventoryLine(**ln.model_dump()) for ln in side.lines],
+            warehouse=side.warehouse,
+            period_start=side.period_start,
+            period_end=side.period_end,
+        )
+
+    try:
+        return pdiff.doi_chieu_hai_lan_xuat(_dung(req.truoc), _dung(req.sau))
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+
+
+@router.post("/partner-import")
+async def tool_partner_import(
+    request: Request,
+    file: UploadFile = File(..., description="Danh sách khách hàng / nhà cung cấp MISA (.xlsx)"),
+    sheet: Optional[str] = Form(None),
+    role: str = Form("", description="Bỏ trống thì tự đoán từ tiêu đề file"),
+    x_api_token: Optional[str] = Header(None),
+):
+    """
+    Nạp danh sách đối tác từ .xlsx rồi soi công nợ luôn — một lần gửi file.
+
+    Cùng nguyên tắc với inventory-import: file KHÔNG ghi ra đĩa (P2), và đọc
+    hỏng thì KHÔNG soi. Ở bảng này lớp tự kiểm là cột STT, vì dòng 'Tổng' của
+    MISA bỏ trống mọi cột số nên không đối chiếu tổng được.
+    """
+    require_api_token(x_api_token)
+    data = await _doc_file(request, file)
+    try:
+        res = pi.load_partners_xlsx_bytes(data, sheet=sheet, role=role.strip())
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc))
+
+    payload: dict[str, Any] = {
+        "import": {
+            "ok": res.ok, "file_name": file.filename, "role": res.role,
+            "rows_parsed": len(res.partners), "warnings": res.warnings,
+            "checks": res.checks,
+            "partners": [asdict(p) for p in res.partners],
+        },
+        "audit": None,
+        "audit_skipped_reason": None,
+    }
+    if not res.ok:
+        payload["audit_skipped_reason"] = (
+            "Chưa đọc chắc chắn được danh sách nên không soi công nợ — xem 'checks'. "
+            "Soi trên dữ liệu thiếu dòng sẽ cho ra tỷ lệ tập trung sai mà vẫn trông hợp lý."
+        )
+        return payload
+
+    khach = res.partners if res.role != pi.NHA_CUNG_CAP else []
+    ncc = res.partners if res.role == pi.NHA_CUNG_CAP else []
+    payload["audit"] = rcv.audit_partners(khach, ncc)
+    return payload
+
+
+@router.post("/product-import")
+async def tool_product_import(
+    request: Request,
+    file: UploadFile = File(..., description="Danh sách hàng hóa, dịch vụ MISA (.xlsx)"),
+    sheet: Optional[str] = Form(None),
+    x_api_token: Optional[str] = Header(None),
+):
+    """Nạp danh mục hàng hoá từ .xlsx rồi đối chiếu cờ thuế GTGT luôn."""
+    require_api_token(x_api_token)
+    data = await _doc_file(request, file)
+    try:
+        res = vc.load_products_xlsx_bytes(data, sheet=sheet)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc))
+
+    payload: dict[str, Any] = {
+        "import": {
+            "ok": res.ok, "file_name": file.filename,
+            "rows_parsed": len(res.products), "warnings": res.warnings,
+            "checks": res.checks,
+            "products": [asdict(p) for p in res.products],
+        },
+        "audit": None,
+        "audit_skipped_reason": None,
+    }
+    if not res.ok:
+        payload["audit_skipped_reason"] = (
+            "Chưa đọc chắc chắn được danh mục nên không đối chiếu thuế suất — xem 'checks'."
+        )
+        return payload
+    payload["audit"] = vc.audit_vat_catalog(res.products)
+    return payload
+
+
 # ===========================================================================
 # Manifest — nguồn cho agentic tool-calling và lớp MCP sau này
 # ===========================================================================
@@ -443,7 +676,11 @@ _TOOL_DEFS: list[dict[str, Any]] = [
         "name": "vat",
         "method": "POST",
         "path": "/tools/vat",
-        "description": "Tính lại tổng hoá đơn + VAT theo NĐ 72/2024 bằng code thuần.",
+        "description": (
+            "Tính lại tổng hoá đơn + VAT bằng code thuần từ đơn giá, số lượng và "
+            "diện thuế của từng dòng. Diện thuế là ĐẦU VÀO — dùng vat_catalog_audit "
+            "để biết mã hàng nào thuộc diện 8%."
+        ),
         "input_schema": VatRequest.model_json_schema(),
     },
     {
@@ -469,6 +706,32 @@ _TOOL_DEFS: list[dict[str, Any]] = [
         ),
         "input_schema": InventoryAuditRequest.model_json_schema(),
     },
+    {
+        "name": "partner_audit",
+        "method": "POST",
+        "path": "/tools/partner-audit",
+        "description": (
+            "Soi công nợ từ số dư khách hàng và nhà cung cấp: mức độ tập trung "
+            "(một khách giữ bao nhiêu phần trăm tiền chưa về), số dư ngược dấu, "
+            "đối tác vừa mua vừa bán có thể bù trừ, mã số thuế sai hoặc trùng, "
+            "phải thu quy ra bao nhiêu ngày giá vốn. KHÔNG tính được tuổi nợ vì "
+            "số dư không kèm ngày hoá đơn."
+        ),
+        "input_schema": PartnerAuditRequest.model_json_schema(),
+    },
+    {
+        "name": "vat_catalog_audit",
+        "method": "POST",
+        "path": "/tools/vat-catalog-audit",
+        "description": (
+            "Đối chiếu cờ 'Giảm 2% thuế suất thuế GTGT' của từng mã hàng với "
+            "Nghị quyết 204/2025/QH15 và Nghị định 174/2025/NĐ-CP (hiệu lực "
+            "01/7/2025 đến 31/12/2026). Chỉ ra mã nào thuộc diện 8%, mã nào giữ "
+            "10%, mã nào cần kế toán xác nhận. Là ĐỀ XUẤT kèm căn cứ, không phải "
+            "quyết định thay kế toán."
+        ),
+        "input_schema": VatCatalogRequest.model_json_schema(),
+    },
 ]
 
 
@@ -493,6 +756,8 @@ _TOOL_IMPL: dict[str, tuple[type[BaseModel], Any]] = {
     "vat": (VatRequest, tool_vat),
     "report": (ReportRequestIn, tool_report),
     "inventory_audit": (InventoryAuditRequest, tool_inventory_audit),
+    "partner_audit": (PartnerAuditRequest, tool_partner_audit),
+    "vat_catalog_audit": (VatCatalogRequest, tool_vat_catalog_audit),
 }
 
 

@@ -129,9 +129,24 @@ def test_manifest_lists_all_tools_with_schemas():
     body = resp.json()
     names = {t["name"] for t in body["tools"]}
     assert names == {"quote", "carrier_selection", "forecast_reorder", "vat",
-                     "report", "inventory_audit"}
+                     "report", "inventory_audit", "partner_audit",
+                     "vat_catalog_audit"}
     for t in body["tools"]:
         assert t["input_schema"].get("properties"), f"tool {t['name']} thiếu schema"
+
+
+def test_tool_nhan_FILE_khong_duoc_nam_trong_manifest():
+    """
+    Manifest là danh mục cho model và cho MCP client. Model không sinh ra được
+    một file upload, và `period_diff` cần HAI bản báo cáo của hai thời điểm —
+    thứ chỉ giao diện mới có. Quảng cáo chúng ở đây là hứa một tool mà mọi lần
+    gọi đều hỏng.
+    """
+    names = {t["name"] for t in client.get("/tools").json()["tools"]}
+    assert "inventory_import" not in names
+    assert "partner_import" not in names
+    assert "product_import" not in names
+    assert "period_diff" not in names
 
 
 def test_tools_quote_endpoint():
