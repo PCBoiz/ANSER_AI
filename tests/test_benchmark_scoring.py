@@ -10,14 +10,19 @@ Mẫu dùng ở đây lấy NGUYÊN VĂN từ báo cáo hỏng, không phải b�
 
 from __future__ import annotations
 
+import json
+
 import pytest
 
 from offline_training.benchmark_v3 import (
+    kiem_ket_qua,
     parse_outputs,
     score_agent,
+    score_n8n,
     score_narration,
     score_planner,
     tach_tool_tu_json_cut,
+    tran_token,
 )
 
 # Nguyên văn hai mẫu trong tuned_report — JSON hợp lệ, đứt giữa chừng vì chạm
@@ -335,6 +340,153 @@ def test_agent_per_row_bat_duoc_ca_hong():
     rows = [{"_id": "A1", "ask_back": True}]
     kq = score_agent(rows, ['{"thought": "x", "tool": "report", "arguments": {}}'])
     assert kq["per_row"] == [False], "gọi tool khi thiếu dữ kiện = trượt"
+
+
+# ---------------------------------------------------------------------------
+# Nhánh n8n — trước 15/08/2026 nó ghi nhầm dữ liệu của extraction vào file JSON
+# ---------------------------------------------------------------------------
+
+def _workflow_hop_le() -> str:
+    return json.dumps({
+        "action": "create_workflow",
+        "name": "Cảnh báo tồn kho",
+        "payload": {
+            "nodes": [
+                {"name": "Mỗi 4 tiếng", "type": "n8n-nodes-base.scheduleTrigger",
+                 "typeVersion": 1.2, "position": [0, 0], "parameters": {}},
+                {"name": "Gọi API", "type": "n8n-nodes-base.httpRequest",
+                 "typeVersion": 4.2, "position": [220, 0],
+                 "parameters": {"url": "https://x/y", "method": "GET"}},
+            ],
+            "connections": {
+                "Mỗi 4 tiếng": {
+                    "main": [[{"node": "Gọi API", "type": "main", "index": 0}]]
+                }
+            },
+        },
+    }, ensure_ascii=False)
+
+
+def test_n8n_tra_ve_ket_qua_tung_cau_cua_CHINH_NO():
+    """
+    Bản cũ đếm `n_valid` tại chỗ trong `main()` rồi ghi
+    `ket_qua_chay["n8n"] = result` — mà khối n8n KHÔNG hề gán `result`. Biến đó
+    còn sót từ khối extraction ngay trên, nên mục "n8n" trong file JSON là bản
+    sao y của extraction: n=98, row_ids `EX0228...`, per_field origin/destination.
+
+    Báo cáo .txt vẫn in đúng vì nó in từ biến cục bộ. Không một dòng lỗi nào.
+    """
+    rows = [{"_id": "N8N0001", "task": "t", "plan": "p"},
+            {"_id": "N8N0002", "task": "t", "plan": "p"}]
+    kq = score_n8n(rows, [_workflow_hop_le(), '{"action": "create_workflow"'])
+
+    assert kq["row_ids"] == ["N8N0001", "N8N0002"], "row_ids phải của chính nhánh n8n"
+    assert kq["per_row"] == [True, False]
+    assert kq["n_valid"] == 1 and kq["n"] == 2
+    assert kq["valid_rate"] == 0.5
+
+
+def test_n8n_dem_cat_cut_RIENG_khong_gop_vao_workflow_sai():
+    """
+    Cắt cụt sửa bằng nới trần token; workflow sai cấu trúc sửa bằng dữ liệu
+    huấn luyện. Gộp hai thứ vào một tỷ lệ là chỉ đường sai cho người đi sửa.
+    """
+    rows = [{"_id": "N1"}, {"_id": "N2"}]
+    kq = score_n8n(rows, [_workflow_hop_le(), '{"action": "crea'],
+                   ["stop", "length"])
+    assert kq["n_cat_cut"] == 1
+    assert kq["n_valid"] == 1
+
+
+def test_n8n_khong_truyen_finish_thi_van_chay():
+    """Gọi cũ (hai đối số) không được nổ — nó vẫn nằm trong notebook cũ."""
+    kq = score_n8n([{"_id": "N1"}], [_workflow_hop_le()])
+    assert kq["per_row"] == [True] and kq["n_cat_cut"] == 0
+
+
+# ---------------------------------------------------------------------------
+# Chốt chặn trước khi ghi JSON
+# ---------------------------------------------------------------------------
+
+def test_hai_nhanh_trung_ma_cau_thi_NEM_chu_khong_ghi_ra_file():
+    """
+    Đúng hình dạng lỗi 15/08: file có đủ bốn mục, mỗi mục đúng cấu trúc, và
+    mục n8n là bản sao y của extraction. Không có gì phát ra tín hiệu — nó chỉ
+    lộ khi đọc tay `row_ids`.
+
+    Ném chứ không cảnh báo: file này đi thẳng vào `compare_runs` để ra kết luận
+    có nên dùng bản fine-tune không.
+    """
+    ext = {"n": 2, "per_row": [True, False], "row_ids": ["EX0228", "EX0229"]}
+    with pytest.raises(AssertionError, match="CÙNG danh sách mã câu"):
+        kiem_ket_qua({"extraction": ext, "n8n": dict(ext)})
+
+
+def test_per_row_lech_row_ids_thi_nem():
+    with pytest.raises(AssertionError, match="hai lần chấm khác nhau"):
+        kiem_ket_qua({"n8n": {"n": 3, "per_row": [True], "row_ids": ["A", "B", "C"]}})
+
+
+def test_bo_do_dung_DUNG_tran_token_cua_production():
+    """
+    Bộ đo không được rộng tay hơn thứ đang chạy thật.
+
+    15/08/2026: benchmark cấp agentic 1024 và narration 2048, production cấp
+    700 và 1200. Không bên nào sai một mình — ghép lại thì mọi tỷ lệ cắt cụt
+    đo được đều ĐẸP HƠN thực tế, và ta có thể ship một model đã "đạt" trong khi
+    khách vẫn nhận câu đứt giữa chừng. Sai đúng chiều nguy hiểm.
+
+    Test này chốt hướng: mặc định của bộ đo PHẢI là hằng số của production.
+    Nới trần benchmark để lấy số đẹp thì phải nới cả production, và khi đó phải
+    trả lời được câu "cửa sổ ngữ cảnh có còn đủ chỗ cho đầu vào không".
+    """
+    from src.agents.agentic import MAX_DECISION_TOKENS
+    from src.agents.coder import MAX_WORKFLOW_TOKENS
+    from src.agents.manager import MAX_REPORT_TOKENS
+
+    for env, hang_so in (("BENCH_AGENT_MAX_TOKENS", MAX_DECISION_TOKENS),
+                         ("BENCH_NARR_MAX_TOKENS", MAX_REPORT_TOKENS),
+                         ("BENCH_N8N_MAX_TOKENS", MAX_WORKFLOW_TOKENS)):
+        assert tran_token(env, hang_so) == hang_so
+
+
+def test_tran_token_van_ep_tay_duoc_bang_env(monkeypatch):
+    """Đo cận trên ("không vướng trần thì model làm được gì") vẫn phải làm được."""
+    monkeypatch.setenv("BENCH_AGENT_MAX_TOKENS", "4096")
+    assert tran_token("BENCH_AGENT_MAX_TOKENS", 1024) == 4096
+
+
+def test_env_rong_khong_lam_no_ma_lui_ve_mac_dinh(monkeypatch):
+    """`export BENCH_...=` (gán rỗng) là chuyện thường trong shell script."""
+    monkeypatch.setenv("BENCH_AGENT_MAX_TOKENS", "")
+    assert tran_token("BENCH_AGENT_MAX_TOKENS", 1024) == 1024
+
+
+def test_cua_so_ngu_canh_du_cho_dau_ra_dai_nhat():
+    """
+    Nâng trần ĐẦU RA mà quên cửa sổ là đổi một lỗi ồn ào lấy một lỗi im lặng:
+    vLLM cắt phần ĐẦU VÀO, model trả lời trên nửa bảng số, và không có gì cho
+    thấy nửa kia đã mất.
+
+    Nhánh báo cáo là nhánh ngốn nhất — 2048 token ra, ngữ cảnh là danh sách
+    phát hiện dài theo số dòng sổ. Đòi cửa sổ chừa lại ít nhất bằng phần đầu ra.
+    """
+    from src.agents.manager import MAX_REPORT_TOKENS
+    from src.core.config import Config
+
+    cua_so = Config().vllm_config["max_model_len"]
+    assert cua_so - MAX_REPORT_TOKENS >= MAX_REPORT_TOKENS, (
+        f"cửa sổ {cua_so} trừ đầu ra {MAX_REPORT_TOKENS} chỉ còn "
+        f"{cua_so - MAX_REPORT_TOKENS} token cho system + ngữ cảnh + lịch sử"
+    )
+
+
+def test_ket_qua_dung_thi_di_qua_im_lang():
+    kiem_ket_qua({
+        "extraction": {"per_row": [True], "row_ids": ["EX0001"]},
+        "n8n": {"per_row": [True], "row_ids": ["N8N0001"]},
+        "bang_luat": {"per_row": [], "row_ids": []},   # rỗng: bỏ qua, không nổ
+    })
 
 
 # ---------------------------------------------------------------------------

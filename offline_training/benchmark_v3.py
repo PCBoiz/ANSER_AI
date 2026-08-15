@@ -196,6 +196,125 @@ def score_extraction(rows: list[dict], outputs: list[str]) -> dict:
     }
 
 
+def score_n8n(rows: list[dict], outputs: list[str],
+              finishes: list[str] | None = None) -> dict:
+    """
+    Tỷ lệ workflow model sinh ra qua được `validate_workflow()`.
+
+    VÌ SAO TÁCH THÀNH HÀM (15/08/2026). Trước đây khối này nằm thẳng trong
+    `main()`: nó đếm `n_valid` tại chỗ rồi ghi `ket_qua_chay["n8n"] = result`
+    — mà `result` KHÔNG hề được gán ở đây. Biến đó còn sót từ khối extraction
+    ngay trên, nên mục "n8n" trong file JSON thực chất là bản sao y của
+    extraction: n=98, `row_ids` bắt đầu bằng `EX0228`, `per_field` toàn
+    origin/destination.
+
+    Báo cáo `.txt` vẫn in đúng (20/34 và 22/34) vì nó in từ biến cục bộ, nên
+    không có gì cho thấy file JSON sai. `compare_runs` thì so extraction hai
+    lần rồi gọi kết quả đó là n8n. Cả một nhánh mất dữ liệu so cặp mà không
+    một dòng lỗi nào.
+
+    Hàm thuần thì không dựng nổi cái bẫy đó: muốn có `per_row` thì phải trả về,
+    và trả về thì gọi ở đâu cũng nhận đúng thứ mình tính.
+
+    Cắt cụt đếm RIÊNG, không tính là một loại "workflow sai": nó sửa bằng nới
+    trần token, còn workflow sai cấu trúc thì sửa bằng dữ liệu huấn luyện.
+    """
+    from src.core.workflow_schema import validate_workflow
+
+    finishes = finishes or [""] * len(outputs)
+    per_row: list[bool] = []
+    failures: list[tuple[str, str]] = []
+    n_cut = 0
+
+    for row, raw, finish in zip(rows, outputs, finishes):
+        if finish == "length":
+            n_cut += 1
+        try:
+            ok, why = validate_workflow(json.loads(raw))
+        except Exception as exc:
+            ok, why = False, f"JSON lỗi: {exc}"
+        per_row.append(bool(ok))
+        if not ok:
+            failures.append((str(row.get("_id", "?")), why))
+
+    n_valid = sum(per_row)
+    n = max(len(rows), 1)
+    return {
+        "n": len(rows),
+        "n_valid": n_valid,
+        "per_row": per_row,
+        "row_ids": _ma_dong(rows),
+        "valid_rate": n_valid / n,
+        "n_cat_cut": n_cut,
+        "failures": failures,
+    }
+
+
+def tran_token(env: str, mac_dinh: int) -> int:
+    """
+    Trần token cho một nhánh đo — mặc định LẤY TỪ CHÍNH MÃ PRODUCTION.
+
+    Trước 15/08/2026 mỗi bên viết số của mình: benchmark 1024/2048, production
+    700/1200/1600. Không ai sai một mình, nhưng ghép lại thì bộ đo rộng tay hơn
+    thứ đang chạy thật — nên mọi tỷ lệ cắt cụt đo được đều ĐẸP HƠN thực tế, và
+    ta có thể ship một model đã "đạt" mà khách vẫn nhận câu đứt giữa chừng.
+
+    Truyền hằng số của production vào `mac_dinh` thì hai bên chỉ còn một nguồn
+    (P4): sửa trần ở production là bộ đo đi theo, không cần nhớ sửa hai chỗ.
+
+    Env chỉ để ép tay khi cần đo cận trên ("nếu không vướng trần thì model làm
+    được gì") — mà đó là một câu hỏi khác, phải hỏi có ý thức.
+    """
+    return int(os.getenv(env, "").strip() or mac_dinh)
+
+
+def kiem_ket_qua(ket_qua: dict[str, dict]) -> None:
+    """
+    Chốt chặn TRƯỚC khi ghi JSON: mỗi nhánh phải mang dữ liệu CỦA CHÍNH NÓ.
+
+    Sinh ra sau lỗi 15/08/2026 — khối n8n ghi `ket_qua_chay["n8n"] = result`
+    trong khi `result` còn sót từ khối extraction. File JSON có đủ bốn mục,
+    mỗi mục đúng cấu trúc, không dòng lỗi nào; chỉ có điều mục "n8n" là bản
+    sao y của extraction. Phát hiện được là do đọc tay `row_ids` thấy toàn
+    `EX0228` trong nhánh n8n.
+
+    Hai bất biến, đều rẻ và đều đủ để chặn đúng lớp lỗi đó:
+
+      1. `per_row` phải dài bằng `row_ids` — lệch nghĩa là hai trường đến từ
+         hai lần chấm khác nhau.
+      2. Hai nhánh KHÔNG được có cùng danh sách mã câu. Hai bộ eval khác nhau
+         không thể trùng mã; trùng thì chỉ có thể là một biến bị gán nhầm.
+
+    Ném thẳng chứ không cảnh báo: file này đi vào `compare_runs` để ra kết luận
+    "có nên dùng bản fine-tune không". Ghi ra một file sai rồi in cảnh báo là
+    trao cho người đọc một con số họ tưởng đã được kiểm.
+    """
+    for muc, kq in ket_qua.items():
+        pr, ids = kq.get("per_row"), kq.get("row_ids")
+        if pr is None or ids is None:
+            continue
+        if len(pr) != len(ids):
+            raise AssertionError(
+                f"nhánh {muc!r}: per_row {len(pr)} phần tử nhưng row_ids "
+                f"{len(ids)} — hai trường này đến từ hai lần chấm khác nhau"
+            )
+
+    da_thay: dict[tuple, str] = {}
+    for muc, kq in ket_qua.items():
+        ids = kq.get("row_ids")
+        if not ids:
+            continue
+        khoa = tuple(ids)
+        if khoa in da_thay:
+            raise AssertionError(
+                f"nhánh {muc!r} và {da_thay[khoa]!r} có CÙNG danh sách mã câu "
+                f"({len(ids)} mã, bắt đầu {ids[0]!r}). Hai bộ eval khác nhau "
+                f"không thể trùng mã — gần như chắc chắn một biến bị gán nhầm "
+                f"kết quả của nhánh kia."
+            )
+        da_thay[khoa] = muc
+
+
 # Dưới ngưỡng này thì con số KHÔNG kết luận được gì, nên không được phép chặn.
 #
 # 5/5 cho khoảng Wilson khoảng 48%–100%: không phân biệt nổi với 3/5. Chặn hay
@@ -675,6 +794,10 @@ def main() -> None:
     args = parser.parse_args()
 
     _stage_catalog_dir()          # catalog node cho validate_workflow
+    # Trần token của CHÍNH production — xem `tran_token`.
+    from src.agents.agentic import MAX_DECISION_TOKENS
+    from src.agents.coder import MAX_WORKFLOW_TOKENS
+    from src.agents.manager import MAX_REPORT_TOKENS
     from src.core.prompts import Prompts
     from src.core.schemas import QuoteExtraction
     from src.core.workflow_schema import (
@@ -682,7 +805,6 @@ def main() -> None:
         reload_catalog,
         render_examples,
         render_node_catalog,
-        validate_workflow,
     )
     reload_catalog()
 
@@ -753,22 +875,21 @@ def main() -> None:
                  {"role": "user", "content": f"YÊU CẦU: {r['task']}\nKẾ HOẠCH: {r['plan']}"}]
                 for r in rows
             ]
-            outputs, _finish = generate(llm, chats, build_workflow_schema(),
-                                        max_tokens=2048, temperature=0.0)
-            n_valid = 0
-            for row, raw in zip(rows, outputs):
-                try:
-                    ok, why = validate_workflow(json.loads(raw))
-                except Exception as exc:
-                    ok, why = False, f"JSON lỗi: {exc}"
-                n_valid += ok
-                if not ok:
-                    print(f"  ✗ {row['_id']}: {why}")
-            rate = n_valid / len(rows)
-            print(f"\n[n8n] hợp lệ {n_valid}/{len(rows)} ({rate * 100:.0f}%)")
+            outputs, finishes = generate(
+                llm, chats, build_workflow_schema(),
+                max_tokens=tran_token("BENCH_N8N_MAX_TOKENS", MAX_WORKFLOW_TOKENS),
+                temperature=0.0)
+            result = score_n8n(rows, outputs, finishes)
+            print(f"\n[n8n] hợp lệ {result['n_valid']}/{result['n']}"
+                  f" ({result['valid_rate'] * 100:.0f}%)")
+            if result["n_cat_cut"]:
+                print(f"    trong đó {result['n_cat_cut']} ca CẮT CỤT (chạm trần token)"
+                      f" — sửa bằng nới trần, không phải bằng train lại")
+            for _id, why in result["failures"][:10]:
+                print(f"  ✗ {_id}: {why}")
             ket_qua_chay["n8n"] = result
             n8n_min = float(os.getenv("N8N_VALID_MIN", "0.90"))
-            chan(gate_fail, "n8n hợp lệ", n_valid, len(rows), n8n_min,
+            chan(gate_fail, "n8n hợp lệ", result["n_valid"], result["n"], n8n_min,
                  yeu=mau_qua_it)
         else:
             print("\n[n8n] ⚠ thiếu eval_n8n.jsonl — bỏ qua")
@@ -789,12 +910,14 @@ def main() -> None:
                      "content": getattr(Prompts, name).format(context=r["context"])},
                     {"role": "user", "content": r["question"]},
                 ])
-            # 1100 -> 2048: ban fine-tune viet dai hon han, 7/27 cau bi cat cut
-            # giua chung. Cau dut giua mot con so bi cham diem thanh "bia so"
-            # (05/08/2026: "bia so 0006" thuc ra la manh vun).
+            # Trần lấy từ `manager.MAX_REPORT_TOKENS` — cùng số production cấp
+            # cho nhánh báo cáo. Câu đứt giữa một con số bị chấm thành "bịa số"
+            # (05/08/2026: "bịa số 0006" thực ra là mảnh vụn), nên trần lệch
+            # giữa hai bên không chỉ làm sai tỷ lệ cắt cụt mà còn sai cả tỷ lệ
+            # bịa số.
             outputs, finishes = generate(
                 llm, chats, None,
-                max_tokens=int(os.getenv("BENCH_NARR_MAX_TOKENS", "2048")),
+                max_tokens=tran_token("BENCH_NARR_MAX_TOKENS", MAX_REPORT_TOKENS),
                 temperature=0.2)
             result = score_narration(rows, outputs, finishes)
             print(f"\n[narration] đạt {result['pass_rate'] * 100:.0f}% (n={result['n']})")
@@ -885,7 +1008,8 @@ def main() -> None:
                     [[{"role": "system", "content": system},
                       {"role": "user", "content": rows[i]["question"]}] for i in idxs],
                     schema,
-                    max_tokens=int(os.getenv("BENCH_AGENT_MAX_TOKENS", "1024")),
+                    max_tokens=tran_token("BENCH_AGENT_MAX_TOKENS",
+                                          MAX_DECISION_TOKENS),
                     temperature=0.0,
                 )
                 for vi_tri, i in enumerate(idxs):
@@ -928,6 +1052,7 @@ def main() -> None:
 
     # ---- Ghi kết quả từng câu ----------------------------------------------
     if args.json_out:
+        kiem_ket_qua(ket_qua_chay)
         # Bỏ `failures`/`parse` khỏi file: chúng là chuỗi để người đọc, còn file
         # này để MÁY so hai lần chạy. Giữ lại chỉ làm file phình và làm `diff`
         # giữa hai bản đầy nhiễu.
