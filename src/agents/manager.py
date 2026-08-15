@@ -37,6 +37,15 @@ from src.core.prompts import Prompts
 
 logger = logging.getLogger("projecta.agents.manager")
 
+# Trần token nhánh BÁO CÁO (văn dài). Hằng số chứ không phải số viết tại chỗ:
+# `offline_training/benchmark_v3.py` import chính biến này làm mặc định cho bộ
+# đo narration, nên hai bên không lệch được nữa (P4).
+#
+# 1200 -> 2048 (15/08/2026): phiên đo cho bản tinh chỉnh cắt cụt 8/27 câu Ở TRẦN
+# 2048. Production khi ấy cấp 1200, tức là tám câu đó ở máy khách còn đứt sớm
+# hơn — mà báo cáo lại ghi tỷ lệ đo ở trần rộng hơn. Số đẹp hơn sự thật.
+MAX_REPORT_TOKENS = 2048
+
 
 # torch và sentence_transformers được import LƯỜI, ngay trước lúc thực sự cần.
 #
@@ -540,7 +549,7 @@ class ManagerAgent(BaseAgent):
         return await self.generate_chat(
             system=system,
             user=task,
-            max_new_tokens=1200,       # văn dài: gấp ~3 lần nhánh chat
+            max_new_tokens=MAX_REPORT_TOKENS,   # văn dài: gấp ~5 lần nhánh chat
             temperature=0.2,
             history=history,
         )

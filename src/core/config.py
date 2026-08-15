@@ -110,10 +110,23 @@ class Config:
         #
         #  Ép tay bằng env khi cần (GPU lạ, nhân mới lỗi): TEXT_QUANTIZATION=awq
         #  thì nhớ đặt luôn TEXT_DTYPE=half — nhân awq cũ chỉ nhận float16.
+        #
+        #  max_model_len 4096 -> TEXT_MAX_MODEL_LEN (mặc định 8192), 15/08/2026.
+        #  Ba chỗ đang khai ba con số khác nhau cho cùng một model: engine trong
+        #  tiến trình 4096, `deploy/docker-compose.yml` 8192, benchmark 8192.
+        #  Nên thứ đo được trên Colab không phải thứ chạy trên máy khách.
+        #
+        #  Phải nâng, không chỉ để cho khớp: nhánh báo cáo vừa lên 2048 token
+        #  ĐẦU RA. Trên cửa sổ 4096 thì system + ngữ cảnh + lịch sử còn đúng
+        #  2048 — mà ngữ cảnh kế toán là danh sách phát hiện, dài theo số dòng
+        #  sổ. Tràn ở đây không ném lỗi rõ ràng, nó cắt đầu vào; model trả lời
+        #  trên nửa bảng số và không có gì cho thấy nửa kia đã mất.
+        #
+        #  Cùng tên biến với compose (P4): đổi một chỗ, cả hai đường đi theo.
         forced_quant = os.getenv("TEXT_QUANTIZATION", "").strip() or None
         self.vllm_config = {
             "gpu_memory_utilization": 0.55,
-            "max_model_len":          4096,
+            "max_model_len":          int(os.getenv("TEXT_MAX_MODEL_LEN", "8192")),
             "dtype": os.getenv("TEXT_DTYPE", "").strip()
                      or ("half" if forced_quant == "awq" else "auto"),
             "quantization":           forced_quant,

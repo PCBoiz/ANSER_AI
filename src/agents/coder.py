@@ -18,6 +18,14 @@ from src.agents.base import BaseAgent
 from src.core.agent_middleware import AgentMiddleware
 from src.core.prompts import Prompts
 
+# Trần token sinh workflow. Hằng số chứ không phải số viết tại chỗ:
+# `offline_training/benchmark_v3.py` import chính biến này làm mặc định (P4).
+#
+# 1600 -> 2048 (15/08/2026): benchmark vốn đã đo ở 2048 và vẫn thấy 3/34 ca cắt
+# cụt, nên production ở 1600 đứt sớm hơn cả con số đã báo cáo. Workflow đứt giữa
+# chừng không "gần đúng" — nó không import vào n8n được, tức là hỏng hoàn toàn.
+MAX_WORKFLOW_TOKENS = 2048
+
 
 class CoderAgent(BaseAgent):
     def __init__(self, engine, memory):
@@ -47,7 +55,7 @@ class CoderAgent(BaseAgent):
         return await self.generate_chat(
             system=system,
             user=user,
-            max_new_tokens=1600,
+            max_new_tokens=MAX_WORKFLOW_TOKENS,
             temperature=0.1,
             json_schema=self.middleware.get_workflow_json_schema(),
         )
