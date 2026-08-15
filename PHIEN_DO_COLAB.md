@@ -3,12 +3,63 @@
 **Mục tiêu:** có con số để trả lời một câu duy nhất — *bản fine-tune có hơn model
 gốc không, và hơn đủ để đáng dùng không?*
 
-Cổng này chưa từng được đưa ra. Không có `baseline.json` hay `tuned.json` nào
-trong repo, và tám commit gần đây toàn là **sửa** công cụ đo chứ chưa lần nào
-**dùng** nó.
-
 > **Đừng thuê GPU trước khi có kết quả phiên này.** Trả tiền hằng tháng cho một
 > lớp chưa đo bao giờ là cách nhanh nhất để tốn tiền vào thứ có thể không cần.
+
+---
+
+## Phiên 15/08/2026 đã chạy. Đây là phiên ĐO LẠI.
+
+Lần chạy đầu tiên cho ra bốn file (`baseline.json`, `tuned.json`, hai
+`*_report.txt`) và **ba lỗi nằm trong chính bộ đo và mã production**, không phải
+trong model. Đã sửa xong; phiên này chạy lại để có con số dùng được.
+
+### Đã tìm ra gì
+
+| Lỗi | Ở đâu | Hậu quả lên số đo |
+|---|---|---|
+| `arguments_schema()` không đóng object | **production**, `agentic.py` | model vẫn viết được `sales` dù đã bị bỏ → 7/19 đầu ra agentic không đọc được thành JSON |
+| trần token production **chặt hơn** benchmark | `agentic.py` 700, `manager.py` 1200, `coder.py` 1600 | tỷ lệ cắt cụt đo được **đẹp hơn** thứ khách nhận |
+| `ket_qua_chay["n8n"] = result` gán biến còn sót | `benchmark_v3.py` | mục "n8n" trong JSON là **bản sao y của extraction** — cả nhánh mất dữ liệu so cặp |
+
+Lỗi thứ nhất là nặng nhất vì nó **không phải chuyện đo**: `arguments_schema` chỉ
+lọc `properties` mà không đặt `additionalProperties: False`, trong khi JSON
+Schema mặc định *cho phép* trường lạ. Lớp phòng thủ mà docstring của nó mô tả
+chưa từng tồn tại — ở benchmark lẫn ở máy khách. Bằng chứng là đầu ra thật:
+
+```
+{"tool": "report", "arguments": {"granularity": "half_year",
+ "sales": [{"date": "2025-04-15", "revenue": 45000000, ...}],
+ "margin": 10, "margin": 15, "margin": 20, "m
+```
+
+`sales` nằm đó dù đã bị bỏ, `margin` lặp ba lần — khoá trùng chỉ lọt được khi
+object không bị đóng.
+
+### Đã sửa gì
+
+* `arguments_schema()` đóng tầng ngoài (`$defs` để mở — đó là dữ liệu khách khai thật)
+* Trần token production nâng lên **1024 / 2048 / 2048**, và benchmark **import
+  thẳng hằng số của production** thay vì viết số riêng — hai bên không lệch được nữa
+* `max_model_len` 4096 → `TEXT_MAX_MODEL_LEN` (mặc định 8192): 2048 token đầu ra
+  trên cửa sổ 4096 thì phần đầu vào bị cắt **im lặng**
+* Nhánh n8n tách thành `score_n8n()` trả `per_row`/`row_ids` như mọi nhánh khác
+* `kiem_ket_qua()` chặn trước lúc ghi JSON: hai nhánh không được trùng danh sách mã câu
+
+881 test xanh trên máy.
+
+### Kết quả lần đầu, để đối chiếu
+
+| Nhánh | Gốc | Tinh chỉnh | p |
+|---|---|---|---|
+| extraction | 0,0% | **65,3%** | ~0 |
+| narration | 88,9% | 55,6% | 0,0117 |
+| agentic | 52,6% | 15,8% | 0,0391 |
+| n8n | 58,8% | 64,7% | *(không so được)* |
+
+Con số cần nhìn lại sau khi sửa là **agentic** — phần lớn thất bại của nó đến từ
+lỗi lược đồ. narration thì đừng kỳ vọng đổi nhiều: trần 2048 đã là trần cũ của
+benchmark, tám câu cắt cụt là model viết dài thật.
 
 ---
 
@@ -17,27 +68,43 @@ trong repo, và tám commit gần đây toàn là **sửa** công cụ đo chứ
 | Thứ | Ghi chú |
 |---|---|
 | Colab có **GPU L4** (hoặc A100) | T4 16GB không đủ cho Qwen3-8B AWQ |
-| **`DEEPSEEK_API_KEY`** trong Colab Secrets | tên khoá đúng là `DEEPSEEK_API_KEY` |
 | Drive đã có `ANSER_AI_Logistics/anser-v3-awq` | đã xác nhận là có |
-| ~2 giờ | không phải train lại, chỉ sinh dữ liệu + đo |
+| Drive đã có `ANSER_AI_Logistics/generated` | dữ liệu phiên 15/08 — **đo lại thì dùng lại, không sinh mới** |
+| **`DEEPSEEK_API_KEY`** trong Colab Secrets | chỉ cần khi sinh dữ liệu mới. Tên khoá đúng là `DEEPSEEK_API_KEY` |
+| ~1 giờ khi đo lại | ~2 giờ nếu phải sinh lại dữ liệu |
 
 Khoá API **không đi qua chat và không nằm trên máy làm việc** — dán thẳng vào
-Colab Secrets, ô 10 tự đọc ra.
+Colab Secrets, ô 10 tự đọc ra. Colab Secrets **không tự thành biến môi trường**,
+và mất sau mỗi lần Restart runtime — nên ô 10 phải chạy lại sau ô 30.
 
 ---
 
 ## Chạy ô nào
 
-### Giai đoạn 1 — chuẩn bị và sinh dữ liệu (~35 phút)
+### 🔁 Đo lại thì BỎ QUA ô 12–18 — dữ liệu còn nguyên trên Drive
+
+Ô 4 trỏ `ANSER_GENERATED_DIR` vào
+`/content/drive/MyDrive/ANSER_AI_Logistics/generated`, nên bộ dữ liệu sinh hôm
+15/08 **không mất theo runtime**. Chạy lại ô 13, 14, 15 là gọi DeepSeek lần nữa
+để nhận đúng dữ liệu đang có — mất tiền và mất 35 phút, đổi lại không gì cả.
+
+Ô 20 (preflight) vẫn chạy: nó xác nhận dữ liệu trên Drive còn đủ. Thấy ba dòng
+`✓` ở mục dưới là đi thẳng sang Giai đoạn 3.
+
+> Lần này **phải kéo lại mã nguồn** (ô 4) — ba lỗi vừa sửa nằm trong repo, không
+> nằm trong notebook. Ô 4 clone thẳng từ GitHub nên chỉ cần chạy nó là đủ, miễn
+> là bản sửa **đã push**.
+
+### Giai đoạn 1 — chuẩn bị (~10 phút khi đo lại, ~35 phút khi chạy mới)
 
 | Ô | Việc | Ghi chú |
 |---|---|---|
 | 2 | kiểm GPU | thấy `L4` hoặc `A100` mới đi tiếp |
-| 4 | gắn Drive + kéo mã nguồn | |
+| 4 | gắn Drive + kéo mã nguồn | **bắt buộc** — mang bản sửa về |
 | 6 | cài thư viện | lâu nhất trong nhóm này |
 | 8 | kiểm dung lượng Drive | |
-| 10 | đọc khoá API | in ra `✓` là được |
-| 12–18 | **sinh dữ liệu** | ô 13, 14, 15 gọi DeepSeek — tốn tiền |
+| 10 | đọc khoá API | đo lại thì không cần, nhưng chạy cũng không hại |
+| 12–18 | sinh dữ liệu | **bỏ khi đo lại.** Ô 13, 14, 15 gọi DeepSeek — tốn tiền |
 | 20 | **preflight** | đọc kỹ, xem mục dưới |
 
 ### ⛔ Dừng ở ô 20 và đọc
@@ -73,7 +140,7 @@ Bắt buộc. vLLM không dùng chung tiến trình với thư viện train đư
 
 ---
 
-## Đọc kết quả — bốn cái bẫy
+## Đọc kết quả — năm cái bẫy
 
 ### 1. "✅ Qua mọi ngưỡng" có thể là câu nói suông
 
@@ -111,6 +178,22 @@ Nhánh nào `n < 20` sẽ **không** được dùng làm cổng chặn, và nói
 một thắng lợi rõ ràng, nhưng `p = 0.2266` và **3 ca bị làm hỏng**. Không phân
 biệt được với tung đồng xu.
 
+### 5. Một con số "kém" có thể là mã hỏng, không phải model kém
+
+Ba lần liên tiếp bộ đo cho ra số xấu vì lý do không nằm ở model:
+
+* `tool_rate = 0.0` — bộ chấm đọc `row["tool"]` trong khi file ghi `expected_tool`
+* extraction và agentic gần bằng 0 — guided decoding im lặng không áp dụng
+* agentic 15,8% — `arguments_schema` không đóng object *(15/08)*
+
+Trước khi kết luận "model kém", đọc ba dòng này trong báo cáo: **`⚠ ... đầu ra
+KHÔNG đọc được thành JSON`**, **`⚠ ... CẮT CỤT`**, và **`[chốt chặn]`**. Tỷ lệ
+JSON hỏng ≥ 30% gần như luôn là mã, không phải model.
+
+Riêng nhánh `bảng luật chọn tool` thì **không bao giờ** là model — đó là
+`tool_planner.py`, mã tất định. Nó giống nhau ở mọi lần chạy, và sai thì sửa
+bằng một dòng regex.
+
 ---
 
 ## Quyết định sau phiên đo
@@ -126,6 +209,20 @@ biệt được với tung đồng xu.
 kiệm một vòng train, một chỗ có thể hỏng, và tiền GPU. Phiên đo này đáng giá kể
 cả khi kết luận là "không cần fine-tune"; thứ không đáng là **không đo mà vẫn
 dùng**.
+
+### Cân theo nhánh nào ĐANG DÙNG, không theo nhánh nào điểm cao
+
+Đây là chỗ dễ đọc sai nhất sau phiên 15/08.
+
+`extraction` là **bóc tách yêu cầu báo giá vận tải** — `origin`, `destination`,
+`vehicle_type`. Nó thắng áp đảo (0% → 65,3%, sửa 64 câu, hỏng 0). Nhưng vận tải
+vừa được hạ xuống nhánh phụ, còn lõi kế toán mà Hoàng Phát đang dùng
+(`partner_audit`, `vat_catalog_audit`, `inventory_audit`, `period_diff`) là
+**Python tất định, không có model nào tham gia**.
+
+Model chỉ còn hai việc trong luồng kế toán: **diễn giải kết quả** (narration) và
+**gọi tool** (agentic). Nên khi cân, cho hai nhánh đó nặng hơn hẳn — một bản
+fine-tune thắng extraction mà thua narration là thắng ở chỗ khách không chạm tới.
 
 ---
 
