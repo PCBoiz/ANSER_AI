@@ -58,6 +58,15 @@ from src.core.utils import extract_json_block
 logger = logging.getLogger("projecta.agents.agentic")
 
 DEFAULT_MAX_STEPS = 4
+
+# Trần token cho MỘT quyết định agentic. Hằng số chứ không phải số viết tại chỗ:
+# `offline_training/benchmark_v3.py` import chính biến này làm mặc định, nên hai
+# bên không lệch được nữa (P4).
+#
+# Vì sao phải khoá lại (15/08/2026): benchmark đo ở 1024 trong khi production
+# cấp 700. Số đo được vì thế LẠC QUAN HƠN thứ khách nhận — sai đúng chiều nguy
+# hiểm, vì nó khiến ta ship một thứ đã đo "đạt" mà thực tế cắt cụt nhiều hơn.
+MAX_DECISION_TOKENS = 1024
 # Kết quả tool dài hơn mức này bị cắt trước khi đưa lại vào prompt: bảng xếp
 # hạng 100 mặt hàng ăn hết ngân sách ngữ cảnh mà model chỉ cần vài dòng đầu.
 MAX_OBSERVATION_CHARS = 3000
@@ -75,6 +84,27 @@ def arguments_schema(tool_def: dict, bo_truong: tuple[str, ...] = ()) -> dict[st
 
     Tức là ta bắt model bịa dữ liệu, rồi vứt đi, rồi hỏng vì chính việc bịa đó.
 
+    `additionalProperties: False` LÀ PHẦN LÀM CHO VIỆC BỎ CÓ HIỆU LỰC (15/08/2026).
+
+    Bản đầu chỉ lọc `properties` rồi dừng — mà JSON Schema mặc định CHO PHÉP
+    trường lạ. Grammar vì thế vẫn ký giấy phép cho đúng trường ta vừa bỏ, nên
+    việc bỏ chỉ đổi phần tài liệu chứ không đổi phần ràng buộc. Nói cách khác:
+    hàm này mô tả một lớp phòng thủ chưa từng tồn tại.
+
+    Phiên đo 15/08 cho thấy tận mắt. `report` bỏ `sales`/`expenses`, model vẫn ra:
+
+        {"tool": "report", "arguments": {"granularity": "half_year",
+         "sales": [{"date": "2025-04-15", "revenue": 45000000, ...}],
+         "margin": 10, "margin": 15, "margin": 20, "m
+
+    `sales` nằm đó dù đã bị bỏ, và `margin` lặp ba lần — khoá trùng chỉ lọt được
+    khi object không bị đóng. 7/12 câu nhóm này chạm trần token, 7/19 đầu ra
+    không đọc được thành JSON. Đúng ngõ cụt đoạn trên mô tả, chỉ là nó xảy ra
+    thật chứ không phải giả định.
+
+    CHỈ đóng ở TẦNG NGOÀI. `$defs` (SurchargeIn, PricingRuleIn...) để mở: đó là
+    những trường người dùng khai thật, siết thêm là chặn dữ liệu hợp lệ.
+
     `$defs` phải mang theo: schema pydantic dùng `$ref` trỏ vào đó, bỏ lại thì
     grammar gãy ngay lúc dựng.
     """
@@ -84,7 +114,11 @@ def arguments_schema(tool_def: dict, bo_truong: tuple[str, ...] = ()) -> dict[st
         for ten, mo_ta in (goc.get("properties") or {}).items()
         if ten not in bo_truong
     }
-    out: dict[str, Any] = {"type": "object", "properties": props}
+    out: dict[str, Any] = {
+        "type": "object",
+        "properties": props,
+        "additionalProperties": False,
+    }
     buoc = [r for r in (goc.get("required") or []) if r not in bo_truong]
     if buoc:
         out["required"] = buoc
@@ -267,7 +301,10 @@ class AgenticLoop:
             raw = await self.manager.generate_chat(
                 system=system,
                 user=user_turn,
-                max_new_tokens=700,
+                # Trần không phải cách sửa gốc: nguyên nhân là `arguments_schema`
+                # thiếu `additionalProperties` nên model viết được mảng dài vô
+                # hạn. Sửa xong chỗ đó thì 1024 là dư dả, không phải vừa đủ.
+                max_new_tokens=MAX_DECISION_TOKENS,
                 temperature=0.1,
                 json_schema=schema,
                 history=transcript,

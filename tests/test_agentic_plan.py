@@ -185,6 +185,76 @@ def test_giu_nguyen_tham_so_model_duoc_phep_dien():
     assert set(s["required"]) == {"items", "stated_total"}
 
 
+def test_bo_truong_khong_du_phai_dong_luon_object():
+    """
+    BỎ khỏi `properties` mà không đóng object là KHÔNG bỏ gì cả.
+
+    JSON Schema mặc định CHO PHÉP trường lạ, nên grammar vẫn ký giấy phép cho
+    đúng cái trường ta vừa gạch tên. Bản đầu của `arguments_schema` dừng ở bước
+    lọc, và vì thế lớp phòng thủ nó mô tả chưa từng tồn tại — phát hiện trong
+    phiên đo 15/08/2026.
+    """
+    tool = {"name": "report", "input_schema": {
+        "type": "object",
+        "properties": {"granularity": {"type": "string"}, "sales": {"type": "array"}},
+    }}
+    assert arguments_schema(tool, ("sales",))["additionalProperties"] is False
+
+
+def test_lien_dinh_dau_ra_that_cua_phien_do_bi_tu_choi():
+    """
+    Đầu ra THẬT của bản fine-tune ngày 15/08, rút gọn nguyên hình dạng.
+
+    `report` đã bỏ `sales`/`expenses`, model vẫn viết `sales` — rồi phình tới
+    trần token, cắt cụt, `_parse` trả None, vòng lặp gãy. Test này giữ nguyên
+    hình dạng ấy và đòi lược đồ TỪ CHỐI nó. Hỏng test này nghĩa là ngõ cụt đã
+    mở lại, và triệu chứng ở production sẽ là "tôi chưa hoàn thành được yêu
+    cầu này" chứ không phải một lỗi đọc được.
+    """
+    jsonschema = pytest.importorskip("jsonschema")
+    from src.api.routes.tools import get_tool_defs
+    from src.core.tool_planner import system_data_fields
+
+    report = next(t for t in get_tool_defs() if t["name"] == "report")
+    s = build_decision_schema(
+        ["report"], arguments_schema(report, system_data_fields("report"))
+    )
+    v = jsonschema.Draft202012Validator(s)
+
+    bia = {"thought": "Dữ liệu đầy đủ, gọi công cụ report.",
+           "tool": "report",
+           "arguments": {"granularity": "half_year", "periods_back": 1,
+                         "sales": [{"date": "2025-04-15", "revenue": 45000000}]}}
+    assert not v.is_valid(bia), "`sales` do model bịa vẫn lọt qua lược đồ"
+
+    sach = {"thought": "Dữ liệu đầy đủ, gọi công cụ report.",
+            "tool": "report",
+            "arguments": {"granularity": "half_year", "periods_back": 1}}
+    assert v.is_valid(sach), "siết quá tay — quyết định hợp lệ bị chặn"
+
+
+def test_truong_nguoi_dung_khai_that_van_di_qua_duoc():
+    """
+    Chỉ đóng TẦNG NGOÀI. `quote` không bỏ trường nào, và các object lồng trong
+    `$defs` (phụ phí, quy tắc giá) là dữ liệu người dùng khai thật — đóng luôn
+    tầng đó là chặn đầu vào hợp lệ để đổi lấy không gì cả.
+    """
+    jsonschema = pytest.importorskip("jsonschema")
+    from src.api.routes.tools import get_tool_defs
+    from src.core.tool_planner import system_data_fields
+
+    quote = next(t for t in get_tool_defs() if t["name"] == "quote")
+    s = build_decision_schema(
+        ["quote"], arguments_schema(quote, system_data_fields("quote"))
+    )
+    that = {"thought": "đủ dữ kiện", "tool": "quote",
+            "arguments": {"carrier_cost": 10_000_000,
+                          "pricing_rule": {"base_margin_pct": 10,
+                                           "surcharges": [{"name": "bốc xếp",
+                                                           "amount": 500_000}]}}}
+    assert jsonschema.Draft202012Validator(s).is_valid(that)
+
+
 def test_defs_duoc_nang_len_goc_tai_lieu():
     """
     `$ref: "#/$defs/X"` là con trỏ tính từ gốc TÀI LIỆU, không từ object chứa nó.
