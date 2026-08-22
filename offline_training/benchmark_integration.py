@@ -36,6 +36,11 @@ API_TOKEN = (os.environ.get("BRAIN_API_TOKEN")
              or os.environ.get("API_AUTH_TOKEN") or "").strip()
 if API_TOKEN:
     HEADERS["X-API-Token"] = API_TOKEN
+
+
+def dau_van(tok: str) -> str:
+    """Vân tay token để đối chiếu bằng mắt — KHÔNG in cả token ra log."""
+    return f"{tok[:4]}…{tok[-4:]}" if len(tok) >= 12 else "(quá ngắn)"
 TIMEOUT   = 180
 POLL_MAX  = 90
 
@@ -199,7 +204,7 @@ async def main():
             print(f"  Health: engine_ready={hs.get('engine_ready')} "
                   f"degraded={hs.get('degraded')} "
                   f"auth_enabled={hs.get('auth_enabled')}")
-            print(f"  Token gửi kèm: {'CÓ' if API_TOKEN else 'KHÔNG'}\n")
+            print(f"  Token gửi kèm: {dau_van(API_TOKEN) if API_TOKEN else 'KHÔNG'}\n")
 
             # Chặn ở đây thay vì để sáu ca cùng trả 401. Sáu dòng "LỖI GỌI API"
             # giống hệt nhau trông như model hỏng, còn thật ra là thiếu một biến
@@ -232,6 +237,20 @@ async def main():
             try:
                 raw, dur = await ask(client, t["prompt"])
             except Exception as e:
+                # 401 KHÔNG phải "một ca hỏng" — nó hỏng như nhau cho cả sáu ca,
+                # nên dừng ngay và nói đúng nguyên nhân. Sáu dòng 401 giống hệt
+                # nhau trông như model chết, còn thật ra là lệch một chuỗi.
+                if "401" in str(e):
+                    sys.exit(
+                        f"\n  ✗ Brain TỪ CHỐI token đang gửi ({dau_van(API_TOKEN)}).\n\n"
+                        "    Token có gửi, nhưng KHÔNG khớp cái server đang giữ.\n"
+                        "    Nguyên nhân thường gặp nhất: ô 4.1 được chạy lại SAU khi\n"
+                        "    server đã bật. Ô đó sinh token ngẫu nhiên, còn server thì\n"
+                        "    chụp giá trị tại lúc nó khởi động — chạy lại là hai bên\n"
+                        "    lệch nhau ngay, mà /health vẫn xanh vì nó không đòi token.\n\n"
+                        "    Cách xử: chạy ô 4.5 (dọn) → 4.1 → 4.2 → 4.3 → 4.4.\n"
+                        "    Bản ô 4.1 mới dùng `setdefault` nên chạy lại KHÔNG đổi token nữa."
+                    )
                 print(f"     ✗ LỖI GỌI API: {str(e)[:80]}\n")
                 results.append((t["id"], t["name"], 0, len(t["checks"]), 0.0))
                 continue
