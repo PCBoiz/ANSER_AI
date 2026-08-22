@@ -142,7 +142,12 @@ def test_file_rong_tra_400(gia_lap_vision):
 
 def test_duong_ocr_ban_le_van_con(gia_lap_vision):
     """Công ty vẫn nhập hàng — tính năng đọc hoá đơn bán lẻ vẫn cần."""
-    routes = {r.path for r in app.routes}
+    # Đọc từ lược đồ OpenAPI, KHÔNG duyệt `app.routes`. Từ FastAPI 0.141 /
+    # Starlette 1.6, router được include vào bọc trong `_IncludedRouter` — object đó
+    # không có `.path`, nên bản cũ ném AttributeError chứ không phải báo thiếu
+    # đường. `requirements.txt` không ghim fastapi nên đây là lỗi tự đến theo thời
+    # gian, không phải do ai sửa gì.
+    routes = set(app.openapi()["paths"])
     assert "/ocr" in routes
     assert "/ocr/freight" in routes
 
