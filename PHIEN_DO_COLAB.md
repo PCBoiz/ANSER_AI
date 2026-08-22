@@ -138,6 +138,44 @@ Bắt buộc. vLLM không dùng chung tiến trình với thư viện train đư
 | 38 | **đo bản fine-tune** | ~20 phút |
 | 40 | **so hai bản THEO CẶP** | 1 phút |
 
+### So thêm một model thứ ba (tuỳ chọn)
+
+`--model` nay nhận cả endpoint, không chỉ đường dẫn weights:
+
+```bash
+python offline_training/benchmark_v3.py --model anthropic:claude-opus-5 \
+    --no-gate --json /content/claude.json
+python -m offline_training.compare_runs /content/tuned.json /content/claude.json
+```
+
+Cần `pip install anthropic` và `ANTHROPIC_API_KEY` trong Colab Secrets.
+Ước tính ~150.000đ một lượt quét đủ bộ.
+
+> ⚠️ **R2.** Dạng `anthropic:` gửi dữ liệu ra ngoài, nên chỉ chạy trên bộ đề
+> tổng hợp (`generated/*_eval.jsonl` — sinh ngược nên tên công ty và tuyến
+> đường đều hư cấu) hoặc bộ đã ẩn danh qua `sample_data/an_danh.py`. Không bao
+> giờ trên bản xuất MISA thật của khách.
+
+Hai lần chạy bị ràng buộc JSON bằng hai cơ chế khác nhau (`guided_json` phía
+sampling vs. `structured_output` phía API), nên `compare_runs` in một dòng cảnh
+báo — chênh lệch khi đó lẫn cả phần do cơ chế. Mục `bang_luat` thì không đáng
+so: nó chạy bảng luật Python thuần, không có model trong đó.
+
+### Giai đoạn 4 — chạy thử đầu-cuối (ô 42–47, tuỳ chọn)
+
+Dựng Brain lên thật rồi mở đường hầm ngrok để Body gọi vào — thấy được phần
+benchmark không thấy: đường xác thực, luồng task bất đồng bộ, độ trễ qua mạng.
+Ô 4.3 in sẵn hai dòng dán thẳng vào `frontend/.env.local` của Body.
+
+> ⚠️ Phiên demo **rời**, không phải cách triển khai: AGENTS.md §3.1 — điều khoản
+> Colab Paid cấm phục vụ web service. Đường thật là Cloudflare Tunnel trong
+> `deploy/docker-compose.yml`. Chạy xong nhớ chạy ô 4.5 để dọn.
+
+Ô 4.4 chạy `benchmark_integration.py`. **Ca T2 trượt sẵn** — nó soi hợp đồng
+`{"action": "query_db"}` đã bị gỡ, không phải model kém. Thứ đáng tin ở ô đó là
+độ trễ p95, `/health`, và việc luồng `POST /chat` → `GET /api/v1/task/{id}`
+chạy thông.
+
 ---
 
 ## Đọc kết quả — năm cái bẫy
@@ -233,6 +271,7 @@ Ba file, nằm ở `/content/drive/MyDrive/ANSER_AI_Logistics/`:
 * `baseline_report.txt`
 * `tuned_report.txt`
 * `baseline.json` + `tuned.json` — kết quả **từng câu**, để so lại sau này
+* `claude.json` — nếu có chạy model thứ ba
 
 Kèm ảnh chụp phần in của ô 40.
 
