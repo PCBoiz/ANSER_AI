@@ -62,13 +62,18 @@ class NhaCungCap(Protocol):
              max_tokens: int, temperature: float) -> tuple[list[str], list[str]]:
         ...
 
+    def dien_dat_duoc(self, json_schema: dict) -> bool:
+        """Bản dựng có ÉP được lược đồ này không, hay chỉ sinh tự do rồi hy vọng."""
+        ...
+
 
 # ---------------------------------------------------------------------------
 # Dựng tham số — hàm THUẦN, test được không cần SDK, không cần mạng
 # ---------------------------------------------------------------------------
 
 def tham_so_anthropic(model: str, chat: Chat, json_schema: dict | None,
-                      max_tokens: int, effort: str = "") -> dict[str, Any]:
+                      max_tokens: int, effort: str = "",
+                      suy_nghi: str = "tat") -> dict[str, Any]:
     """
     Tham số cho `client.messages.create`.
 
@@ -78,6 +83,17 @@ def tham_so_anthropic(model: str, chat: Chat, json_schema: dict | None,
     hỏng ngay câu đầu — và thông báo lỗi không nói gì về nhiệt độ.
 
     Cũng KHÔNG có `budget_tokens`: đã gỡ trên Opus 5, dùng `output_config.effort`.
+
+    SUY NGHĨ TẮT MẶC ĐỊNH — và đây là quyết định về PHÉP ĐO, không phải về chất
+    lượng. Opus 5 bật suy nghĩ mặc định, mà token suy nghĩ tính vào `max_tokens`.
+    Bản vLLM thì chạy `enable_thinking=False`. Để nguyên mặc định thì cùng một
+    con số `max_tokens` cho hai bên hai lượng đầu ra khác hẳn — đo ở trần 200
+    token, Claude tiêu sạch vào suy nghĩ và trả về CHUỖI RỖNG, rồi bảng kết quả
+    ghi "JSON hỏng" (gặp thật 23/08/2026).
+
+    Tắt suy nghĩ làm `max_tokens` hai bên nghĩa như nhau. Muốn đo Claude ở trạng
+    thái tốt nhất của nó thì đặt `BENCH_CLAUDE_THINKING=adaptive` — nhưng khi đó
+    phải nới trần token, và phải nói rõ là đã nới.
 
     Tin nhắn `system` của chat phải tách khỏi `messages` và đưa lên tham số
     `system` riêng — Anthropic không nhận `role: "system"` trong `messages` như
@@ -94,8 +110,12 @@ def tham_so_anthropic(model: str, chat: Chat, json_schema: dict | None,
     if he_thong:
         kw["system"] = "\n\n".join(he_thong)
 
+    kw["thinking"] = {"type": "adaptive"} if suy_nghi == "adaptive" else {"type": "disabled"}
+
     cau_hinh: dict[str, Any] = {}
     if json_schema is not None:
+        # Lược đồ tới đây PHẢI đóng sẵn — xem `dong_luoc_do`. Chỗ gọi có
+        # trách nhiệm lùi về không-ràng-buộc khi không đóng được.
         cau_hinh["format"] = {"type": "json_schema", "schema": json_schema}
     if effort:
         cau_hinh["effort"] = effort
@@ -127,6 +147,110 @@ def payload_openai(model: str, chat: Chat, json_schema: dict | None,
     if json_schema is not None:
         p["guided_json"] = json_schema
     return p
+
+
+# Khoá KIỂM TRA mà structured output của Anthropic không đỡ. Bỏ đi KHÔNG làm
+# sai phép đo: chúng ràng buộc GIÁ TRỊ, không ràng buộc HÌNH DẠNG, mà tầng chấm
+# điểm vốn đã tự kiểm lại giá trị bằng chính pydantic model của endpoint
+# (`_kiem_tham_so` trong benchmark_v3.py). Giữ nguyên phần cấu trúc — `type`,
+# `properties`, `required`, `enum`, `anyOf`, `$ref`, `$defs`, `items`.
+#
+# Danh sách này dựng theo lỗi 400 THẬT, không đoán. Gặp khoá mới thì thông báo
+# lỗi in ra sẽ gọi đích danh nó; thêm vào đây rồi chạy lại.
+KHOA_KHONG_DO = frozenset({
+    "minimum", "maximum", "exclusiveMinimum", "exclusiveMaximum", "multipleOf",
+    "minLength", "maxLength", "pattern", "format",
+    "minItems", "maxItems", "uniqueItems",
+    "minProperties", "maxProperties",
+})
+
+# Khoá CẤU TRÚC Anthropic không đỡ. KHÁC HẲN nhóm trên: những khoá này quyết
+# định model được phép sinh ra HÌNH DẠNG nào, nên bỏ đi là đổi phép đo.
+#
+# `build_decision_schema` dùng `oneOf` + `not` để cấm model xuất nửa vời — vừa
+# gọi tool vừa tuyên bố đáp án. Lọc hai khoá đó là cho phép đúng cái nó sinh ra
+# để chặn, rồi vẫn chấm điểm như thể đã chặn.
+#
+# `anyOf` KHÔNG nằm đây: nó qua được (lược đồ quote có `anyOf` và lỗi 400 gọi
+# đích danh `oneOf`, không gọi `anyOf`).
+KHOA_CAU_TRUC_KHONG_DO = frozenset({"oneOf", "allOf", "not", "if", "then", "else"})
+
+
+def dong_luoc_do(luoc_do: dict) -> tuple[dict | None, list[str], set[str]]:
+    """
+    Đóng mọi `object` trong lược đồ, hoặc trả về lý do không đóng được.
+
+    VÌ SAO PHẢI CÓ HÀM NÀY
+    ----------------------
+    Anthropic từ chối lược đồ có object không khai `additionalProperties: false`:
+
+        400 output_config.format.schema: For 'object' type,
+            'additionalProperties' must be explicitly set to false
+
+    vLLM `guided_json` không đòi thế. Nên cùng một lược đồ, một bên nhận một bên
+    không — và cách vá hiển nhiên (đóng hết) là cái bẫy.
+
+    ĐÓNG ĐƯỢC vs KHÔNG ĐÓNG ĐƯỢC
+    ----------------------------
+    Object CÓ `properties` thì đóng vô hại: nó chỉ cấm trường KHÔNG khai, còn
+    trường đã khai vẫn qua.
+
+    Object có `properties` RỖNG là object tự do — đóng nó là cấm sạch. Lược đồ
+    workflow n8n có đúng hai chỗ như vậy, và cả hai đều sống còn:
+
+        payload.nodes[].parameters   cấu hình thật của từng node
+        payload.connections          khoá là TÊN node, nên động hoàn toàn
+
+    Đóng hai chỗ đó thì mọi workflow sinh ra đều không tham số, không kết nối,
+    trượt `validate_workflow` sạch — và bảng kết quả sẽ đọc thành "model kém"
+    trong khi thứ hỏng là khung đo.
+
+    Nên: đóng được thì đóng, không đóng được thì **trả về None** để chỗ gọi lùi
+    về sinh KHÔNG ràng buộc và nói ra, thay vì lặng lẽ đo một thứ khác.
+
+    KHOÁ CẤU TRÚC
+    -------------
+    Cùng lý do, một dạng khác: `oneOf`/`not` trong `build_decision_schema` quyết
+    định hình dạng hợp lệ. Anthropic không đỡ (`Schema type 'oneOf' is not
+    supported`), mà lọc đi là cho phép đúng cái lược đồ sinh ra để cấm. Nên xếp
+    chung nhóm "không diễn đạt được" với object tự do.
+
+    Trả về `(lược_đồ, lý_do_không_diễn_đạt_được, khoá_đã_lọc)`. Danh sách lý do
+    rỗng nghĩa là đóng thành công.
+    """
+    mo: list[str] = []
+    da_loc: set[str] = set()
+
+    def di(nut, duong: str):
+        if isinstance(nut, list):
+            return [di(v, f"{duong}[{i}]") for i, v in enumerate(nut)]
+        if not isinstance(nut, dict):
+            return nut
+
+        ra = {}
+        for k, v in nut.items():
+            # Chỉ lọc ở tầng TỪ VỰNG lược đồ. Một `properties` tên "pattern" là
+            # tên trường của người dùng, không phải khoá kiểm tra — nên không
+            # đụng tới nội dung nằm dưới `properties`/`$defs`.
+            duoi_tu_vung = not duong.endswith((".properties", ".$defs"))
+            if k in KHOA_KHONG_DO and duoi_tu_vung:
+                da_loc.add(k)
+                continue
+            if k in KHOA_CAU_TRUC_KHONG_DO and duoi_tu_vung:
+                mo.append(f"khoá cấu trúc {k!r} tại {duong or '$'}")
+            ra[k] = di(v, f"{duong}.{k}")
+
+        kieu = ra.get("type")
+        la_object = kieu == "object" or (isinstance(kieu, list) and "object" in kieu)
+        if la_object and "additionalProperties" not in ra:
+            if ra.get("properties"):
+                ra["additionalProperties"] = False
+            else:
+                mo.append(duong or "$")
+        return ra
+
+    dong = di(luoc_do, "$")
+    return (None, mo, da_loc) if mo else (dong, [], da_loc)
 
 
 # Anthropic gọi tên lý do dừng khác vLLM. Quy về đúng bộ từ mà tầng chấm điểm
@@ -210,6 +334,11 @@ class VLLMTrongTienTrinh:
             trust_remote_code=True,
         )
 
+    def dien_dat_duoc(self, json_schema: dict) -> bool:
+        # xgrammar nhận cả `oneOf`, `not`, object tự do. Có hỏng thì hỏng lúc
+        # dựng grammar, và `smoke_test_guided` bắt đúng chỗ đó.
+        return True
+
     def sinh(self, chats: list[Chat], json_schema: dict | None,
              max_tokens: int, temperature: float) -> tuple[list[str], list[str]]:
         from vllm import SamplingParams
@@ -256,6 +385,11 @@ class OpenAITuongThich:
         self.model = model
         # Khoá đọc từ env, KHÔNG nhận qua tham số dòng lệnh (R2b).
         self._api_key = os.getenv("VLLM_API_KEY", "")
+
+    def dien_dat_duoc(self, json_schema: dict) -> bool:
+        # `guided_json` của vLLM nhận nguyên lược đồ. Server KHÔNG phải vLLM thì
+        # bỏ qua nó trong im lặng — chốt chặn lược đồ đồ chơi bắt trường hợp đó.
+        return True
 
     def _mot_cau(self, chat: Chat, json_schema: dict | None,
                  max_tokens: int, temperature: float) -> tuple[str, str]:
@@ -306,14 +440,58 @@ class Anthropic:
 
         self.ten = spec
         self.model = model
+        # Danh nghĩa là structured_output; hạ xuống "hon_hop" nếu có lược đồ
+        # không đóng được và phải sinh không ràng buộc. Trường này đi vào file
+        # JSON, `compare_runs` đọc để cảnh báo.
+        self.rang_buoc = "structured_output"
         # `ANTHROPIC_API_KEY` đọc từ env qua chính SDK — không nhận qua dòng lệnh (R2b).
         self._client = anthropic.Anthropic(max_retries=4)
         self._effort = os.getenv("BENCH_CLAUDE_EFFORT", "").strip()
+        self._suy_nghi = os.getenv("BENCH_CLAUDE_THINKING", "tat").strip() or "tat"
+        self._da_bao: set[str] = set()
+        if self._suy_nghi == "adaptive":
+            print("  ⓘ suy nghĩ BẬT (BENCH_CLAUDE_THINKING=adaptive) — token suy nghĩ"
+                  " tính vào\n    max_tokens, nên trần token không còn so được với bên"
+                  " vLLM.")
+        else:
+            print("  ⓘ suy nghĩ TẮT — để max_tokens nghĩa như bên vLLM"
+                  " (enable_thinking=False).")
+
+    def dien_dat_duoc(self, json_schema: dict) -> bool:
+        return dong_luoc_do(json_schema)[0] is not None
+
+    def _chuan_bi_luoc_do(self, json_schema: dict | None) -> dict | None:
+        """Đóng lược đồ, hoặc bỏ ràng buộc và NÓI RA — không lặng lẽ đổi phép đo."""
+        if json_schema is None:
+            return None
+        dong, mo, da_loc = dong_luoc_do(json_schema)
+        if da_loc and "loc" not in self._da_bao:
+            self._da_bao.add("loc")
+            print(f"  ⓘ đã lọc khoá lược đồ Anthropic không đỡ: {sorted(da_loc)}")
+            print("    Đây là ràng buộc GIÁ TRỊ, không phải hình dạng — tầng chấm điểm"
+                  " vẫn tự\n    kiểm lại bằng pydantic model thật của endpoint.")
+        if dong is not None:
+            return dong
+
+        khoa = ",".join(sorted(mo))
+        if khoa not in self._da_bao:
+            self._da_bao.add(khoa)
+            self.rang_buoc = "hon_hop"
+            print("  ⚠ LƯỢC ĐỒ KHÔNG DIỄN ĐẠT ĐƯỢC — sinh KHÔNG ràng buộc cho nhánh này.")
+            for d in sorted(mo):
+                print(f"      {d}")
+            print("    Bỏ những chỗ trên đi là ĐỔI PHÉP ĐO, không phải vá lược đồ:"
+                  " object tự do\n    mà đóng lại là cấm sạch nội dung; `oneOf`/`not`"
+                  " mà lọc đi là cho phép\n    đúng cái lược đồ sinh ra để cấm.")
+            print("    -> nhánh này so với bên vLLM là so KHÔNG CÂN: một bên có grammar,"
+                  " một bên không.")
+        return None
 
     def _mot_cau(self, chat: Chat, json_schema: dict | None,
                  max_tokens: int) -> tuple[str, str]:
         resp = self._client.messages.create(
-            **tham_so_anthropic(self.model, chat, json_schema, max_tokens, self._effort)
+            **tham_so_anthropic(self.model, chat, self._chuan_bi_luoc_do(json_schema),
+                                max_tokens, self._effort, self._suy_nghi)
         )
         # Lọc theo `type`, không lấy khối đầu tiên: suy nghĩ bật mặc định trên
         # Opus 5 nên khối đầu có thể là `thinking`.
@@ -385,7 +563,9 @@ __all__ = [
     "OpenAITuongThich",
     "SONG_SONG",
     "VLLMTrongTienTrinh",
+    "KHOA_CAU_TRUC_KHONG_DO",
     "doi_ly_do_dung",
+    "dong_luoc_do",
     "dung_provider",
     "payload_openai",
     "tach_spec",

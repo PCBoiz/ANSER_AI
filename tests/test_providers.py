@@ -26,13 +26,18 @@ số đã tách khỏi phần gọi đi. Đó là lý do nó tách.
 
 from __future__ import annotations
 
+import json
+
 import pytest
 
 from offline_training.providers import (
+    KHOA_CAU_TRUC_KHONG_DO,
+    KHOA_KHONG_DO,
     Anthropic,
     OpenAITuongThich,
     VLLMTrongTienTrinh,
     doi_ly_do_dung,
+    dong_luoc_do,
     dung_provider,
     payload_openai,
     tach_spec,
@@ -274,3 +279,201 @@ def test_thieu_sdk_thi_noi_ro_cach_cai_chu_khong_nem_ImportError():
     """
     with pytest.raises(SystemExit, match="pip install anthropic"):
         dung_provider("anthropic:claude-opus-5")
+
+
+# ---------------------------------------------------------------------------
+# dong_luoc_do — hai lỗi 400 THẬT gặp ngày 23/08/2026
+# ---------------------------------------------------------------------------
+#
+# Anthropic từ chối lược đồ theo hai kiểu khác nhau, và hai kiểu đó phải được
+# xử khác nhau:
+#
+#   "For 'object' type, 'additionalProperties' must be explicitly set to false"
+#   "For 'number' type, property 'minimum' is not supported"
+#
+# Cái thứ nhất KHÔNG phải lúc nào cũng vá được — object tự do mà đóng lại là cấm
+# sạch nội dung. Cái thứ hai vá được vô hại — nó ràng buộc giá trị, không ràng
+# buộc hình dạng, mà tầng chấm điểm vốn đã tự kiểm lại giá trị bằng pydantic.
+
+
+def test_object_co_truong_thi_dong_duoc():
+    """Đóng ở đây chỉ cấm trường KHÔNG khai — trường đã khai vẫn qua."""
+    dong, mo, _ = dong_luoc_do({
+        "type": "object",
+        "properties": {"ten": {"type": "string"}},
+    })
+    assert mo == []
+    assert dong["additionalProperties"] is False
+
+
+def test_object_TU_DO_thi_KHONG_dong_duoc():
+    """
+    `properties` rỗng nghĩa là mọi khoá đều hợp lệ. Đóng nó là cấm sạch — và
+    bảng kết quả sẽ đọc thành "model kém" trong khi hỏng là khung đo.
+    """
+    dong, mo, _ = dong_luoc_do({"type": "object", "properties": {}})
+    assert dong is None
+    assert mo == ["$"]
+
+
+def test_bao_dung_DUONG_DAN_cua_object_tu_do():
+    """
+    Phải gọi đích danh chỗ hỏng. "Lược đồ không đóng được" mà không nói chỗ nào
+    thì người đọc lúc 11 giờ đêm không có gì để lần.
+    """
+    dong, mo, _ = dong_luoc_do({
+        "type": "object",
+        "properties": {
+            "nodes": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {"parameters": {"type": "object", "properties": {}}},
+                },
+            },
+        },
+    })
+    assert dong is None
+    assert mo == ["$.properties.nodes.items.properties.parameters"]
+
+
+def test_dong_ca_trong_defs_va_items():
+    dong, mo, _ = dong_luoc_do({
+        "type": "object",
+        "properties": {"ds": {"type": "array", "items": {"$ref": "#/$defs/X"}}},
+        "$defs": {"X": {"type": "object", "properties": {"a": {"type": "string"}}}},
+    })
+    assert mo == []
+    assert dong["additionalProperties"] is False
+    assert dong["$defs"]["X"]["additionalProperties"] is False
+
+
+def test_giu_nguyen_additionalProperties_da_khai():
+    """Người viết lược đồ đã quyết định rồi thì đừng quyết hộ."""
+    dong, mo, _ = dong_luoc_do({
+        "type": "object", "properties": {}, "additionalProperties": True,
+    })
+    assert mo == []
+    assert dong["additionalProperties"] is True
+
+
+def test_type_la_danh_sach_van_nhan_ra_object():
+    """`{"type": ["object", "null"]}` là object — Pydantic sinh ra dạng này."""
+    dong, mo, _ = dong_luoc_do({"type": ["object", "null"], "properties": {}})
+    assert dong is None and mo == ["$"]
+
+
+def test_loc_khoa_rang_buoc_gia_tri():
+    """
+    `exclusiveMinimum` trên `carrier_cost` chính là khoá làm hỏng lần chạy đầu.
+    Bỏ nó không làm sai phép đo: `_kiem_tham_so` vẫn kiểm lại bằng pydantic thật.
+    """
+    dong, mo, da_loc = dong_luoc_do({
+        "type": "object",
+        "properties": {"gia": {"type": "number", "exclusiveMinimum": 0}},
+    })
+    assert mo == []
+    assert "exclusiveMinimum" not in dong["properties"]["gia"]
+    assert da_loc == {"exclusiveMinimum"}
+    assert dong["properties"]["gia"]["type"] == "number"   # phần hình dạng còn nguyên
+
+
+def test_KHONG_loc_ten_truong_trung_ten_khoa():
+    """
+    Một trường tên `pattern` là TÊN NGƯỜI DÙNG ĐẶT, không phải khoá kiểm tra.
+    Lọc theo tên mà không nhìn vị trí là xoá mất trường thật của người ta.
+    """
+    dong, _, da_loc = dong_luoc_do({
+        "type": "object",
+        "properties": {"pattern": {"type": "string"}, "format": {"type": "string"}},
+    })
+    assert set(dong["properties"]) == {"pattern", "format"}
+    assert da_loc == set()
+
+
+def test_giu_nguyen_phan_cau_truc():
+    """`enum`, `required`, `anyOf`, `$ref` là hình dạng — lọc là hỏng phép đo."""
+    goc = {
+        "type": "object",
+        "required": ["tool"],
+        "properties": {
+            "tool": {"type": "string", "enum": ["report"]},
+            "x": {"anyOf": [{"type": "number", "minimum": 1}, {"type": "null"}]},
+        },
+    }
+    dong, mo, da_loc = dong_luoc_do(goc)
+    assert mo == []
+    assert dong["required"] == ["tool"]
+    assert dong["properties"]["tool"]["enum"] == ["report"]
+    assert [n.get("type") for n in dong["properties"]["x"]["anyOf"]] == ["number", "null"]
+    assert da_loc == {"minimum"}
+
+
+def test_khong_dot_bien_luoc_do_goc():
+    """
+    Lược đồ gốc còn được đưa vào vLLM ở lần chạy khác trong cùng tiến trình.
+    Sửa tại chỗ là lặng lẽ đổi ràng buộc của bản dựng kia.
+    """
+    goc = {"type": "object", "properties": {"a": {"type": "number", "minimum": 0}}}
+    truoc = json.dumps(goc, sort_keys=True)
+    dong_luoc_do(goc)
+    assert json.dumps(goc, sort_keys=True) == truoc
+
+
+def test_moi_khoa_trong_KHOA_KHONG_DO_deu_bi_loc():
+    for khoa in KHOA_KHONG_DO:
+        _, _, da_loc = dong_luoc_do({"type": "object", "properties": {"a": {"type": "string"}},
+                                     khoa: 1})
+        assert khoa in da_loc, khoa
+
+
+def test_luoc_do_workflow_n8n_THAT_khong_dong_duoc():
+    """
+    Bài kiểm hồi quy cho phát hiện 23/08/2026, chạy trên lược đồ THẬT.
+
+    Hai chỗ tự do là `parameters` (cấu hình từng node) và `connections` (khoá là
+    TÊN node). Nếu sau này ai đó đóng chúng lại ở `workflow_schema.py`, test này
+    đỏ — và đó là tín hiệu đúng: đóng chúng lại là cấm workflow có tham số.
+    """
+    from src.core import workflow_schema
+
+    dong, mo, _ = dong_luoc_do(workflow_schema.build_workflow_schema())
+    assert dong is None, "lược đồ n8n đã đóng hết — kiểm lại workflow_schema.py"
+    assert any(d.endswith(".parameters") for d in mo), mo
+    assert any(d.endswith(".connections") for d in mo), mo
+
+
+@pytest.mark.parametrize("khoa", sorted(KHOA_CAU_TRUC_KHONG_DO))
+def test_khoa_cau_truc_thi_LUI_chu_khong_loc(khoa):
+    """
+    Khác hẳn nhóm ràng buộc giá trị: những khoá này quyết định model được
+    phép sinh ra HÌNH DẠNG nào. `build_decision_schema` dùng `oneOf` + `not` để
+    cấm model vừa gọi tool vừa tuyên bố đáp án — lọc đi là cho phép đúng cái
+    lược đồ sinh ra để chặn, rồi vẫn chấm điểm như thể đã chặn.
+    """
+    dong, mo, da_loc = dong_luoc_do({
+        "type": "object", "properties": {"a": {"type": "string"}}, khoa: [{"required": ["a"]}],
+    })
+    assert dong is None
+    assert any(khoa in ly_do for ly_do in mo), mo
+    assert khoa not in da_loc
+
+
+def test_anyOf_KHONG_bi_coi_la_khong_do_duoc():
+    """Lỗi 400 gọi đích danh `oneOf`, không gọi `anyOf` — đừng cấm thêm."""
+    dong, mo, _ = dong_luoc_do({
+        "type": "object",
+        "properties": {"x": {"anyOf": [{"type": "number"}, {"type": "null"}]}},
+    })
+    assert mo == [] and dong is not None
+
+
+def test_luoc_do_quyet_dinh_agentic_THAT_khong_dien_dat_duoc():
+    """
+    Hồi quy cho lỗi 400 thứ ba (23/08/2026): `Schema type 'oneOf' is not supported`.
+    """
+    from src.agents.agentic import build_decision_schema
+
+    dong, mo, _ = dong_luoc_do(build_decision_schema(["report"]))
+    assert dong is None
+    assert any("oneOf" in ly_do for ly_do in mo), mo

@@ -637,9 +637,17 @@ def smoke_test_guided(nha: NhaCungCap) -> None:
     from src.api.routes.tools import get_tool_defs
     from src.core.tool_planner import system_data_fields
 
+    bo_qua: list[str] = []
     for t in get_tool_defs():
         ten = t["name"]
         s = build_decision_schema([ten], arguments_schema(t, system_data_fields(ten)))
+        # Chốt chặn này chỉ có nghĩa khi bản dựng ÉP được lược đồ. Câu nhắc
+        # ("Gọi tool X với tham số bất kỳ") không có chữ nào bảo xuất JSON — nó
+        # dựa hoàn toàn vào grammar. Bản dựng không ép được thì model trả văn
+        # xuôi, và chấm nó là "hỏng" tức là chấm sai chỗ.
+        if not nha.dien_dat_duoc(s):
+            bo_qua.append(ten)
+            continue
         try:
             raw = nha.sinh(
                 [[{"role": "user", "content": f"Gọi tool {ten} với tham số bất kỳ."}]],
@@ -649,15 +657,37 @@ def smoke_test_guided(nha: NhaCungCap) -> None:
         except Exception as exc:
             print(f"    lược đồ {ten} HỎNG: {exc}")
             print(f"    lược đồ: {json.dumps(s, ensure_ascii=False)[:400]}")
+            if nha.rang_buoc == "guided_json":
+                chan_doan = (
+                    "Gần như chắc chắn là `$ref` treo: `arguments_schema()` bỏ trường "
+                    "nhưng `$defs` phải được NÂNG LÊN GỐC của lược đồ quyết định — "
+                    "`#/$defs/X` là con trỏ tính từ gốc tài liệu, không từ object "
+                    "chứa nó.\n"
+                    "Chạy `pytest tests/test_agentic_plan.py -k schema` để khoanh vùng."
+                )
+            else:
+                # Bản dựng qua API hỏng vì lý do khác hẳn: tập JSON Schema mỗi
+                # nhà cung cấp đỡ là một tập khác. Thông báo lỗi in ngay phía
+                # trên đã gọi đích danh khoá bị từ chối — đừng đoán thay nó.
+                chan_doan = (
+                    "Đây là bản dựng qua API, không phải grammar cục bộ — đọc thông "
+                    "báo lỗi in ngay phía trên.\n"
+                    "Nếu nó gọi tên một khoá lược đồ (kiểu \"property 'minimum' is not "
+                    "supported\"), thêm khoá đó vào `KHOA_KHONG_DO` trong "
+                    "`offline_training/providers.py` rồi chạy lại — danh sách ấy dựng "
+                    "theo lỗi thật, không dựng theo phỏng đoán."
+                )
             raise SystemExit(
                 f"Lược đồ quyết định của tool {ten!r} không dựng được grammar.\n"
-                "Gần như chắc chắn là `$ref` treo: `arguments_schema()` bỏ trường "
-                "nhưng `$defs` phải được NÂNG LÊN GỐC của lược đồ quyết định — "
-                "`#/$defs/X` là con trỏ tính từ gốc tài liệu, không từ object "
-                "chứa nó.\n"
-                "Chạy `pytest tests/test_agentic_plan.py -k schema` để khoanh vùng."
+                + chan_doan
             ) from exc
-    print(f"[chốt chặn] lược đồ agentic ({len(get_tool_defs())} tool): ✓ dựng được")
+    da_kiem = len(get_tool_defs()) - len(bo_qua)
+    print(f"[chốt chặn] lược đồ agentic: ✓ dựng được {da_kiem}/{len(get_tool_defs())} tool")
+    if bo_qua:
+        print(f"    ⚠ bỏ qua {len(bo_qua)}: {', '.join(bo_qua)}")
+        print("      Bản dựng này không ép được lược đồ quyết định (xem lý do ở"
+              " trên), nên\n      nhánh agentic sẽ chạy KHÔNG ràng buộc —"
+              " số của nó KHÔNG so trực tiếp\n      được với bên có grammar.")
 
 
 
