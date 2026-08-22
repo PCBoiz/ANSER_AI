@@ -114,6 +114,15 @@ def main() -> None:
     print(f"  B (tinh chỉnh): {b.get('model', '?')}")
     print("=" * 66)
 
+    # Hai bản ép JSON bằng hai cơ chế khác nhau thì chính cơ chế đã là một biến.
+    # Ví dụ: grammar phía sampling loại thẳng token làm JSON sai, còn structured
+    # output phía API lại từ chối cả lược đồ nó không đỡ. Không nói ra thì người đọc
+    # sẽ quy toàn bộ chênh lệch cho năng lực model.
+    ra, rb = a.get("rang_buoc"), b.get("rang_buoc")
+    if ra and rb and ra != rb:
+        print(f"\n⚠ HAI BẢN BỊ RÀNG BUỘC KHÁC NHAU:  A={ra}   B={rb}")
+        print("  Chênh lệch dưới đây lẫn cả phần do cơ chế, không thuần là năng lực model.")
+
     sa, sb = a.get("sections") or {}, b.get("sections") or {}
     chung = [m for m in sa if m in sb]
     if not chung:

@@ -30,3 +30,7 @@ liger-kernel
 #     (autoawq có thể đòi transformers khác — chạy sau khi train xong,
 #      restart runtime; hoặc dùng llm-compressor, xem README)
 #   Bước benchmark: pip install vllm==0.8.5
+#   So model qua API: pip install anthropic
+#     (chỉ cần khi `--model anthropic:...`. Dạng đó GỬI DỮ LIỆU RA NGOÀI —
+#      xem R2 trong AGENTS.md: chỉ chạy trên bộ đề tổng hợp hoặc đã ẩn danh,
+#      không bao giờ trên bản xuất sổ sách thật của khách.)

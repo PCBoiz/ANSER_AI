@@ -35,6 +35,43 @@ Dữ liệu v2 khôi phục từ Drive nằm ở [`v2_sources/`](v2_sources/) �
 Qwen/Qwen3-8B --no-gate`. Con số baseline quyết định fine-tune cần cứu bao
 nhiêu điểm — và là mốc so sánh sau khi train.
 
+### `--model` nhận ba dạng
+
+`build_llm()` cũ chỉ nạp vLLM trong tiến trình, nên chỉ so được hai bộ weights
+chạy cùng một runtime. Nay `benchmark_v3.py` đi qua `providers.py`:
+
+| `--model` | Chạy ở đâu | `rang_buoc` ghi vào JSON |
+|---|---|---|
+| `Qwen/Qwen3-8B`, `<AWQ_DIR>` | vLLM trong tiến trình (**mặc định, hành vi cũ**) | `guided_json` |
+| `openai:http://127.0.0.1:8001/v1#anser-v3` | endpoint tương thích OpenAI | `guided_json` |
+| `anthropic:claude-opus-5` | API Anthropic | `structured_output` |
+
+Năm hàm `score_*` không đổi — chúng là hàm thuần `(rows, outputs) -> dict`.
+`compare_runs.py` cũng không đổi, và nay **cảnh báo khi hai lần chạy lệch
+`rang_buoc`**: JSON bị ép bằng hai cơ chế khác nhau thì chênh lệch lẫn cả phần
+do cơ chế, không thuần là năng lực model.
+
+⚠️ **Dạng `anthropic:` gửi dữ liệu ra ngoài.** Theo R2 (AGENTS.md §2), chỉ được
+chạy trên bộ đề tổng hợp (`generated/*_eval.jsonl` — sinh ngược nên tên công ty,
+tuyến đường đều hư cấu) hoặc bộ đã ẩn danh qua `sample_data/an_danh.py`. Không
+bao giờ trên bản xuất MISA thật của khách.
+
+Ba lần chạy rồi so từng cặp:
+
+```bash
+python offline_training/benchmark_v3.py --model Qwen/Qwen3-8B \
+    --no-gate --json /content/qwen_base.json
+python offline_training/benchmark_v3.py --model $AWQ_DIR \
+    --json /content/qwen_tuned.json
+python offline_training/benchmark_v3.py --model anthropic:claude-opus-5 \
+    --no-gate --json /content/claude.json
+python -m offline_training.compare_runs /content/qwen_tuned.json /content/claude.json
+```
+
+Mục `bang_luat` không đáng so giữa hai model: `score_planner` chạy
+`tool_planner.plan_tools` — Python thuần, không có model trong đó, nên hai lần
+chạy luôn ra kết quả giống hệt nhau.
+
 Chi phí DeepSeek ước tính cho bước 2+3 (~800 call `deepseek-chat`, ~200
 token/call): **dưới 1 USD**. Distill R1 đắt hơn chỉ dùng lại nếu cần thêm
 data tư vấn — data tư vấn hiện lấy từ v2 convert lại.
