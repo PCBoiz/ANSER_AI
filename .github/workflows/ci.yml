@@ -24,9 +24,9 @@ jobs:
       - name: Ruff
         run: |
           ruff check src/core/memory.py src/core/context.py tests
-          ruff check src/core/reporting.py src/core/metrics.py src/agents/agentic.py offline_training/providers.py
+          ruff check src/core/reporting.py src/core/metrics.py src/agents/agentic.py offline_training/providers.py offline_training/chay_thu_live.py
       - name: Mypy
-        run: mypy src/core/memory.py src/core/context.py offline_training/providers.py
+        run: mypy src/core/memory.py src/core/context.py offline_training/providers.py offline_training/chay_thu_live.py
       - name: Pytest
         env:
           ENV: LOCAL
