@@ -73,7 +73,12 @@ def vram(nhan: str) -> None:
 def hoi(msg: str, gio: float) -> tuple[str, float]:
     """Gửi ĐÚNG như Body: POST /chat trả task_id, rồi poll /api/v1/task/{id}."""
     t0 = time.time()
-    with httpx.Client(timeout=60.0, headers=HEADERS) as client:
+    # `gio` PHẢI áp cho cả POST, không riêng vòng poll. `POST /chat` KHÔNG trả
+    # ngay như tên gọi gợi ý: `chat.py:438` await `ensure_text_runtime()` TRƯỚC
+    # khi tạo task_id, nên nó chờ trọn 1–3 phút nạp model. Bản đầu ghim cứng
+    # 60s ở đây và chết ngay câu đầu (23/08/2026) — tham số 420s chỉ chạm tới
+    # vòng poll, tức là chỗ không bao giờ tới được.
+    with httpx.Client(timeout=gio, headers=HEADERS) as client:
         r = client.post(f"{BRAIN_URL}/chat",
                         json={"user_id": "live-test", "store_id": "1", "message": msg})
         if r.status_code == 401:

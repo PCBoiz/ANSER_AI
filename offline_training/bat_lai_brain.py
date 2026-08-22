@@ -162,6 +162,57 @@ print("=" * 74)
 _vram("mốc-3")
 print(f"     engine_ready={health.get('engine_ready')}  <- phải là False")
 
+# --- HÂM NÓNG: ép nạp model NGAY, ở đây, một lần --------------------------
+#
+# `POST /chat` KHÔNG trả ngay như tên "task bất đồng bộ" gợi ý: `chat.py:438`
+# await `ensure_text_runtime()` TRƯỚC khi tạo `task_id`. Bản vá executor giữ
+# cho event loop thở (nên /health vẫn trả lời) nhưng request đang chờ thì vẫn
+# chờ trọn 1–3 phút nạp model.
+#
+# Mà Body ghim `TIMEOUT_MS.chat = 60_000` (frontend/src/server/brain.ts:109).
+# 60s < 1–3 phút. Nghĩa là câu ĐẦU TIÊN người dùng gõ vào UI sau mỗi lần Brain
+# khởi động lại LUÔN LUÔN timeout — và hiện ra đúng như "model không chạy".
+# Chính nó, không phải model. Chịu ngần ấy thời gian ở đây, một lần, lúc dựng.
+print("")
+print("▸ hâm nóng: ép nạp model ngay (1–3 phút — chịu ở đây để người dùng khỏi chịu)…")
+_t0 = time.time()
+_rq = urllib.request.Request(
+    "http://127.0.0.1:8000/chat",
+    data=json.dumps({"user_id": "ham-nong", "store_id": "1",
+                     "message": "Xin chào"}).encode("utf-8"),
+    headers={"Content-Type": "application/json", "X-API-Token": env["API_AUTH_TOKEN"]},
+    method="POST")
+try:
+    with urllib.request.urlopen(_rq, timeout=900) as _resp:
+        _tid = json.loads(_resp.read())["task_id"]
+except urllib.error.HTTPError as e:
+    proc.terminate()
+    raise SystemExit(f"POST /chat trả {e.code}: {e.read()[:300]!r}") from e
+_giay_nap = time.time() - _t0
+print(f"  ✓ model nạp xong sau {_giay_nap:.0f}s")
+
+_ans = None
+for _ in range(150):
+    time.sleep(2)
+    with urllib.request.urlopen(f"http://127.0.0.1:8000/api/v1/task/{_tid}", timeout=15) as _rp:
+        _tt = json.loads(_rp.read())
+    if _tt.get("status") == "completed":
+        _kq = _tt.get("result") or {}
+        _ans = _kq.get("answer") if isinstance(_kq, dict) else str(_kq)
+        break
+    if _tt.get("status") == "failed":
+        _ans = f"[THẤT BẠI] {_tt.get('error')}"
+        break
+_tong = time.time() - _t0
+print(f"  ✓ câu trả lời đầu sau tổng {_tong:.0f}s ({_tong - _giay_nap:.0f}s sinh chữ):")
+print(f"    {str(_ans)[:220]}")
+
+print("")
+print("=" * 74)
+print("  MỐC 4 — model ĐÃ nạp (so với MỐC 3: 7.8GB sinh ra ở đâu)")
+print("=" * 74)
+_vram("mốc-4")
+
 # --- Đường hầm: tái dùng hầm cũ nếu còn sống -------------------------------
 from pyngrok import conf, ngrok  # noqa: E402
 
@@ -190,5 +241,7 @@ print("=" * 74)
 print(f"BRAIN_URL={BRAIN_URL}")
 print(f"BRAIN_API_TOKEN={os.environ['API_AUTH_TOKEN']}")
 print("=" * 74)
-print("\n▸ Xong. Chạy tiếp:  !python offline_training/chay_thu_live.py")
-print("  (câu đầu nạp model, 1–3 phút)")
+print("")
+print("▸ Xong, model ĐÃ nóng. Chạy tiếp:")
+print("  !cd /content/ANSER_AI && python offline_training/chay_thu_live.py")
+print("  (giờ mọi câu đều nhanh — phần nạp model đã trả xong ở trên)")
