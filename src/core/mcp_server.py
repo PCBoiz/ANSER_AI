@@ -70,7 +70,33 @@ class MCPServer:
           - abs_tol=10 VND bỏ qua nhiễu làm tròn từng dòng.
         2 ngưỡng này nên tinh chỉnh theo quy mô hóa đơn (xem spec Phụ lục, câu hỏi mở #4 —
         hóa đơn sản xuất giá trị lớn có thể cần rel_tol khác hóa đơn bán lẻ).
+
+        items RỖNG -> trả {"error": ..., "is_valid": False}, KHÔNG có
+        calculated_total/difference — xem chú thích đầu hàm.
         """
+        # THIẾU DỮ LIỆU thì NÓI THIẾU, không điền 0 rồi trừ (R1). items rỗng
+        # mà vẫn tính calculated_total=0 rồi kết luận "lệch <stated_total>" là
+        # sản xuất một con số sai CÓ NGUỒN: model buộc phải điền items=[] khi
+        # câu chỉ nêu mỗi số tổng, tầng này trả "lệch 250 triệu", và chốt chặn
+        # neo số liệu cho qua vì con số quả thật lấy từ kết quả tool.
+        #
+        # Chọn early-return thay vì min_length trên schema của /tools/vat:
+        # `documents.py` gọi thẳng MCPServer (không qua schema) với items do
+        # VLM đọc ra — ảnh mờ đọc ra rỗng cũng phải nhận cùng một câu "thiếu
+        # dữ liệu", thay vì mỗi caller tự chế một kiểu chặn riêng.
+        #
+        # `is_valid: False` giữ hợp đồng với caller (`documents.py` đọc trường
+        # này để bật needs_manual_review — không kiểm lại được thì đương nhiên
+        # phải soát tay). CỐ Ý không trả calculated_total/difference: không
+        # tính được thì không có con số nào để ai đó lỡ tay đem đi dùng.
+        if not items:
+            return {
+                "error": "không có dòng hàng nào để tính lại",
+                "is_valid": False,
+                "stated_total": _round_vnd(float(stated_total or 0)),
+                "lines": [],
+            }
+
         calculated_total = 0
         line_breakdown = []
 

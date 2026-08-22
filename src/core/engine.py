@@ -127,20 +127,36 @@ class ModelEngine:
     """
 
     _instance = None
+    # Khoá LUỒNG (không phải asyncio): từ 23/08/2026 việc nạp runtime được đẩy
+    # sang `run_in_executor` để khỏi chặn event loop, mà text và vision đi qua
+    # hai asyncio.Lock KHÁC NHAU — nghĩa là hai THREAD có thể cùng gọi
+    # `ModelEngine()` thật sự song song. Không có khoá này thì cả hai thấy
+    # `_instance is None` và nạp model hai lần lên cùng một GPU.
+    _khoa_singleton = threading.Lock()
 
     def __new__(cls):
         if cls._instance is None:
-            inst = super(ModelEngine, cls).__new__(cls)
-            try:
-                inst._initialize()
-            except Exception:
-                # Không giữ instance hỏng — lần gọi sau sẽ thử khởi tạo lại
-                cls._instance = None
-                raise
-            cls._instance = inst
+            with cls._khoa_singleton:
+                # Kiểm lại trong khoá: luồng kia có thể vừa nạp xong.
+                if cls._instance is None:
+                    inst = super(ModelEngine, cls).__new__(cls)
+                    try:
+                        inst._initialize()
+                    except Exception:
+                        # Không giữ instance hỏng — lần gọi sau sẽ thử khởi tạo lại
+                        cls._instance = None
+                        raise
+                    cls._instance = inst
         return cls._instance
 
     def _initialize(self):
+        """
+        Nạp model — CHẶN LUỒNG hàng phút (vLLM dựng engine, VLM về VRAM).
+
+        Người gọi từ code async PHẢI đẩy qua `run_in_executor`
+        (`RuntimeState._nap_text_runtime_dong_bo`), nếu không event loop đứng
+        im suốt thời gian nạp: /health câm và mọi request đang bay đông cứng.
+        """
         self.env = os.getenv("ENV", "LOCAL").upper()
         self.config = Config()
 

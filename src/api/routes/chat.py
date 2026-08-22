@@ -39,7 +39,7 @@ from src.core.engine import TASK_REGISTRY
 from src.core.grounding import guard_answer
 from src.core.retrieval_policy import KHONG_CO_TAI_LIEU, decide_web_fallback
 from src.core.schemas import RetailChatResponse
-from src.core.tool_planner import plan_tools
+from src.core.tool_planner import la_cau_soat_hoa_don, plan_tools
 from src.core.utils import extract_json_block
 from src.core.workflow_schema import validate_workflow
 
@@ -494,7 +494,24 @@ async def chat_endpoint(
         from src.api.routes.tools import get_tool_defs
 
         plan = plan_tools(user_msg, [t["name"] for t in get_tool_defs()])
-        if plan and cat not in ("LOGISTICS", "TECHNICAL"):
+
+        # NGOẠI LỆ HẸP cho LOGISTICS (sự cố tái hiện 23/08/2026): câu DÁN KÈM
+        # hoá đơn VẬN TẢI bị luật từ khoá của SemanticRouter bắt thành
+        # LOGISTICS (method=keyword, score=1.0) chỉ vì TÊN DÒNG HÀNG trong
+        # hoá đơn chứa chữ vận chuyển ("Cước vận chuyển HN-HP") — đó là DỮ
+        # LIỆU nằm trong tờ hoá đơn, không phải Ý ĐỊNH của người hỏi. Đứng
+        # ngoài vòng agentic khi ấy nghĩa là kế hoạch ["vat"] không bao giờ
+        # chạy: người dùng đòi SOÁT hoá đơn lại nhận về luồng BÁO GIÁ.
+        #
+        # Điều kiện mở cửa CỐ Ý gồm cả hai vế: kế hoạch phải chứa `vat` VÀ câu
+        # phải là soát-hoá-đơn-có-nội-dung-dán-kèm (`la_cau_soat_hoa_don` —
+        # cùng một hàm mà `plan_tools` dùng để cộng `vat`, hai nơi không lệch
+        # nhau được). Câu báo giá thật ("báo giá xe 5 tấn đi Hải Phòng") không
+        # thoả vế nào nên vẫn đi nguyên luồng n8n. TECHNICAL giữ nguyên.
+        soat_hoa_don_logistics = (
+            cat == "LOGISTICS" and "vat" in plan and la_cau_soat_hoa_don(user_msg)
+        )
+        if plan and (cat not in ("LOGISTICS", "TECHNICAL") or soat_hoa_don_logistics):
             resp, grounding_ctx = await _run_agentic(
                 user_msg, plan, store_id, history, request_id, metric
             )

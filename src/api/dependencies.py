@@ -64,6 +64,54 @@ class RuntimeState:
     kb_error: Optional[str] = None
     vision_error: Optional[str] = None
 
+    def _nap_text_runtime_dong_bo(self) -> None:
+        """
+        Phần nạp NẶNG của text runtime — hàm ĐỒNG BỘ, cố tình.
+
+        Dựng `LLM(...)` của vLLM, nạp VLM và mở kho tri thức là công việc CPU/
+        GPU chặn luồng, kéo dài 1–3 phút. Gọi thẳng trong coroutine thì suốt
+        ngần ấy thời gian event loop KHÔNG chạy được callback nào: /health câm,
+        mọi POST đang bay đông cứng, client báo Body timeout 180s ngay trên
+        POST /chat (sự cố 23/08/2026). Vì vậy toàn bộ khối này nằm trong một
+        hàm đồng bộ để `ensure_text_runtime` đẩy nó sang thread qua
+        `run_in_executor` — loop còn thở trong lúc nạp.
+
+        Chỉ được gọi khi ĐANG GIỮ `_model_load_lock`: hàm ghi thẳng vào state
+        dùng chung, hai lượt chạy song song sẽ nạp model hai lần.
+        """
+        if not self.memory:
+            from src.core.memory import MemoryManager
+            self.memory = MemoryManager()
+
+        if RUNTIME_PROFILE == "minimal":
+            self.engine_error = "Text runtime disabled by RUNTIME_PROFILE=minimal"
+            return
+
+        try:
+            from src.core.engine import ModelEngine
+            self.engine = self.engine or ModelEngine()
+        except Exception as exc:
+            self.engine = None
+            self.engine_error = str(exc)
+            logger.error("Engine initialization failed: %s", exc)
+
+        # KB phải tạo TRƯỚC manager để manager dùng chung embedder của KB
+        # (tránh nạp MiniLM 2 lần lên VRAM — xem SemanticRouter(embedder=...)).
+        try:
+            if not self.kb:
+                from src.core.knowledge import KnowledgeBase
+                self.kb = KnowledgeBase()
+        except Exception as exc:
+            self.kb = None
+            self.kb_error = str(exc)
+            logger.warning("Knowledge base initialization failed: %s", exc)
+
+        if self.engine:
+            from src.agents.coder import CoderAgent
+            from src.agents.manager import ManagerAgent
+            self.manager = self.manager or ManagerAgent(self.engine, self.memory, kb=self.kb)
+            self.coder = self.coder or CoderAgent(self.engine, self.memory)
+
     async def ensure_text_runtime(self) -> None:
         """Async, lock-guarded model initialization."""
         # Fast path: already loaded — no lock needed
@@ -75,38 +123,12 @@ class RuntimeState:
             if self.manager and self.coder and self.memory:
                 return
 
-            if not self.memory:
-                from src.core.memory import MemoryManager
-                self.memory = MemoryManager()
-
-            if RUNTIME_PROFILE == "minimal":
-                self.engine_error = "Text runtime disabled by RUNTIME_PROFILE=minimal"
-                return
-
-            try:
-                from src.core.engine import ModelEngine
-                self.engine = self.engine or ModelEngine()
-            except Exception as exc:
-                self.engine = None
-                self.engine_error = str(exc)
-                logger.error("Engine initialization failed: %s", exc)
-
-            # KB phải tạo TRƯỚC manager để manager dùng chung embedder của KB
-            # (tránh nạp MiniLM 2 lần lên VRAM — xem SemanticRouter(embedder=...)).
-            try:
-                if not self.kb:
-                    from src.core.knowledge import KnowledgeBase
-                    self.kb = KnowledgeBase()
-            except Exception as exc:
-                self.kb = None
-                self.kb_error = str(exc)
-                logger.warning("Knowledge base initialization failed: %s", exc)
-
-            if self.engine:
-                from src.agents.coder import CoderAgent
-                from src.agents.manager import ManagerAgent
-                self.manager = self.manager or ManagerAgent(self.engine, self.memory, kb=self.kb)
-                self.coder = self.coder or CoderAgent(self.engine, self.memory)
+            # Khoá + double-check giữ NGUYÊN ngữ nghĩa cũ (hai request đầu đến
+            # cùng lúc vẫn chỉ nạp một lần); chỉ khác ở chỗ phần nặng chạy
+            # trong thread chứ không chặn event loop. `await` vẫn nằm trong
+            # khoá nên không có cửa sổ nào cho lượt thứ hai chen vào nạp trùng.
+            loop = asyncio.get_running_loop()
+            await loop.run_in_executor(None, self._nap_text_runtime_dong_bo)
 
     async def ensure_vision_runtime(self) -> None:
         """
@@ -126,25 +148,35 @@ class RuntimeState:
                 self.vision_error = "Vision runtime disabled by RUNTIME_PROFILE=text-only"
                 return
 
-            # Engine sở hữu model vision -> tạo engine nếu chưa có (ModelEngine là singleton)
-            if not self.engine:
-                try:
-                    from src.core.engine import ModelEngine
-                    self.engine = ModelEngine()
-                except Exception as exc:
-                    self.engine = None
-                    self.engine_error = str(exc)
-                    self.vision_error = self.engine_error
-                    logger.error("Engine init (for vision) failed: %s", exc)
-                    return
+            # Cùng lý do với text runtime: `ModelEngine()` nạp cả vLLM lẫn VLM,
+            # chặn luồng hàng phút. Đẩy sang thread, khoá vẫn giữ nguyên.
+            loop = asyncio.get_running_loop()
+            await loop.run_in_executor(None, self._nap_vision_runtime_dong_bo)
 
+    def _nap_vision_runtime_dong_bo(self) -> None:
+        """
+        Phần nạp NẶNG của vision runtime — đồng bộ, chỉ gọi khi đang giữ
+        `_vision_load_lock` (xem `_nap_text_runtime_dong_bo`).
+        """
+        # Engine sở hữu model vision -> tạo engine nếu chưa có (ModelEngine là singleton)
+        if not self.engine:
             try:
-                from src.agents.vision import VisionAgent
-                self.vision = VisionAgent(self.engine)   # <-- truyền engine vào (trước đây VisionAgent())
+                from src.core.engine import ModelEngine
+                self.engine = ModelEngine()
             except Exception as exc:
-                self.vision = None
-                self.vision_error = str(exc)
-                logger.error("Vision initialization failed: %s", exc)
+                self.engine = None
+                self.engine_error = str(exc)
+                self.vision_error = self.engine_error
+                logger.error("Engine init (for vision) failed: %s", exc)
+                return
+
+        try:
+            from src.agents.vision import VisionAgent
+            self.vision = VisionAgent(self.engine)   # <-- truyền engine vào (trước đây VisionAgent())
+        except Exception as exc:
+            self.vision = None
+            self.vision_error = str(exc)
+            logger.error("Vision initialization failed: %s", exc)
 
 
 # Global singleton

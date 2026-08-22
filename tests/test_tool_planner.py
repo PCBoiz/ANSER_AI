@@ -9,6 +9,7 @@ khớp và một ca KHÔNG được khớp.
 from src.core.tool_planner import (
     MAX_PLAN,
     NEEDS_SYSTEM_DATA,
+    la_cau_soat_hoa_don,
     needs_system_data,
     plan_tools,
 )
@@ -74,6 +75,135 @@ def test_hoi_mot_con_so_van_thuoc_ve_nhanh_du_lieu():
     """
     assert ke_hoach("doanh thu hôm nay là bao nhiêu") == []
     assert ke_hoach("hôm nay bán được mấy đơn") == []
+
+
+# --------------------------------------------------------------------------
+# vat — câu SOÁT HOÁ ĐƠN không được rơi vào inventory_audit (sự cố T4, 23/08)
+# --------------------------------------------------------------------------
+
+# Câu T4 nguyên bản: hoá đơn do VLM đọc ra, dán kèm dạng JSON. Chữ "kiểm" và
+# "kho" trong TÊN DÒNG HÀNG ("Phí kiểm đếm, lưu kho bãi") từng làm mẫu
+# `inventory_audit` khớp nhầm — dữ liệu bên trong hoá đơn bị đọc thành ý định.
+CAU_HOA_DON_T4 = (
+    'Qwen2-VL đọc được hóa đơn sau, hãy kiểm tra tính hợp lệ: '
+    '{"items": [{"name": "Phí kiểm đếm, lưu kho bãi", "price": 500000, '
+    '"qty": 2}, {"name": "Cước vận chuyển HN-HP", "price": 2500000, '
+    '"qty": 1}], "subtotal": 3500000, "vat_rate": 8, "total_amount": 3780000}'
+)
+
+
+def test_cau_soat_hoa_don_ra_vat_khong_keo_inventory_audit():
+    """
+    CHỌN THIẾT KẾ: ra đúng ["vat"], KHÔNG phải "vat xếp trước inventory_audit".
+    Chỉ xếp lại thứ tự thì inventory_audit vẫn nằm trong kế hoạch, vòng agentic
+    vẫn chạm _CHUA_CO_NGUON và "chưa có bảng tồn kho" vẫn đến tay người dùng —
+    đúng triệu chứng T4. Ý định của câu là soát MỘT tờ hoá đơn; "kho" ở đây là
+    tên dòng hàng, không phải yêu cầu soi kho, nên phải gạt hẳn khỏi kế hoạch.
+    """
+    assert ke_hoach(CAU_HOA_DON_T4) == ["vat"]
+
+
+def test_cau_soat_hoa_don_khong_co_chu_vat_van_ra_vat():
+    """
+    "đối chiếu … có khớp không" không chứa thuế/vat/gtgt nên luật `vat` cũ
+    không với tới, còn "hóa đơn lưu kho" thì khớp mẫu kho — trước khi sửa, câu
+    này đi thẳng vào inventory_audit (đúng đường hỏng của T4).
+    """
+    assert ke_hoach(
+        "đối chiếu hóa đơn lưu kho này giúp tôi: tổng 3.500.000đ có khớp không"
+    ) == ["vat"]
+
+
+def test_cau_soi_kho_that_van_ve_inventory_audit():
+    """Luật phủ quyết chỉ đụng câu có 'hoá đơn' — soi kho thật không bị vạ lây."""
+    assert ke_hoach("soi giúp tôi sổ tồn kho") == ["inventory_audit"]
+
+
+def test_cau_hoi_thu_tuc_hoa_don_khong_kich_hoat_tool():
+    """
+    Không có số tiền thì không có gì để tính lại — câu hỏi THỦ TỤC về hoá đơn
+    thuộc nhánh cũ/RAG (cùng lý do cờ `can_so` của luật `vat`), và cũng không
+    được rơi vào inventory_audit.
+    """
+    assert ke_hoach("hóa đơn hợp lệ cần những thông tin gì") == []
+
+
+# --------------------------------------------------------------------------
+# Phủ quyết hoá đơn KHÔNG được vạ lây câu soi KHO THẬT (phản biện 23/08)
+# --------------------------------------------------------------------------
+
+# Bốn câu soi kho thật có NHẮC hoá đơn bằng lời — không dán kèm nội dung nào.
+# Trước khi sửa, `_HOA_DON_KIEM` phủ quyết vô điều kiện làm cả bốn ra []:
+# người hỏi kiểm kê kho nhận về nhánh router thay vì bảng đối chiếu tồn kho.
+CAC_CAU_SOI_KHO_NHAC_HOA_DON = [
+    "kiểm kê kho tháng này, đối chiếu với hóa đơn nhập hàng",
+    "đối chiếu tồn kho với hóa đơn nhập tháng này",
+    "rà soát kho, tiện thể xem hóa đơn nhập",
+    "kiểm tra tồn kho rồi xuất hóa đơn cho khách",
+]
+
+
+def test_cau_soi_kho_that_nhac_hoa_don_van_ve_inventory_audit():
+    """
+    Chỉ NHẮC hoá đơn bằng lời (không có JSON, không có số tiền nào) thì đây là
+    yêu cầu soi kho — phủ quyết chỉ dành cho câu CÓ nội dung hoá đơn dán kèm
+    (đặc trưng sự cố T4), không dành cho những câu này.
+    """
+    for cau in CAC_CAU_SOI_KHO_NHAC_HOA_DON:
+        assert ke_hoach(cau) == ["inventory_audit"], cau
+        assert not la_cau_soat_hoa_don(cau), cau
+
+
+def test_mot_so_tien_tran_khong_du_de_cong_vat():
+    """
+    Câu chỉ nêu MỖI số tổng thì không có dòng hàng nào để tính lại: cộng `vat`
+    ép model điền items=[] -> calculated_total=0 -> "lệch 250 triệu" — một con
+    số sai có nguồn, lọt chốt chặn neo số liệu (tái hiện 23/08/2026). Hai câu
+    này phải rơi về nhánh router như câu hỏi thủ tục, KHÔNG ra vat.
+    """
+    for cau in [
+        "kiểm tra hóa đơn tổng 250 triệu có khớp sổ sách không",
+        "kiểm tra hóa đơn tổng 3.780.000đ có đúng không",
+    ]:
+        assert ke_hoach(cau) == [], cau
+        assert not la_cau_soat_hoa_don(cau), cau
+
+
+def test_cau_ghep_hoa_don_dan_kem_va_soi_kho_that_ra_ca_hai():
+    """
+    CHỌN THIẾT KẾ cho câu ghép: vế kho nằm NGOÀI khối JSON dán kèm là yêu cầu
+    thật, không được nuốt. Khi phần dán kèm tách được về cấu trúc (ngoặc nhọn),
+    planner bỏ khối ngoặc rồi kiểm lại mẫu soi kho trên phần còn lại — vẫn đòi
+    soi kho thì giữ inventory_audit bên cạnh vat. (Không có ngoặc thì không
+    tách nổi trong/ngoài, ưu tiên chống T4 — xem test T4 ngay trên.)
+    """
+    cau = (
+        'kiểm tra hóa đơn {"items": [{"name": "Phí kiểm đếm, lưu kho bãi", '
+        '"price": 500000, "qty": 2}], "total_amount": 1080000} '
+        "và rà soát luôn sổ tồn kho tháng này"
+    )
+    assert ke_hoach(cau) == ["inventory_audit", "vat"]
+    assert la_cau_soat_hoa_don(cau)
+
+
+def test_hop_dong_la_cau_soat_hoa_don_cho_tang_tren():
+    """
+    `chat.py` import hàm này để rẽ nhánh — điều kiện của nó phải ĐÚNG BẰNG
+    điều kiện planner cộng `vat` theo đường hoá đơn, nếu không hai tầng nhìn
+    cùng một câu ra hai ý định khác nhau.
+    """
+    # Có ý định soát + có nội dung dán kèm -> True, và kế hoạch có vat.
+    assert la_cau_soat_hoa_don(CAU_HOA_DON_T4)
+    assert "vat" in ke_hoach(CAU_HOA_DON_T4)
+    cau_hai_cham = "đối chiếu hóa đơn lưu kho này giúp tôi: tổng 3.500.000đ có khớp không"
+    assert la_cau_soat_hoa_don(cau_hai_cham)
+    assert "vat" in ke_hoach(cau_hai_cham)
+
+    # Thiếu một trong hai vế -> False.
+    assert not la_cau_soat_hoa_don("hóa đơn hợp lệ cần những thông tin gì")  # không dán kèm
+    assert not la_cau_soat_hoa_don('{"items": [], "total_amount": 500000}')  # không có ý soát
+    assert not la_cau_soat_hoa_don("")
+    assert not la_cau_soat_hoa_don("soi giúp tôi sổ tồn kho")
 
 
 # --------------------------------------------------------------------------
