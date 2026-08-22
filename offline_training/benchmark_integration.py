@@ -20,6 +20,22 @@ import httpx
 
 BRAIN_URL = os.environ.get("BRAIN_URL", "http://localhost:8000")
 HEADERS   = {"ngrok-skip-browser-warning": "true"}
+
+# Token PHẢI gửi kèm, nếu không Brain trả 401 cho mọi ca — và bảng kết quả sẽ
+# đọc thành "sáu ca hỏng" trong khi thật ra là MỘT lỗi cấu hình.
+#
+# Bản đầu của file này viết từ thời `API_AUTH_TOKEN` còn để rỗng, tức Brain
+# KHÔNG kiểm token gì cả (`require_api_token` return sớm khi biến rỗng). Từ khi
+# Brain được phơi ra Internet qua đường hầm thì token là bắt buộc, và script
+# này bị bỏ lại phía sau.
+#
+# Nhận cả hai tên: `BRAIN_API_TOKEN` là tên phía CLIENT (Body dùng tên này),
+# `API_AUTH_TOKEN` là tên phía SERVER — trên Colab cả hai đầu nằm chung một
+# tiến trình nên chỉ có biến sau.
+API_TOKEN = (os.environ.get("BRAIN_API_TOKEN")
+             or os.environ.get("API_AUTH_TOKEN") or "").strip()
+if API_TOKEN:
+    HEADERS["X-API-Token"] = API_TOKEN
 TIMEOUT   = 180
 POLL_MAX  = 90
 
@@ -181,7 +197,32 @@ async def main():
             h = await client.get(f"{BRAIN_URL}/health")
             hs = h.json()
             print(f"  Health: engine_ready={hs.get('engine_ready')} "
-                  f"degraded={hs.get('degraded')}\n")
+                  f"degraded={hs.get('degraded')} "
+                  f"auth_enabled={hs.get('auth_enabled')}")
+            print(f"  Token gửi kèm: {'CÓ' if API_TOKEN else 'KHÔNG'}\n")
+
+            # Chặn ở đây thay vì để sáu ca cùng trả 401. Sáu dòng "LỖI GỌI API"
+            # giống hệt nhau trông như model hỏng, còn thật ra là thiếu một biến
+            # môi trường — hai chuyện cần đọc khác nhau.
+            if hs.get("auth_enabled") and not API_TOKEN:
+                sys.exit(
+                    "\n  ✗ Brain ĐANG kiểm token mà script không có token để gửi.\n"
+                    "    Mọi ca sẽ trả 401, và đó KHÔNG phải lỗi model.\n\n"
+                    "    Đặt một trong hai biến rồi chạy lại:\n"
+                    "      BRAIN_API_TOKEN=...   (tên phía client, giống Body)\n"
+                    "      API_AUTH_TOKEN=...    (tên phía server)\n\n"
+                    "    Trên Colab, ô 4.1 đã đặt `API_AUTH_TOKEN` vào os.environ —\n"
+                    "    `!lệnh` kế thừa biến đó, nên chạy lại ô 4.1 rồi ô 4.4."
+                )
+
+            # engine_ready=False ngay sau khi bật server là BÌNH THƯỜNG: model nạp
+            # LƯỜI ở request đầu tiên (`ensure_text_runtime`), `lifespan` không nạp
+            # gì. Chỉ đáng lo khi nó vẫn False SAU khi đã có ca chạy qua.
+            if hs.get("engine_ready") is False:
+                print("  ⓘ engine_ready=False — model chưa nạp. Bình thường ở đây:\n"
+                      "    nó nạp ở câu hỏi ĐẦU TIÊN, nên ca T1 sẽ lâu (1–3 phút).\n")
+        except SystemExit:
+            raise
         except Exception as e:
             print(f"  ⚠ Không gọi được /health: {str(e)[:80]}\n")
 
