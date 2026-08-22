@@ -29,7 +29,10 @@ liger-kernel
 #   Bước quantize : pip install autoawq==0.2.9
 #     (autoawq có thể đòi transformers khác — chạy sau khi train xong,
 #      restart runtime; hoặc dùng llm-compressor, xem README)
-#   Bước benchmark: pip install vllm==0.8.5
+#   Bước benchmark: pip install vllm==0.10.2 'transformers>=4.55.2,<5'
+#     (0.8.5 KHÔNG cài được từ khi Colab lên Python 3.13 — nó khai
+#      Requires-Python <3.13. 0.10.2 là bản sớm nhất đỡ 3.13 mà VẪN còn
+#      `GuidedDecodingParams`; 0.12.0 gỡ hẳn API đó.)
 #   So model qua API: pip install anthropic
 #     (chỉ cần khi `--model anthropic:...`. Dạng đó GỬI DỮ LIỆU RA NGOÀI —
 #      xem R2 trong AGENTS.md: chỉ chạy trên bộ đề tổng hợp hoặc đã ẩn danh,

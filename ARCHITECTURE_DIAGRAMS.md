@@ -346,7 +346,7 @@ module" — mà đó chính là ranh giới giữa thiết kế tốt và nợ k
 ```mermaid
 graph TB
     subgraph text["Đường TEXT"]
-        vllm["vllm==0.8.5"]
+        vllm["vllm 0.10.2–0.11.x"]
         tf451["transformers==4.51.3"]
     end
     subgraph vis["Đường ẢNH"]

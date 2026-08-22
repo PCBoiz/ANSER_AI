@@ -611,7 +611,8 @@ def smoke_test_guided(nha: NhaCungCap) -> None:
     if not ok:
         print(f"    đầu ra thô: {raw[:200]!r}")
         goi_y = (
-            "  1. vLLM có GuidedDecodingParams không (bản 0.8.5 thì có)\n"
+            "  1. vLLM có GuidedDecodingParams không — 0.10.2/0.11.x thì có,\n"
+            "     0.12.0 trở lên GỠ HẲN (đổi sang StructuredOutputsParams)\n"
             "  2. backend structured output — thử lùi về engine V0: VLLM_USE_V1=0\n"
             "  3. lược đồ có kiểu mà xgrammar chưa đỡ được không\n"
         ) if nha.rang_buoc == "guided_json" else (

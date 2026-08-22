@@ -477,3 +477,20 @@ def test_luoc_do_quyet_dinh_agentic_THAT_khong_dien_dat_duoc():
     dong, mo, _ = dong_luoc_do(build_decision_schema(["report"]))
     assert dong is None
     assert any("oneOf" in ly_do for ly_do in mo), mo
+
+
+def test_thieu_grammar_thi_DUNG_chu_khong_canh_bao_roi_chay_tiep():
+    """
+    Bản cũ in một dòng cảnh báo rồi sinh KHÔNG ràng buộc. `smoke_test_guided`
+    KHÔNG bắt được trường hợp đó: câu nhắc của nó có chữ bảo xuất JSON, nên
+    model không ràng buộc vẫn trả về JSON hợp lệ và chốt chặn vẫn xanh. Cả phiên đo
+    sau đó chạy không grammar mà không ai biết — đúng buổi đo 04/08/2026.
+
+    vLLM 0.12.0 gỡ `GuidedDecodingParams`, nên đây không phải giả thiết: nâng
+    version quá trần là rơi thẳng vào nó.
+    """
+    import inspect
+
+    than = inspect.getsource(VLLMTrongTienTrinh.sinh)
+    assert "raise SystemExit" in than
+    assert "StructuredOutputsParams" in than, "thông báo phải gọi tên API thay thế"

@@ -347,10 +347,20 @@ class VLLMTrongTienTrinh:
         if json_schema is not None:
             try:
                 from vllm.sampling_params import GuidedDecodingParams
-                kwargs["guided_decoding"] = GuidedDecodingParams(json=json_schema)
-            except ImportError:
-                print("  ⚠ vLLM không có GuidedDecodingParams — chạy KHÔNG ràng buộc "
-                      "(số liệu sẽ kém hơn lúc serve thật)")
+            except ImportError as exc:
+                # DỪNG, không cảnh báo rồi chạy tiếp. Bản cũ chỉ in một dòng rồi
+                # sinh KHÔNG ràng buộc — mà `smoke_test_guided` KHÔNG bắt được
+                # trường hợp đó: câu nhắc của nó ("Tra ve JSON: ...") có chữ bảo
+                # xuất JSON, nên model không ràng buộc vẫn trả về JSON hợp lệ và
+                # chốt chặn vẫn xanh. Cả phiên đo sau đó chạy không grammar mà
+                # không ai biết — đúng buổi đo 04/08/2026.
+                raise SystemExit(
+                    "vLLM bản này không có `GuidedDecodingParams` — không ép được "
+                    "JSON, và đo tiếp là đo một thứ khác.\n"
+                    "0.12.0 đã đổi sang `StructuredOutputsParams`. Dùng "
+                    "`vllm>=0.10.2,<0.12`."
+                ) from exc
+            kwargs["guided_decoding"] = GuidedDecodingParams(json=json_schema)
         params = SamplingParams(**kwargs)
 
         tokenizer = self.llm.get_tokenizer()
