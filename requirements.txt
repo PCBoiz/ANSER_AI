@@ -33,6 +33,18 @@ pytz
 qwen_vl_utils
 requests
 scikit-learn
+# PHỤ THUỘC RUNTIME, không phải công cụ phát triển.
+#
+# Ba module đọc .xlsx đều import nó và cả ba đều nằm sau endpoint đang phục vụ:
+#   src/core/inventory_import.py:392  -> POST /tools/inventory-import
+#   src/core/partner_import.py:234    -> POST /tools/partner-import
+#   src/core/vat_catalog.py:367       -> POST /tools/vat-catalog-audit
+#
+# Trước 23/08/2026 nó KHÔNG có trong requirements.txt, requirements-dev.txt lẫn
+# deploy/. Chạy được suốt vì Colab cài sẵn openpyxl — một bản dựng docker sạch
+# thì cả ba endpoint 500 ngay lần gọi đầu. Cùng lúc đó, 34 test của chính ba
+# đường này `importorskip` rồi nằm im: nhãn xanh không nói gì về chúng.
+openpyxl
 sqlalchemy
 sentence-transformers
 sentencepiece
