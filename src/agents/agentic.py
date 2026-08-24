@@ -187,19 +187,46 @@ def build_answer_schema() -> dict[str, Any]:
 
 
 def render_tools(tool_defs: list[dict]) -> str:
-    """Danh mục tool cho prompt — dẫn xuất từ manifest, không viết tay (P4)."""
+    """
+    Danh mục tool cho prompt — dẫn xuất từ manifest, không viết tay (P4).
+
+    GIẤU TRƯỜNG HỆ THỐNG CẤP, cùng danh sách mà `arguments_schema` dùng.
+
+    Trước 15/08/2026 hàm này đọc `input_schema` ĐẦY ĐỦ, nên prompt quảng cáo
+    đúng những trường bị gạch tên ở tầng lược đồ:
+
+        - report: ...
+            tham số: granularity, periods_back, top_n, sales, expenses
+        - inventory_audit: ...
+            tham số: lines*, warehouse, period_start, period_end
+
+    `sales`, `expenses`, `lines` do `data_provider` bơm vào từ nguồn tất định.
+    Ta vừa bảo model "phải điền `lines`" — dấu * còn nói là BẮT BUỘC — vừa định
+    dùng grammar cấm nó điền. Hai hàm đọc cùng một nguồn mà trả lời trái nhau.
+
+    Phiên đo 15/08 cho thấy vế nào thắng: model làm đúng lời prompt dặn, viết ra
+    nguyên mảng `sales`, phình tới trần token, cắt cụt, `_parse` trả None, vòng
+    lặp gãy — 7/12 câu nhóm `report`. Grammar đã không chặn được (backend giải
+    mã bỏ qua `additionalProperties`), nên lời dặn là thứ duy nhất model nghe.
+
+    Sửa ở đây KHÔNG phụ thuộc backend: không quảng cáo thì không bị xui viết.
+    """
+    from src.core.tool_planner import system_data_fields
+
     lines = []
     for tool in tool_defs:
         schema = tool.get("input_schema") or {}
         props = schema.get("properties") or {}
-        required = set(schema.get("required") or [])
-        fields = ", ".join(
-            f"{name}{'*' if name in required else ''}"
-            for name in list(props)[:12]
-        )
+        bo = set(system_data_fields(tool["name"]))
+        required = set(schema.get("required") or []) - bo
+        hien = [n for n in list(props) if n not in bo][:12]
+        fields = ", ".join(f"{name}{'*' if name in required else ''}" for name in hien)
+        # Chú thích dấu * chỉ in khi CÓ dấu *. Dạy model một quy ước nó không
+        # dùng tới, trên chỗ đắt nhất của prompt, là trả tiền để gây nhiễu.
+        chu_thich = "   (* = bắt buộc)" if required & set(hien) else ""
         lines.append(
             f"- {tool['name']}: {tool.get('description', '').strip()}\n"
-            f"    tham số: {fields or '(không có)'}   (* = bắt buộc)"
+            f"    tham số: {fields or '(không có — hệ thống tự cấp dữ liệu)'}{chu_thich}"
         )
     return "\n".join(lines)
 

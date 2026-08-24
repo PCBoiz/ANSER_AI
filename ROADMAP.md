@@ -123,7 +123,7 @@ sau là làm tốt hơn.
 | Xác thực chặn đúng | ✅ quét 24 endpoint: không token → 401, token sai → 401 |
 | Chỉ báo AI bật/tắt trên giao diện | ✅ chân sidebar, đỏ khi Brain không kiểm token |
 | **Đưa lên chỗ khách truy cập được** | ❌ chưa |
-| **Hướng dẫn cho người không phải kỹ thuật** | ❌ chưa |
+| Hướng dẫn cho người không phải kỹ thuật | ✅ trang **Hướng dẫn dùng** trong app + bản chia sẻ qua link |
 | Xoá file sau khi xử lý | ✅ file không ghi ra đĩa (P2) |
 
 **Ba chỗ compose mô tả mà code chưa làm** — đã ghi thẳng trong file và khoá bằng
@@ -191,9 +191,19 @@ thì lấy ra. Chi tiết và cách đọc lại kết quả: [PHIEN_DO_COLAB.md
 3. Nhánh n8n trong file JSON là **bản sao y của extraction** — cả một nhánh mất
    dữ liệu so cặp mà không dòng lỗi nào
 
-> Còn tồn: `render_tools()` vẫn quảng cáo `sales`/`lines*` cho model trong khi
-> `arguments_schema()` gạch chúng đi — hai hàm đọc cùng một nguồn mà trả lời trái
-> nhau. Chưa sửa.
+**Đã sửa nốt 15/08 (chiều):** `render_tools()` từng quảng cáo `sales`, `expenses`,
+`lines*` cho model trong khi `arguments_schema()` gạch chúng đi — hai hàm đọc
+cùng một nguồn mà trả lời trái nhau, và model nghe theo prompt. Nay cả hai dùng
+chung `system_data_fields()`.
+
+Cách sửa này **không phụ thuộc backend giải mã**, và đó là điểm mấu chốt: chạy
+lại phiên đo sau khi thêm `additionalProperties: False` cho ra kết quả **giống
+hệt tới từng câu** — backend bỏ qua ràng buộc đó. Grammar không chặn được thì lời
+dặn trong prompt là thứ duy nhất còn tác dụng.
+
+`smoke_test_guided()` nay kiểm **thi hành** chứ không chỉ kiểm dựng được: nó sinh
+thử với lược đồ cấm một trường rồi đòi trường đó vắng mặt. Ba giây, và nó biến
+một thất bại vô hình thành một dòng in ở phút thứ nhất.
 
 ---
 
@@ -241,11 +251,11 @@ Danh sách đầy đủ ở [HOANG_PHAT_DU_LIEU_CAN_XIN.md](HOANG_PHAT_DU_LIEU_C
 
 1. **Kế toán thật rà một vòng** (GĐ C) — thứ duy nhất không mua được bằng code
 2. **Đưa lên chỗ khách bấm được** (GĐ B) — biến demo thành sản phẩm
-3. **Hướng dẫn cho người không phải kỹ thuật** — kế toán phải tự đi được từ đầu
-   đến cuối mà không hỏi ai
+3. **Kế toán thật dùng thử một vòng** — đưa hướng dẫn + đường truy cập cho họ,
+   rồi ngồi im xem chỗ nào họ khựng lại
 
-Ba việc này độc lập nhau, làm song song được. *(Việc thứ ba cũ — đo model — đã
-xong 15/08.)*
+Ba việc này độc lập nhau, làm song song được. *(Hai việc đã rời khỏi danh sách
+này trong ngày 15/08: đo model, và viết hướng dẫn.)*
 
 ---
 

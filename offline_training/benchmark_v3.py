@@ -627,7 +627,7 @@ def build_llm(model_path: str):
 
 
 
-def smoke_test_guided(llm) -> None:
+def smoke_test_guided(llm) -> list[str]:
     """
     Kiem RANG BUOC GIAI MA chay duoc, TRUOC khi dot 40 phut do.
 
@@ -699,6 +699,55 @@ def smoke_test_guided(llm) -> None:
                 "Chạy `pytest tests/test_agentic_plan.py -k schema` để khoanh vùng."
             ) from exc
     print(f"[chốt chặn] lược đồ agentic ({len(get_tool_defs())} tool): ✓ dựng được")
+
+    # ---- DỰNG ĐƯỢC KHÁC VỚI THI HÀNH ĐƯỢC (15/08/2026) --------------------
+    #
+    # Hai chốt trên chỉ chứng minh grammar dựng xong và đầu ra đọc được thành
+    # JSON. Không cái nào hỏi câu quan trọng nhất: grammar có THẬT SỰ chặn
+    # không.
+    #
+    # Phiên 15/08 trả lời là KHÔNG. Sau khi thêm `additionalProperties: False`
+    # vào `arguments_schema`, chạy lại cho ra kết quả GIỐNG HỆT tới từng câu —
+    # `per_row`, `n_arg_ok`, `cuu_tu_json_cut`, không lệch một đơn vị — và mẫu
+    # đầu ra hỏng vẫn còn nguyên `"sales": [...]`, thứ lược đồ vừa cấm. Backend
+    # giải mã bỏ qua ràng buộc đó.
+    #
+    # Cả một vòng đo mất trắng, và nó chỉ lộ ra vì có người đọc tay mẫu đầu ra.
+    # Ba giây ở đây biến chuyện đó thành một dòng in.
+    #
+    # KHÔNG thoát: nếu backend không thi hành thì production cũng vậy, nên số đo
+    # được vẫn phản ánh đúng thứ khách nhận. Nó chỉ đổi cách ĐỌC kết quả — lỗi
+    # thuộc về lược đồ hay thuộc về model.
+    canh_bao: list[str] = []
+    report = next((t for t in get_tool_defs() if t["name"] == "report"), None)
+    if report is not None:
+        bo = system_data_fields("report")
+        s = build_decision_schema(["report"], arguments_schema(report, bo))
+        raw = generate(
+            llm,
+            [[{"role": "user", "content":
+               "Gọi tool report. Kèm luôn mảng `sales` gồm 3 dòng bán hàng "
+               "và mảng `expenses` gồm 2 dòng chi phí."}]],
+            s, max_tokens=300, temperature=0.0,
+        )[0][0]
+        try:
+            args = (json.loads(raw) or {}).get("arguments") or {}
+        except Exception:
+            args = {}
+        lot = sorted(set(args) & set(bo))
+        if lot:
+            canh_bao.append(
+                f"grammar KHÔNG thi hành `additionalProperties`: model vẫn sinh "
+                f"được {lot} dù lược đồ đã cấm"
+            )
+            print(f"[chốt chặn] thi hành ràng buộc: ✗ KHÔNG — lọt {lot}")
+            print("    Hệ quả: mọi kết luận về nhánh agentic phải đọc như đo một")
+            print("    cấu hình KHÔNG có lớp chặn. Lời dặn trong prompt")
+            print("    (`render_tools`) là thứ duy nhất còn tác dụng.")
+        else:
+            print("[chốt chặn] thi hành ràng buộc: ✓ trường bị cấm không sinh ra được")
+
+    return canh_bao
 
 
 
@@ -813,8 +862,12 @@ def main() -> None:
 
     llm = build_llm(args.model)
     print(f"\n{'=' * 60}\n  BENCHMARK V3 — {args.model}\n{'=' * 60}")
+    # Cảnh báo về CHÍNH KHUNG ĐO, không phải về model. Gom lại để in ở tổng kết:
+    # "grammar không thi hành ràng buộc" đọc ở phút 1 thì trôi mất, mà nó lại đổi
+    # hoàn toàn cách hiểu nhánh agentic ở phút 40.
+    canh_bao_khung_do: list[str] = []
     if os.getenv("BENCH_SKIP_GUIDED_CHECK", "") != "1":
-        smoke_test_guided(llm)
+        canh_bao_khung_do = smoke_test_guided(llm) or []
     gate_fail = []
     # Nhánh KHÔNG ĐO ĐƯỢC — thiếu file eval, hoặc có nhưng quá ít mẫu để kết
     # luận. Phải gom lại và in ở tổng kết: một phiên đo bỏ qua ba trên bốn nhánh
@@ -1075,6 +1128,10 @@ def main() -> None:
     # In TRƯỚC kết luận. Một phiên bỏ qua ba trên bốn nhánh rồi in "Qua mọi
     # ngưỡng" là câu đúng chữ mà sai hoàn toàn về nghĩa — và đó chính là câu
     # người ta chụp màn hình gửi đi.
+    if canh_bao_khung_do:
+        print("⚠ KHUNG ĐO KHÔNG CHẠY ĐÚNG NHƯ GIẢ ĐỊNH (đọc trước khi kết luận về model):")
+        for x in canh_bao_khung_do:
+            print(f"   {x}")
     if khong_do_duoc:
         print("⚠ KHÔNG ĐO ĐƯỢC (thiếu dữ liệu, không phải model đạt):")
         for x in khong_do_duoc:
@@ -1083,7 +1140,7 @@ def main() -> None:
         print("⚠ ĐO ĐƯỢC NHƯNG KHÔNG KẾT LUẬN ĐƯỢC (mẫu quá ít, không dùng làm cổng):")
         for x in mau_qua_it:
             print(f"   {x}")
-    if khong_do_duoc or mau_qua_it:
+    if canh_bao_khung_do or khong_do_duoc or mau_qua_it:
         print("-" * 60)
 
     if gate_fail and not args.no_gate:

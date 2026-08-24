@@ -159,9 +159,33 @@ def test_decision_schema_forbids_tool_and_answer_together():
 
 
 def test_render_tools_marks_required_params():
+    """`vat` không có trường hệ thống cấp — dấu * phải khớp đúng schema."""
     text = render_tools(_TOOLS)
-    assert "sales*" in text and "granularity" in text
-    assert "granularity*" not in text
+    assert "items*" in text and "stated_total*" in text
+    assert "granularity" in text and "granularity*" not in text
+
+
+def test_render_tools_KHONG_quang_cao_truong_he_thong_cap():
+    """
+    Prompt không được nhắc tới trường mà `data_provider` tự bơm vào.
+
+    Bản cũ đọc `input_schema` đầy đủ nên nó in ra `sales`, `expenses`, `lines*`
+    — đúng những trường `arguments_schema` gạch tên ở tầng lược đồ, và `lines*`
+    còn kèm dấu sao nói rằng BẮT BUỘC. Ta vừa bảo model phải điền, vừa định dùng
+    grammar cấm nó điền.
+
+    Phiên đo 15/08/2026 cho thấy vế nào thắng: model nghe lời prompt, viết ra
+    nguyên mảng `sales`, phình tới trần token rồi cắt cụt — 7/12 câu nhóm
+    `report`. Grammar không chặn được vì backend giải mã bỏ qua
+    `additionalProperties`, nên lời dặn là thứ duy nhất còn tác dụng.
+
+    Đây là phép kiểm KHÔNG phụ thuộc backend: không quảng cáo thì không bị xui.
+    """
+    text = render_tools(_TOOLS)
+    assert "sales" not in text, (
+        "prompt vẫn nhắc `sales` — trường này do data_provider bơm vào, "
+        "model viết ra chỉ để bị vứt đi rồi chết vì chính việc viết đó"
+    )
 
 
 class _ScriptedManager:
