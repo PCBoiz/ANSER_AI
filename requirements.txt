@@ -33,6 +33,18 @@ pytz
 qwen_vl_utils
 requests
 scikit-learn
+# PHỤ THUỘC RUNTIME, không phải công cụ phát triển.
+#
+# Ba module đọc .xlsx đều import nó và cả ba đều nằm sau endpoint đang phục vụ:
+#   src/core/inventory_import.py:392  -> POST /tools/inventory-import
+#   src/core/partner_import.py:234    -> POST /tools/partner-import
+#   src/core/vat_catalog.py:367       -> POST /tools/vat-catalog-audit
+#
+# Trước 23/08/2026 nó KHÔNG có trong requirements.txt, requirements-dev.txt lẫn
+# deploy/. Chạy được suốt vì Colab cài sẵn openpyxl — một bản dựng docker sạch
+# thì cả ba endpoint 500 ngay lần gọi đầu. Cùng lúc đó, 34 test của chính ba
+# đường này `importorskip` rồi nằm im: nhãn xanh không nói gì về chúng.
+openpyxl
 sqlalchemy
 sentence-transformers
 sentencepiece
@@ -40,7 +52,17 @@ timm
 torch>=2.4.0
 transformers>=4.46.0
 uvicorn
-vllm>=0.6.3
+# TRẦN TRÊN LÀ BẮT BUỘC, không phải cho gọn.
+#
+# vLLM 0.12.0 GỠ `GuidedDecodingParams` (đổi sang `StructuredOutputsParams`).
+# `engine.py::_build_guided_decoding` bắt `ImportError` rồi trả None và chạy
+# tiếp — nghĩa là Brain sẽ phục vụ với guided decoding TẮT ÂM THẦM, chỉ để
+# lại một dòng log. Đúng sự cố 04/08/2026, lần đó extraction và agentic rơi
+# gần 0 và trông y hệt một model dở.
+#
+# Sàn 0.10.2: bản sớm nhất cài được trên Python 3.13 (Colab đã lên 3.13, các
+# bản <= 0.10.1 khai `Requires-Python <3.13` nên pip bỏ qua hết).
+vllm>=0.10.2,<0.12
 pytest==8.2.0
 httpx==0.27.0
 underthesea==9.5.0

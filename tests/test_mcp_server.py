@@ -144,15 +144,22 @@ def test_nguong_tuong_doi_ap_dung_cho_hoa_don_lon():
     assert kq["is_valid"]
 
 
-def test_hoa_don_khong_co_dong_nao_ma_van_ghi_tong_thi_bao_sai():
+def test_hoa_don_khong_co_dong_nao_thi_noi_thieu_khong_dien_so_0():
     """
-    VLM đọc ra rỗng nhưng vẫn thấy con số tổng — phải BÁO SAI, không được lặng
-    lẽ coi là khớp. Đây là ca ảnh mờ, hay gặp nhất ở hoá đơn chụp bằng điện thoại.
+    items rỗng (ảnh mờ VLM đọc ra rỗng, hoặc model buộc điền items=[] khi câu
+    chỉ nêu mỗi số tổng) — bản cũ lặng lẽ tính calculated_total=0 rồi kết luận
+    "lệch 5 triệu": một con số sai CÓ NGUỒN, lọt qua chốt chặn neo số liệu
+    (tái hiện 23/08/2026). Thiếu dữ liệu thì NÓI THIẾU (R1): trả lỗi có cấu
+    trúc, is_valid=False để needs_manual_review vẫn bật, và KHÔNG có
+    calculated_total/difference nào để ai đó lỡ tay đem đi dùng.
     """
     kq = MCPServer.validate_invoice_total(items=[], stated_total=5_000_000)
-    assert not kq["is_valid"]
-    assert kq["calculated_total"] == 0
-    assert kq["difference"] == 5_000_000
+    assert kq["error"] == "không có dòng hàng nào để tính lại"
+    assert kq["is_valid"] is False
+    assert "calculated_total" not in kq
+    assert "difference" not in kq
+    assert kq["stated_total"] == 5_000_000
+    assert kq["lines"] == []
 
 
 def test_tra_ve_tung_dong_de_truy_nguoc():

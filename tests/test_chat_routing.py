@@ -357,3 +357,90 @@ def test_nhanh_logistics_khong_bi_vong_agentic_giành_mat(moi_truong, monkeypatc
 
     # Đi vào nhánh báo giá (hỏi thêm trường thiếu), KHÔNG vào vòng agentic.
     assert "tôi cần thêm" in tra_loi.lower()
+
+
+# ---------------------------------------------------------------------------
+# Hoá đơn VẬN TẢI dán kèm — đường vòng của router (tái hiện 23/08/2026)
+# ---------------------------------------------------------------------------
+
+# Hoá đơn thật của khách: TÊN DÒNG HÀNG là dịch vụ vận chuyển, nên luật từ khoá
+# LOGISTICS của SemanticRouter khớp ngay (method=keyword, score=1.0) dù ý định
+# của người hỏi là SOÁT LẠI TỔNG TIỀN.
+_HOA_DON_VAN_TAI = (
+    "Kiểm tra giúp tôi hoá đơn này có đúng không: "
+    '{"items": [{"name": "Cước vận chuyển HN-HP", "quantity": 2, '
+    '"unit_price": 1500000}], "total_amount": 3300000}'
+)
+
+
+def test_router_that_van_xep_hoa_don_van_tai_vao_logistics():
+    """
+    Khoá lại TIỀN ĐỀ của test dưới.
+
+    Nếu một ngày router hết xếp câu này vào LOGISTICS thì ngoại lệ trong
+    chat.py không còn cần thiết — và test dưới sẽ xanh vì lý do khác hẳn lý do
+    nó sinh ra. Assert này bắt ta phải đọc lại.
+    """
+    from src.agents.manager import SemanticRouter
+
+    router = SemanticRouter(tu_nap_embedder=False)   # chế độ từ khoá, không nạp model
+    assert router.route(_HOA_DON_VAN_TAI) == "LOGISTICS"
+
+
+def test_hoa_don_van_tai_dan_kem_van_vao_vong_agentic(moi_truong, monkeypatch):
+    """
+    Câu SOÁT HOÁ ĐƠN không được rơi vào luồng BÁO GIÁ chỉ vì tên dòng hàng.
+
+    Trước bản vá: cat == LOGISTICS -> vòng agentic bị bỏ qua -> kế hoạch
+    ["vat"] không bao giờ chạy, người dùng nhận về câu hỏi thêm tuyến/ngày giao
+    của luồng báo giá n8n.
+    """
+    from src.api import dependencies as deps
+    from src.core.tool_planner import plan_tools
+
+    monkeypatch.setattr(deps.runtime, "kb", None, raising=False)
+    assert "vat" in plan_tools(_HOA_DON_VAN_TAI), "tiền đề: kế hoạch phải có vat"
+
+    moi_truong.category = "LOGISTICS"
+    moi_truong.decisions = [
+        {"thought": "tính lại tổng", "tool": "vat",
+         "arguments": {"items": [{"name": "Cước vận chuyển HN-HP", "quantity": 2,
+                                  "unit_price": 1500000}],
+                       "stated_total": 3300000}},
+        {"thought": "đã có số", "answer": "Tôi đã tính lại tổng hoá đơn giúp bạn."},
+    ]
+
+    da_trich_xuat = []
+
+    async def trich_xuat(*a, **kw):
+        da_trich_xuat.append(a)
+        return '{"origin": null}'
+
+    moi_truong.extract_quote_request = trich_xuat
+
+    tra_loi = _hoi(_HOA_DON_VAN_TAI)
+
+    assert moi_truong.decisions == [], "vòng agentic phải thực sự chạy"
+    assert da_trich_xuat == [], "KHÔNG được rơi vào luồng báo giá n8n"
+    assert "tôi cần thêm" not in tra_loi.lower()
+    assert tra_loi == "Tôi đã tính lại tổng hoá đơn giúp bạn."
+
+
+def test_cau_bao_gia_that_van_di_luong_logistics(moi_truong, monkeypatch):
+    """Mặt còn lại: ngoại lệ trên KHÔNG được kéo câu báo giá thật ra khỏi n8n."""
+    from src.api import dependencies as deps
+
+    monkeypatch.setattr(deps.runtime, "kb", None, raising=False)
+    moi_truong.category = "LOGISTICS"
+
+    da_trich_xuat = []
+
+    async def trich_xuat(*a, **kw):
+        da_trich_xuat.append(a)
+        return '{"origin": null}'
+
+    moi_truong.extract_quote_request = trich_xuat
+    tra_loi = _hoi("báo giá xe 5 tấn đi Hải Phòng ngày mai")
+
+    assert len(da_trich_xuat) == 1, "câu báo giá thật phải đi đường trích xuất"
+    assert "tôi cần thêm" in tra_loi.lower()

@@ -40,6 +40,98 @@ _SO_TIEN = re.compile(
     re.IGNORECASE,
 )
 
+# Câu SOÁT HOÁ ĐƠN: "hoá đơn/invoice" đứng gần một động từ soát (kiểm, soát,
+# đối chiếu, xác minh) hoặc cụm nghi vấn ("hợp lệ", "có đúng", "có khớp").
+#
+# Không nằm trong `_RULES` vì nó không chỉ CHỌN tool mà còn PHỦ QUYẾT tool khác:
+# hoá đơn dán kèm (OCR/VLM đọc ra) hay chứa "kho"/"tồn" trong TÊN DÒNG HÀNG
+# ("phí kiểm đếm, lưu kho bãi"…) làm luật `inventory_audit` khớp nhầm — sự cố
+# benchmark T4 (23/08/2026): người dùng hỏi soát hoá đơn mà nhận "chưa có bảng
+# tồn kho". Bảng `_RULES` chỉ biết cộng thêm tool, không biết gạt tool, nên
+# luật này sống riêng và được `plan_tools` áp SAU khi quét bảng.
+#
+# Cửa sổ 0-60 ký tự vì giữa "hoá đơn" và động từ thường chen vài mệnh đề
+# ("hóa đơn sau, hãy kiểm tra tính hợp lệ"); DOTALL vì nội dung hoá đơn dán
+# kèm hay có xuống dòng.
+#
+# MỘT MÌNH mẫu này KHÔNG đủ để phủ quyết hay cộng `vat` — nó khớp cả những câu
+# soi KHO THẬT có nhắc hoá đơn bằng lời ("kiểm kê kho, đối chiếu với hóa đơn
+# nhập hàng"). Điều kiện đủ nằm ở `la_cau_soat_hoa_don`: phải kèm DẤU HIỆU
+# hoá đơn dán kèm — đúng đặc trưng của sự cố T4.
+_HOA_DON_KIEM = re.compile(
+    r"(kiểm|soát|đối chiếu|xác minh|validate|verify)"
+    r".{0,60}(hoá đơn|hóa đơn|invoice)"
+    r"|(hoá đơn|hóa đơn|invoice).{0,60}"
+    r"(kiểm|soát|đối chiếu|xác minh|hợp lệ|có đúng|có khớp|validate|verify)",
+    re.IGNORECASE | re.DOTALL,
+)
+
+# Dấu hiệu NỘI DUNG HOÁ ĐƠN DÁN KÈM (JSON do OCR/VLM đọc ra, hoặc bảng số
+# liệu chép vào): ngoặc nhọn, hoặc tên trường quen thuộc của payload hoá đơn.
+# Câu gõ tay bằng lời không chứa những thứ này.
+_TU_KHOA_DAN_KEM = re.compile(
+    r"[{}]|\b(items|total_amount|unit_price|subtotal)\b",
+    re.IGNORECASE,
+)
+
+# Khối ngoặc nhọn = phần dán kèm tách được về mặt cấu trúc. Dùng để hỏi "bỏ
+# phần dán kèm đi thì câu còn đòi soi kho không". Greedy `.*` cố ý: lấy từ
+# '{' đầu đến '}' cuối, vì JSON hoá đơn lồng nhiều tầng ngoặc; nhánh hai vớt
+# JSON bị cắt cụt (có mở không có đóng). Thay bằng MỘT khoảng trắng chứ không
+# xoá trắng để hai vế câu không bị dính chữ vào nhau tạo match giả.
+_KHOI_NGOAC = re.compile(r"\{.*\}|\{.*$", re.DOTALL)
+
+
+def _co_dau_hieu_dan_kem(cau: str) -> bool:
+    """
+    Câu có mang theo NỘI DUNG hoá đơn (dán kèm) hay chỉ NHẮC hoá đơn bằng lời?
+
+    Ba dấu hiệu, khớp một là đủ:
+      1. ngoặc nhọn / tên trường JSON quen thuộc — VLM đọc hoá đơn ra JSON;
+      2. >= 2 số tiền — bảng dòng hàng chép tay cũng có đơn giá lẫn tổng;
+      3. dấu hai chấm dẫn vào phần có số tiền ("giúp tôi: tổng 3.500.000đ…")
+         — cách người dùng chép số liệu của MỘT tờ hoá đơn cụ thể vào câu.
+    Câu chỉ có MỘT số tiền trần và không dẫn nội dung ("kiểm tra hóa đơn tổng
+    250 triệu có khớp sổ sách không") là câu hỏi thủ tục/đối chiếu sổ — không
+    có dòng hàng nào để tính lại, cộng `vat` chỉ ép model bịa items=[] rồi ra
+    "lệch 250 triệu" (sự cố nêu ở phản biện 23/08/2026).
+    """
+    if _TU_KHOA_DAN_KEM.search(cau):
+        return True
+    if sum(1 for _ in _SO_TIEN.finditer(cau)) >= 2:
+        return True
+    _truoc, hai_cham, sau = cau.partition(":")
+    return bool(hai_cham) and bool(_SO_TIEN.search(sau))
+
+
+def la_cau_soat_hoa_don(cau: str) -> bool:
+    """
+    Câu là Ý ĐỊNH SOÁT MỘT TỜ HOÁ ĐƠN CỤ THỂ (có dấu hiệu nội dung dán kèm)?
+
+    Đây là hợp đồng công khai cho tầng trên: `src/api/routes/chat.py` import
+    hàm này để rẽ nhánh câu soát hoá đơn. Điều kiện của nó ĐÚNG BẰNG điều kiện
+    `plan_tools` cộng tool `vat` theo đường hoá đơn — hai nơi không được lệch
+    nhau, nên cùng gọi một hàm.
+
+    True  = có ý định soát (`_HOA_DON_KIEM`) VÀ có nội dung dán kèm
+            (`_co_dau_hieu_dan_kem`) — có gì đó để tính lại thật.
+    False = câu chỉ nhắc hoá đơn bằng lời (soi kho thật, hỏi thủ tục…) —
+            đi đường cũ, không phủ quyết tool nào.
+    """
+    q = (cau or "").strip()
+    return bool(q) and bool(_HOA_DON_KIEM.search(q)) and _co_dau_hieu_dan_kem(q)
+
+# Mẫu SOI KHO tách ra thành hằng riêng vì được dùng ở HAI chỗ: trong `_RULES`
+# (chọn tool) và trong `plan_tools` (kiểm lại trên phần câu ĐÃ BỎ khối dán kèm
+# — xem chú thích phủ quyết ở đó). Hai chỗ phải cùng một mẫu, viết hai lần thì
+# trôi nhau (P4).
+_MAU_SOI_KHO = re.compile(
+    r"(soi|rà|rà soát|kiểm tra|kiểm|đối chiếu|audit)\s+.{0,12}(kho|tồn|sổ sách)"
+    r"|tồn (kho )?âm|sai sổ sách|lệch sổ|hàng chết|hàng tồn lâu"
+    r"|giá vốn.{0,15}(sai|lệch|bất thường)",
+    re.IGNORECASE,
+)
+
 # Mỗi luật: (tên tool, mẫu nhận diện, có cần số tiền kèm theo không).
 #
 # Viết CHẶT có chủ đích. Luật bắt hụt thì câu đó đi tiếp vào nhánh cũ — vẫn trả
@@ -48,12 +140,7 @@ _SO_TIEN = re.compile(
 _RULES: list[tuple[str, re.Pattern[str], bool]] = [
     (
         "inventory_audit",
-        re.compile(
-            r"(soi|rà|rà soát|kiểm tra|kiểm|đối chiếu|audit)\s+.{0,12}(kho|tồn|sổ sách)"
-            r"|tồn (kho )?âm|sai sổ sách|lệch sổ|hàng chết|hàng tồn lâu"
-            r"|giá vốn.{0,15}(sai|lệch|bất thường)",
-            re.IGNORECASE,
-        ),
+        _MAU_SOI_KHO,
         False,
     ),
     (
@@ -203,6 +290,30 @@ def plan_tools(question: str, available: list[str] | None = None) -> list[str]:
         for tool, mau, can_so in _RULES
         if mau.search(q) and (co_so_tien or not can_so)
     }
+    # Soát hoá đơn CÓ NỘI DUNG DÁN KÈM là ý định về MỘT tờ hoá đơn — cộng
+    # `vat` và gạt `inventory_audit` (mẫu kho khớp nhờ chữ "kho"/"tồn" trong
+    # TÊN DÒNG HÀNG của hoá đơn, không phải nhờ một yêu cầu soi kho — sự cố
+    # T4). Gạt hẳn thay vì chỉ xếp `vat` lên trước: còn nằm trong kế hoạch thì
+    # vòng agentic vẫn chạm "chưa có bảng tồn kho" và câu đó vẫn đến tay người
+    # dùng.
+    #
+    # Điều kiện là `la_cau_soat_hoa_don` chứ KHÔNG phải `_HOA_DON_KIEM` trần:
+    # mẫu trần phủ quyết cả câu soi KHO THẬT có nhắc hoá đơn bằng lời ("kiểm kê
+    # kho, đối chiếu với hóa đơn nhập hàng" từng ra [] thay vì inventory_audit
+    # — phản biện 23/08/2026). Không có dấu hiệu dán kèm thì không có gì để
+    # tính lại, câu đi đường cũ nguyên vẹn.
+    if la_cau_soat_hoa_don(q):
+        khop.add("vat")
+        # CÂU GHÉP "soát hoá đơn <JSON> và rà soát sổ tồn kho": vế kho là yêu
+        # cầu THẬT, không được nuốt. Chỉ phân xử được khi phần dán kèm tách ra
+        # được về cấu trúc (có ngoặc nhọn): bỏ khối ngoặc đi mà câu VẪN đòi soi
+        # kho thì giữ inventory_audit. Không có ngoặc thì không tách nổi trong/
+        # ngoài — ưu tiên chống T4, phủ quyết (lựa chọn có chủ đích, có test
+        # ghi nhận trong tests/test_tool_planner.py).
+        van_doi_soi_kho = "{" in q and _MAU_SOI_KHO.search(_KHOI_NGOAC.sub(" ", q))
+        if not van_doi_soi_kho:
+            khop.discard("inventory_audit")
+
     if available is not None:
         khop &= set(available)
 
@@ -215,6 +326,7 @@ def needs_system_data(tool: str) -> bool:
 
 
 __all__ = [
+    "la_cau_soat_hoa_don",
     "plan_tools",
     "needs_system_data",
     "system_data_fields",

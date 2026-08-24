@@ -135,9 +135,14 @@ async def test_van_hoi_lai_duoc_khi_thieu_tham_so():
     """
     Ép enum KHÔNG được ép model phải gọi tool bằng mọi giá. Thiếu tham số bắt
     buộc thì nó vẫn phải hỏi lại, nếu không nó sẽ điền bừa.
+
+    Cơ chế đổi 23/08/2026: hỏi lại nay đi qua trường `hoi_lai` chứ không phải
+    `answer`. Ý định của test giữ nguyên — cái đổi là `answer` không còn tồn
+    tại ở bước còn kế hoạch, vì nó là cửa để model tự tính rồi tuyên bố đáp án
+    (xem `test_con_ke_hoach_thi_khong_the_tu_tinh`).
     """
     manager = _GhiSchema([
-        {"thought": "thiếu số tiền", "answer": "Đơn hàng tổng bao nhiêu tiền ạ?"},
+        {"thought": "thiếu số tiền", "hoi_lai": "Đơn hàng tổng bao nhiêu tiền ạ?"},
     ])
 
     out = await AgenticLoop(
@@ -146,7 +151,69 @@ async def test_van_hoi_lai_duoc_khi_thieu_tham_so():
 
     assert out["answer"].startswith("Đơn hàng tổng")
     assert out["tool_calls"] == 0
-    assert "answer" in (manager.schemas[0].get("properties") or {})
+    assert out["data_missing"] is True          # -> metric.asked_back
+    assert "hoi_lai" in (manager.schemas[0].get("properties") or {})
+
+
+@pytest.mark.asyncio
+async def test_con_ke_hoach_thi_khong_the_tu_tinh():
+    """
+    Ca thật 23/08/2026, ở tầng grammar.
+
+    "Kiểm tra hoá đơn: {Cước 5.000.000, Phụ phí 500.000}, tổng ghi 6.500.000đ"
+    -> `plan_tools` cho ["vat"], `chat.py` mở cửa vào vòng agentic, NHƯNG
+    `tool_calls=0`: model tự cộng 5.000.000+500.000 rồi so với 6.500.000 trong
+    đầu. Lần đó ra số ĐÚNG, và đó mới là chỗ nguy — số do model tự tính thì lần
+    sau sai cũng không có gì báo.
+
+    Chốt chặn neo số liệu không đỡ được: `guard_answer` chỉ chạy khi có
+    `grounding_ctx`, mà `grounding_ctx` dựng từ `observations` — không gọi tool
+    thì không có quan sát nào để đối chiếu.
+
+    Nên chặn ở tầng SAMPLING: còn kế hoạch thì `answer` không có trong lược đồ.
+    """
+    manager = _GhiSchema([
+        {"thought": "đủ số liệu", "tool": "vat",
+         "arguments": {"items": [], "stated_total": 6500000}},
+        {"thought": "xong", "answer": "Tổng ghi lệch 1.000.000đ."},
+    ])
+
+    out = await AgenticLoop(
+        manager, _TOOLS, lambda n, a: {"is_valid": False}, planner=lambda q, names: ["vat"],
+    ).run("Kiểm tra hoá đơn tổng ghi 6.500.000đ")
+
+    buoc1 = manager.schemas[0].get("properties") or {}
+    assert "answer" not in buoc1, "còn kế hoạch mà vẫn cho `answer` — đúng lỗ hổng cũ"
+    assert "tool" in buoc1 and "hoi_lai" in buoc1
+    assert out["tool_calls"] >= 1, "tool PHẢI chạy, không được tự nhẩm"
+
+    # Hết kế hoạch thì `answer` quay lại — nếu không thì không ai kết luận được.
+    assert "answer" in (manager.schemas[1].get("properties") or {})
+
+
+def test_luoc_do_ep_tool_khong_hop_le_hoa_cau_tra_loi_thang():
+    """Chứng minh bằng chính bộ kiểm JSON Schema, không phải bằng mắt."""
+    jsonschema = pytest.importorskip("jsonschema")
+    s = build_decision_schema(["vat"], None, bat_buoc_tool=True)
+    v = jsonschema.Draft202012Validator(s)
+
+    assert not v.is_valid({"thought": "t", "answer": "Tôi tính ra 5.500.000đ."}), \
+        "grammar vẫn sinh ra được một câu trả lời tự tính"
+    assert v.is_valid({"thought": "t", "hoi_lai": "Tổng đơn bao nhiêu ạ?"})
+    assert v.is_valid({"thought": "t", "tool": "vat",
+                       "arguments": {"items": [], "stated_total": 1}})
+    # Không được vừa gọi tool vừa hỏi lại.
+    assert not v.is_valid({"thought": "t", "tool": "vat", "arguments": {},
+                           "hoi_lai": "hỏi thêm"})
+
+
+def test_khong_ke_hoach_thi_luoc_do_giu_nguyen_nhu_cu():
+    """Mặc định KHÔNG đổi — `bat_buoc_tool` phải là lựa chọn, không phải mặc định."""
+    s = build_decision_schema(["report", "vat"])
+    props = s["properties"]
+    assert "answer" in props and "hoi_lai" not in props
+    assert s["required"] == ["thought"]
+    assert len(s["oneOf"]) == 2
 
 
 # --------------------------------------------------------------------------

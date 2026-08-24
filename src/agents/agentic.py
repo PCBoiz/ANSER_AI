@@ -128,7 +128,9 @@ def arguments_schema(tool_def: dict, bo_truong: tuple[str, ...] = ()) -> dict[st
 
 
 def build_decision_schema(
-    tool_names: list[str], arg_schema: dict[str, Any] | None = None
+    tool_names: list[str],
+    arg_schema: dict[str, Any] | None = None,
+    bat_buoc_tool: bool = False,
 ) -> dict[str, Any]:
     """
     JSON Schema cho MỘT quyết định của agent — đưa vào guided_json.
@@ -138,6 +140,32 @@ def build_decision_schema(
 
     `arg_schema` (tuỳ chọn): ràng buộc `arguments` khi đã biết chắc tool nào sẽ
     chạy — xem `arguments_schema`.
+
+    `bat_buoc_tool`: thay nhánh `answer` tự do bằng `hoi_lai` — model vẫn hỏi
+    lại được khi THIẾU THAM SỐ, nhưng không còn cửa nào để trả về một con số
+    nó tự tính.
+
+    Cấm tiệt cả hai là sai, và có test giữ điều đó
+    (`test_van_hoi_lai_duoc_khi_thieu_tham_so`): "tính thuế giúp tôi" không kèm
+    số tiền mà bị ép gọi `vat` thì model phải BỊA `stated_total`. Như vậy chỉ là
+    đổi một lỗi R1 (tự nhẩm kết quả) lấy một lỗi R1 khác (bịa đầu vào) — mà lỗi
+    sau còn tệ hơn vì con số bịa đi qua tool nên trông như "có nguồn".
+
+    Nên chia đôi: có đủ tham số -> gọi tool; thiếu -> `hoi_lai`. Cái không còn
+    tồn tại là nhánh thứ ba: tự tính rồi tuyên bố đáp án.
+
+    Vì sao cần: khi `plan_tools` đã chọn tool bằng luật tất định thì việc gọi
+    tool KHÔNG còn là lựa chọn của model. Để ngỏ nhánh `answer` là để ngỏ đúng
+    cái cửa mà nó đi qua. Phiên 23/08/2026, câu soát hoá đơn có kế hoạch
+    ["vat"] nhưng `tool_calls=0`: model tự nhẩm 5.000.000+500.000=5.500.000 rồi
+    so với 6.500.000 trong đầu. Lần đó ra số ĐÚNG — và đó mới là chỗ nguy, vì
+    một con số model tự tính thì lần sau sai cũng không có gì báo. AGENTS.md R1
+    nói số tài chính phải ra từ tool tất định, không phải từ phép nhẩm của model.
+
+    Chốt chặn neo số liệu (`guard_answer`) KHÔNG bắt được ca này: nó chỉ chạy
+    khi CÓ `grounding_ctx`, mà `grounding_ctx` lấy từ `observations` — không gọi
+    tool thì không có quan sát nào, nên không có gì để đối chiếu và nó bỏ qua.
+    Hai chốt chặn cùng hở một chỗ.
     """
     args = dict(arg_schema) if arg_schema else {"type": "object"}
 
@@ -147,21 +175,44 @@ def build_decision_schema(
     # sinh. Loại lỗi nổ ở phút 20 của phiên Colab.
     defs = args.pop("$defs", None)
 
-    schema: dict[str, Any] = {
-        "type": "object",
-        "properties": {
-            "thought": {"type": "string", "maxLength": 400},
-            "tool": {"type": "string", "enum": tool_names},
-            "arguments": args,
-            "answer": {"type": "string", "maxLength": 2000},
-        },
-        "required": ["thought"],
-        "oneOf": [
-            {"required": ["tool", "arguments"], "not": {"required": ["answer"]}},
-            {"required": ["answer"], "not": {"required": ["tool"]}},
-        ],
-        "additionalProperties": False,
+    thuoc_tinh: dict[str, Any] = {
+        "thought": {"type": "string", "maxLength": 400},
+        "tool": {"type": "string", "enum": tool_names},
+        "arguments": args,
     }
+    schema: dict[str, Any]
+    if bat_buoc_tool:
+        # `hoi_lai` NGẮN và tên trường nói đúng công dụng: chỗ này để hỏi, không
+        # phải để trả lời. Cộng với `additionalProperties: False`, grammar không
+        # sinh nổi một quyết định mang theo kết quả tự tính.
+        thuoc_tinh["hoi_lai"] = {
+            "type": "string",
+            "maxLength": 300,
+            "description": "Chỉ dùng khi THIẾU tham số bắt buộc: hỏi người dùng "
+                           "cung cấp thêm. Không đặt kết quả tính toán vào đây.",
+        }
+        schema = {
+            "type": "object",
+            "properties": thuoc_tinh,
+            "required": ["thought"],
+            "oneOf": [
+                {"required": ["tool", "arguments"], "not": {"required": ["hoi_lai"]}},
+                {"required": ["hoi_lai"], "not": {"required": ["tool"]}},
+            ],
+            "additionalProperties": False,
+        }
+    else:
+        thuoc_tinh["answer"] = {"type": "string", "maxLength": 2000}
+        schema = {
+            "type": "object",
+            "properties": thuoc_tinh,
+            "required": ["thought"],
+            "oneOf": [
+                {"required": ["tool", "arguments"], "not": {"required": ["answer"]}},
+                {"required": ["answer"], "not": {"required": ["tool"]}},
+            ],
+            "additionalProperties": False,
+        }
     if defs:
         schema["$defs"] = defs
     return schema
@@ -319,7 +370,13 @@ class AgenticLoop:
             # Ràng buộc ở tầng SAMPLING, không phải trong prompt: còn kế hoạch
             # thì enum chỉ có một tên; hết kế hoạch thì chỉ còn `answer`.
             if plan:
-                schema = build_decision_schema([plan[0]], self._arg_schema(plan[0]))
+                # `bat_buoc_tool=True` khớp với đúng câu ở trên: "còn kế hoạch
+                # thì enum chỉ có một tên". Trước 23/08/2026 chỗ này vẫn để ngỏ
+                # nhánh `answer`, nên câu chữ và grammar nói hai điều khác nhau
+                # — và model đi theo grammar.
+                schema = build_decision_schema(
+                    [plan[0]], self._arg_schema(plan[0]), bat_buoc_tool=True
+                )
             elif co_ke_hoach:
                 schema = answer_schema
             else:
@@ -342,6 +399,25 @@ class AgenticLoop:
                 logger.warning("Agentic: không đọc được quyết định ở bước %d", step_no)
                 steps.append({"step": step_no, "error": "quyết định không đọc được"})
                 break
+
+            # --- model xin thêm tham số (chỉ có ở bước còn kế hoạch) ---
+            if decision.get("hoi_lai"):
+                steps.append({
+                    "step": step_no,
+                    "thought": decision.get("thought", ""),
+                    "answer": decision["hoi_lai"],
+                    "hoi_lai": True,
+                })
+                return {
+                    "answer": decision["hoi_lai"],
+                    "steps": steps,
+                    "tool_calls": len([s for s in steps if "tool" in s]),
+                    "hit_limit": False,
+                    "plan": plan,
+                    "observations": observations,
+                    # `_run_agentic` đọc cờ này để đặt `metric.asked_back`.
+                    "data_missing": True,
+                }
 
             # --- model kết luận ---
             if decision.get("answer"):

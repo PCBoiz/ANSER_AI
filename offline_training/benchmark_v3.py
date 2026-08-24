@@ -2,8 +2,8 @@
 benchmark_v3.py — BƯỚC 8 pipeline v3: cổng chặn chất lượng (thay benchmark cũ).
 
 benchmark_integration.py cũ đo hợp đồng đã bỏ ("action": "query_db"...) và cần
-server + ngrok. Bản này chạy vLLM offline NGAY TRONG Colab, đo đúng 3 việc
-model làm trong kiến trúc mới:
+server + ngrok. Bản này mặc định chạy vLLM offline NGAY TRONG Colab, đo đúng
+3 việc model làm trong kiến trúc mới:
 
   1. extraction — eval_extraction.jsonl (nhãn tất định từ reverse-generation):
      độ chính xác từng trường + kỷ luật null (đoán bừa trường thiếu = lỗi nặng)
@@ -17,6 +17,10 @@ DÙNG ĐỂ:
       python offline_training/benchmark_v3.py --model Qwen/Qwen3-8B --no-gate
   - làm cổng chặn sau fine-tune (dưới ngưỡng là exit 1):
       python offline_training/benchmark_v3.py --model <AWQ_DIR>
+  - so với một model sau endpoint (xem `providers.py` và README mục
+    "`--model` nhận ba dạng"):
+      --model 'openai:http://127.0.0.1:8001/v1#anser-v3'
+      --model anthropic:claude-opus-5      # R2: chỉ trên bộ tổng hợp/ẩn danh
 
 Ngưỡng chỉnh qua env: EXTRACT_FIELD_MIN, EXTRACT_READY_MIN, N8N_VALID_MIN, NARR_MIN
 """
@@ -66,6 +70,7 @@ from offline_training.dgen_common import (
     strip_diacritics,
 )
 from offline_training.make_n8n_pairs import _stage_catalog_dir
+from offline_training.providers import NhaCungCap, dung_provider
 
 REQUIRED_FIELDS = ("origin", "destination", "vehicle_type")
 
@@ -575,59 +580,7 @@ def score_narration(rows: list[dict], outputs: list[str],
     }
 
 
-# ---------------------------------------------------------------------------
-# Sinh bằng vLLM offline
-# ---------------------------------------------------------------------------
-
-def build_llm(model_path: str):
-    """
-    Dựng vLLM offline.
-
-    ÉP `quantization="awq"` LÀ SAI — sửa 03/08/2026 sau khi benchmark chết ngay
-    lúc khởi tạo:
-
-        ValueError: torch.bfloat16 is not supported for quantization method awq.
-                    Supported dtypes: [torch.float16]
-
-    Hai cái sai chồng nhau. Thứ nhất, nhận dạng bằng cách dò chữ "awq" trong
-    ĐƯỜNG DẪN: một thư mục tên bất kỳ có chứa "awq" là bị ép nhầm, còn model AWQ
-    để ở thư mục tên khác thì không nhận ra. Thứ hai, ép tay ghi đè lựa chọn của
-    vLLM — chính nó đã báo trong log:
-
-        Detected that the model can run with awq_marlin, however you specified
-        quantization=awq explicitly, so forcing awq
-
-    `awq_marlin` vừa nhanh hơn vừa chạy được bfloat16; nhân `awq` cũ thì không,
-    nên `dtype="auto"` (ra bfloat16 theo config Qwen3) đâm thẳng vào ràng buộc
-    float16 rồi nổ.
-
-    Cách đúng: ĐỂ YÊN cho vLLM đọc `quantization_config` trong config.json và tự
-    chọn nhân. Nó có đủ thông tin hơn ta — biết cả compute capability của GPU
-    đang chạy (awq_marlin cần Ampere trở lên, T4 thì không có).
-
-    `BENCH_QUANT` để ép tay khi cần; ép thì phải hạ dtype xuống float16 vì nhân
-    awq cũ chỉ nhận đúng kiểu đó.
-    """
-    from vllm import LLM
-
-    forced = os.getenv("BENCH_QUANT", "").strip() or None
-    dtype = os.getenv("BENCH_DTYPE", "").strip() or ("float16" if forced == "awq" else "auto")
-    if forced:
-        print(f"  ép quantization={forced}, dtype={dtype} (BENCH_QUANT)")
-
-    return LLM(
-        model=model_path,
-        quantization=forced,
-        dtype=dtype,
-        max_model_len=8192,
-        gpu_memory_utilization=float(os.getenv("BENCH_GPU_UTIL", "0.85")),
-        enforce_eager=os.getenv("BENCH_ENFORCE_EAGER", "1") == "1",
-        trust_remote_code=True,
-    )
-
-
-
-def smoke_test_guided(llm) -> list[str]:
+def smoke_test_guided(nha: NhaCungCap) -> list[str]:
     """
     Kiem RANG BUOC GIAI MA chay duoc, TRUOC khi dot 40 phut do.
 
@@ -643,8 +596,7 @@ def smoke_test_guided(llm) -> list[str]:
         "properties": {"ten": {"type": "string"}, "so": {"type": "integer"}},
         "required": ["ten", "so"],
     }
-    raw = generate(
-        llm,
+    raw = nha.sinh(
         [[{"role": "user", "content": "Tra ve JSON: ten='xe tai', so=5"}]],
         schema, max_tokens=64, temperature=0.0,
     )[0][0]
@@ -658,14 +610,23 @@ def smoke_test_guided(llm) -> list[str]:
     print(f"\n[chốt chặn] ràng buộc JSON: {trang_thai}")
     if not ok:
         print(f"    đầu ra thô: {raw[:200]!r}")
+        goi_y = (
+            "  1. vLLM có GuidedDecodingParams không — 0.10.2/0.11.x thì có,\n"
+            "     0.12.0 trở lên GỠ HẲN (đổi sang StructuredOutputsParams)\n"
+            "  2. backend structured output — thử lùi về engine V0: VLLM_USE_V1=0\n"
+            "  3. lược đồ có kiểu mà xgrammar chưa đỡ được không\n"
+        ) if nha.rang_buoc == "guided_json" else (
+            "  1. endpoint/API có nhận lược đồ này không — `oneOf`, `$ref` và\n"
+            "     `$defs` là ba chỗ hay bị từ chối nhất\n"
+            "  2. đúng tên model chưa, và model đó có đỡ structured output không\n"
+            "  3. khoá API đã đặt trong biến môi trường chưa\n"
+        )
         raise SystemExit(
             "Ràng buộc giải mã JSON KHÔNG hoạt động — đo tiếp là vô nghĩa: mọi "
             "nhánh cần JSON sẽ ra 0 và trông y hệt một model dở.\n\n"
-            "Kiểm theo thứ tự:\n"
-            "  1. vLLM có GuidedDecodingParams không (bản 0.8.5 thì có)\n"
-            "  2. backend structured output — thử lùi về engine V0: VLLM_USE_V1=0\n"
-            "  3. lược đồ có kiểu mà xgrammar chưa đỡ được không\n\n"
-            "Bỏ qua chốt này: BENCH_SKIP_GUIDED_CHECK=1 (KHÔNG khuyến nghị)"
+            f"Bản dựng: {nha.ten}   (ràng buộc: {nha.rang_buoc})\n\n"
+            "Kiểm theo thứ tự:\n" + goi_y +
+            "\nBỏ qua chốt này: BENCH_SKIP_GUIDED_CHECK=1 (KHÔNG khuyến nghị)"
         )
 
     # ---- lược đồ THẬT của vòng agentic --------------------------------------
@@ -677,12 +638,19 @@ def smoke_test_guided(llm) -> list[str]:
     from src.api.routes.tools import get_tool_defs
     from src.core.tool_planner import system_data_fields
 
+    bo_qua: list[str] = []
     for t in get_tool_defs():
         ten = t["name"]
         s = build_decision_schema([ten], arguments_schema(t, system_data_fields(ten)))
+        # Chốt chặn này chỉ có nghĩa khi bản dựng ÉP được lược đồ. Câu nhắc
+        # ("Gọi tool X với tham số bất kỳ") không có chữ nào bảo xuất JSON — nó
+        # dựa hoàn toàn vào grammar. Bản dựng không ép được thì model trả văn
+        # xuôi, và chấm nó là "hỏng" tức là chấm sai chỗ.
+        if not nha.dien_dat_duoc(s):
+            bo_qua.append(ten)
+            continue
         try:
-            raw = generate(
-                llm,
+            raw = nha.sinh(
                 [[{"role": "user", "content": f"Gọi tool {ten} với tham số bất kỳ."}]],
                 s, max_tokens=200, temperature=0.0,
             )[0][0]
@@ -690,15 +658,37 @@ def smoke_test_guided(llm) -> list[str]:
         except Exception as exc:
             print(f"    lược đồ {ten} HỎNG: {exc}")
             print(f"    lược đồ: {json.dumps(s, ensure_ascii=False)[:400]}")
+            if nha.rang_buoc == "guided_json":
+                chan_doan = (
+                    "Gần như chắc chắn là `$ref` treo: `arguments_schema()` bỏ trường "
+                    "nhưng `$defs` phải được NÂNG LÊN GỐC của lược đồ quyết định — "
+                    "`#/$defs/X` là con trỏ tính từ gốc tài liệu, không từ object "
+                    "chứa nó.\n"
+                    "Chạy `pytest tests/test_agentic_plan.py -k schema` để khoanh vùng."
+                )
+            else:
+                # Bản dựng qua API hỏng vì lý do khác hẳn: tập JSON Schema mỗi
+                # nhà cung cấp đỡ là một tập khác. Thông báo lỗi in ngay phía
+                # trên đã gọi đích danh khoá bị từ chối — đừng đoán thay nó.
+                chan_doan = (
+                    "Đây là bản dựng qua API, không phải grammar cục bộ — đọc thông "
+                    "báo lỗi in ngay phía trên.\n"
+                    "Nếu nó gọi tên một khoá lược đồ (kiểu \"property 'minimum' is not "
+                    "supported\"), thêm khoá đó vào `KHOA_KHONG_DO` trong "
+                    "`offline_training/providers.py` rồi chạy lại — danh sách ấy dựng "
+                    "theo lỗi thật, không dựng theo phỏng đoán."
+                )
             raise SystemExit(
                 f"Lược đồ quyết định của tool {ten!r} không dựng được grammar.\n"
-                "Gần như chắc chắn là `$ref` treo: `arguments_schema()` bỏ trường "
-                "nhưng `$defs` phải được NÂNG LÊN GỐC của lược đồ quyết định — "
-                "`#/$defs/X` là con trỏ tính từ gốc tài liệu, không từ object "
-                "chứa nó.\n"
-                "Chạy `pytest tests/test_agentic_plan.py -k schema` để khoanh vùng."
+                + chan_doan
             ) from exc
-    print(f"[chốt chặn] lược đồ agentic ({len(get_tool_defs())} tool): ✓ dựng được")
+    da_kiem = len(get_tool_defs()) - len(bo_qua)
+    print(f"[chốt chặn] lược đồ agentic: ✓ dựng được {da_kiem}/{len(get_tool_defs())} tool")
+    if bo_qua:
+        print(f"    ⚠ bỏ qua {len(bo_qua)}: {', '.join(bo_qua)}")
+        print("      Bản dựng này không ép được lược đồ quyết định (xem lý do ở"
+              " trên), nên\n      nhánh agentic sẽ chạy KHÔNG ràng buộc —"
+              " số của nó KHÔNG so trực tiếp\n      được với bên có grammar.")
 
     # ---- DỰNG ĐƯỢC KHÁC VỚI THI HÀNH ĐƯỢC (15/08/2026) --------------------
     #
@@ -720,11 +710,12 @@ def smoke_test_guided(llm) -> list[str]:
     # thuộc về lược đồ hay thuộc về model.
     canh_bao: list[str] = []
     report = next((t for t in get_tool_defs() if t["name"] == "report"), None)
-    if report is not None:
+    if report is not None and nha.dien_dat_duoc(
+        build_decision_schema(["report"], arguments_schema(report, system_data_fields("report")))
+    ):
         bo = system_data_fields("report")
         s = build_decision_schema(["report"], arguments_schema(report, bo))
-        raw = generate(
-            llm,
+        raw = nha.sinh(
             [[{"role": "user", "content":
                "Gọi tool report. Kèm luôn mảng `sales` gồm 3 dòng bán hàng "
                "và mảng `expenses` gồm 2 dòng chi phí."}]],
@@ -767,44 +758,6 @@ def build_extraction_chat(row: dict, prompts) -> list[dict]:
         *prompts.format_extraction_history(row.get("history"), today),
         {"role": "user", "content": prompts.format_extraction_user(row["message"], today)},
     ]
-
-
-def generate(llm, chats: list[list[dict]], json_schema: dict | None,
-             max_tokens: int, temperature: float) -> list[str]:
-    from vllm import SamplingParams
-
-    kwargs = dict(temperature=temperature, max_tokens=max_tokens)
-    if json_schema is not None:
-        try:
-            from vllm.sampling_params import GuidedDecodingParams
-            kwargs["guided_decoding"] = GuidedDecodingParams(json=json_schema)
-        except ImportError:
-            print("  ⚠ vLLM không có GuidedDecodingParams — chạy KHÔNG ràng buộc "
-                  "(số liệu sẽ kém hơn lúc serve thật)")
-    params = SamplingParams(**kwargs)
-
-    tokenizer = llm.get_tokenizer()
-    prompts = [
-        tokenizer.apply_chat_template(
-            chat, tokenize=False, add_generation_prompt=True, enable_thinking=False
-        )
-        for chat in chats
-    ]
-    outputs = llm.generate(prompts, params)
-
-    # CẮT CỤT vì chạm trần token là chuyện KHÁC HẲN với sinh ra rác, nhưng cả
-    # hai đều làm `json.loads` hỏng rồi thành dict rỗng. vLLM có sẵn
-    # `finish_reason`, trước đây ta vứt đi — nên trả kèm để tầng chấm điểm phân
-    # biệt được "model làm sai" với "model chưa nói hết câu".
-    n_trunc = sum(1 for o in outputs if o.outputs[0].finish_reason == "length")
-    if n_trunc:
-        print(f"  ⚠ {n_trunc}/{len(outputs)} đầu ra bị CẮT CỤT vì chạm trần "
-              f"{max_tokens} token.")
-
-    return (
-        [o.outputs[0].text.strip() for o in outputs],
-        [o.outputs[0].finish_reason for o in outputs],
-    )
 
 
 def tach_tool_tu_json_cut(raw: str) -> str | None:
@@ -860,14 +813,15 @@ def main() -> None:
     def cap(rows):
         return rows[:args.max_samples] if args.max_samples else rows
 
-    llm = build_llm(args.model)
-    print(f"\n{'=' * 60}\n  BENCHMARK V3 — {args.model}\n{'=' * 60}")
-    # Cảnh báo về CHÍNH KHUNG ĐO, không phải về model. Gom lại để in ở tổng kết:
-    # "grammar không thi hành ràng buộc" đọc ở phút 1 thì trôi mất, mà nó lại đổi
-    # hoàn toàn cách hiểu nhánh agentic ở phút 40.
+    nha = dung_provider(args.model)
+    print(f"\n{'=' * 60}\n  BENCHMARK V3 — {nha.ten}\n"
+          f"  ràng buộc JSON: {nha.rang_buoc}\n{'=' * 60}")
+    # Cảnh báo về CHÍNH KHUNG ĐO, không phải về model. `nha.rang_buoc` nói bộ đo
+    # ĐỊNH dùng chế độ nào; danh sách này nói chế độ đó có THI HÀNH thật không.
+    # Hai câu hỏi khác nhau, và phiên 15/08 cho thấy câu thứ hai mới quan trọng.
     canh_bao_khung_do: list[str] = []
     if os.getenv("BENCH_SKIP_GUIDED_CHECK", "") != "1":
-        canh_bao_khung_do = smoke_test_guided(llm) or []
+        canh_bao_khung_do = smoke_test_guided(nha) or []
     gate_fail = []
     # Nhánh KHÔNG ĐO ĐƯỢC — thiếu file eval, hoặc có nhưng quá ít mẫu để kết
     # luận. Phải gom lại và in ở tổng kết: một phiên đo bỏ qua ba trên bốn nhánh
@@ -885,7 +839,7 @@ def main() -> None:
         rows = cap(load_jsonl(GENERATED_DIR / "eval_extraction.jsonl"))
         if rows:
             chats = [build_extraction_chat(r, Prompts) for r in rows]
-            outputs, _finish = generate(llm, chats, QuoteExtraction.model_json_schema(),
+            outputs, _finish = nha.sinh(chats, QuoteExtraction.model_json_schema(),
                                         max_tokens=256, temperature=0.0)
             result = score_extraction(rows, outputs)
             print(f"\n[extraction] n={result['n']}")
@@ -928,8 +882,8 @@ def main() -> None:
                  {"role": "user", "content": f"YÊU CẦU: {r['task']}\nKẾ HOẠCH: {r['plan']}"}]
                 for r in rows
             ]
-            outputs, finishes = generate(
-                llm, chats, build_workflow_schema(),
+            outputs, finishes = nha.sinh(
+                chats, build_workflow_schema(),
                 max_tokens=tran_token("BENCH_N8N_MAX_TOKENS", MAX_WORKFLOW_TOKENS),
                 temperature=0.0)
             result = score_n8n(rows, outputs, finishes)
@@ -968,8 +922,8 @@ def main() -> None:
             # (05/08/2026: "bịa số 0006" thực ra là mảnh vụn), nên trần lệch
             # giữa hai bên không chỉ làm sai tỷ lệ cắt cụt mà còn sai cả tỷ lệ
             # bịa số.
-            outputs, finishes = generate(
-                llm, chats, None,
+            outputs, finishes = nha.sinh(
+                chats, None,
                 max_tokens=tran_token("BENCH_NARR_MAX_TOKENS", MAX_REPORT_TOKENS),
                 temperature=0.2)
             result = score_narration(rows, outputs, finishes)
@@ -1056,8 +1010,7 @@ def main() -> None:
                     )
                 else:
                     schema = build_decision_schema(names)
-                o, f = generate(
-                    llm,
+                o, f = nha.sinh(
                     [[{"role": "system", "content": system},
                       {"role": "user", "content": rows[i]["question"]}] for i in idxs],
                     schema,
@@ -1114,7 +1067,8 @@ def main() -> None:
             for muc, kq in ket_qua_chay.items()
         }
         Path(args.json_out).write_text(
-            json.dumps({"model": args.model, "sections": gon},
+            json.dumps({"model": nha.ten, "rang_buoc": nha.rang_buoc,
+                        "sections": gon},
                        ensure_ascii=False, indent=1),
             encoding="utf-8",
         )

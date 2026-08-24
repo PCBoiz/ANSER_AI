@@ -6,3 +6,9 @@ pytest-asyncio>=0.23
 ruff
 mypy
 pre-commit
+
+# `tests/test_agentic_plan.py` dung `pytest.importorskip("jsonschema")` de kiem
+# rang lieu grammar CO SINH RA NOI mot hinh dang hay khong. Thieu goi nay thi
+# nhung test do khong fail — chung SKIP, va nhan xanh khong noi gi ve chot chan
+# quan trong nhat cua vong agentic. Phat hien 23/08/2026: 3 test nam im nhu vay.
+jsonschema
