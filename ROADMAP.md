@@ -22,17 +22,18 @@ cánh cổng mà khách không có chìa, còn thứ tạo ra giá trị thì kh
 
 | Lớp | Trạng thái | Bằng chứng |
 |---|---|---|
-| **Kế toán / sổ sách** | 🟢 chạy thật, đo được | 864 test · 6 file MISA thật · 12/12 ca gieo lỗi, 0 báo oan |
+| **Kế toán / sổ sách** | 🟢 chạy thật, đo được | 932 test · 6 file MISA thật · 12/12 ca gieo lỗi, 0 báo oan |
 | **Giao diện (Body)** | 🟢 chạy thật | 20/20 ca qua đúng luồng người dùng, có đăng nhập |
 | **Nạp file .xlsx** | 🟢 chạy thật | 121+161+104+42 dòng đọc sạch, 0 cảnh báo |
 | **RAG (kho tri thức)** | 🟡 có code, chạy được, chưa đo | 4 lỗ hổng cũ đã vá; chưa có bộ đo |
-| **Lớp AI (chat, agentic)** | 🔴 **chưa có một con số nào** | benchmark chưa từng chạy xong |
+| **Lớp AI (chat, agentic)** | 🟢 **đã đo, đã quyết** | 2 phiên Colab đầy đủ · kết luận: **dùng model gốc** |
 | **VLM (đọc hoá đơn)** | 🔴 chưa đo | chưa có hoá đơn thật nào |
-| **Hạ tầng triển khai** | 🔴 **viết xong, chưa chạy lần nào** | compose đủ; 3 phần khai báo rõ là chưa nối |
+| **Hạ tầng triển khai** | 🟡 chạy được trên máy, chưa mở ra ngoài | quét xác thực 24 endpoint qua HTTP thật; 3 phần compose vẫn chưa nối |
 | **Báo giá / chọn nhà xe** | ⚫ tạm gác | khách không làm vận tải |
 
-**Đọc kỹ dòng "lớp AI".** Tám commit gần đây toàn là *sửa công cụ đo*, chưa lần
-nào *dùng* nó. Ta đang có một cái cân đã hiệu chỉnh rất kỹ mà chưa cân gì.
+**Cập nhật 15/08/2026 — GĐ D đã xong.** Hai phiên đo đầy đủ trên Colab, so theo
+cặp bằng McNemar. Kết luận: **dùng model gốc, chưa cần train lại.** Chi tiết ở
+[PHIEN_DO_COLAB.md](PHIEN_DO_COLAB.md); tóm tắt ở GĐ D bên dưới.
 
 ---
 
@@ -47,9 +48,15 @@ Hai lần gần đây nó tự chứng minh:
   vẫn mở ra Internet.
 * Dựng **bộ đo** cho lớp kế toán → lộ ra `allow_zero_value` là code chết, kho
   khuyến mại vẫn báo oan 29 dòng trên đường thật.
+* Quét **từng endpoint một** qua HTTP thật (15/08) → lộ ra `GET /tools` và
+  `GET /api/v1/task/{id}` **không kiểm token**. Cái sau trả câu trả lời đầy đủ
+  của AI: tên khách, mã số thuế, số công nợ. Hai mươi endpoint kia đều đúng.
+* Chạy phiên **đo model** → lộ ra ba lỗi mã, trong đó `arguments_schema()` mô tả
+  một lớp phòng thủ **chưa từng tồn tại**.
 
-Không test đơn vị nào bắt được hai lỗi đó. Cả hai đều là "hai thứ đúng riêng lẻ,
-sai khi ghép".
+Không test đơn vị nào bắt được bốn lỗi đó. Cả bốn đều là "hai thứ đúng riêng lẻ,
+sai khi ghép" — và ba trong bốn là **phòng thủ dựng dở**: thứ trông như đã có mà
+thực ra không. Loại này nguy hiểm hơn thiếu hẳn, vì nó làm ta thôi nhìn vào đó.
 
 ---
 
@@ -57,11 +64,11 @@ sai khi ghép".
 
 ```mermaid
 flowchart TD
-    A["GĐ A — Lõi sổ sách<br/>ĐÃ XONG: 6 phép kiểm, bộ đo, 864 test"]
+    A["GĐ A — Lõi sổ sách<br/>ĐÃ XONG: 6 phép kiểm, bộ đo, 932 test"]
 
     A --> B["GĐ B — Khách tự dùng được<br/>hạ tầng tối thiểu + hướng dẫn"]
     A --> C["GĐ C — Kế toán thật rà một vòng<br/>thứ bộ đo KHÔNG thay được"]
-    A --> D["GĐ D — Đo lớp AI<br/>baseline vs fine-tune, rồi mới quyết"]
+    A --> D["GĐ D — Đo lớp AI<br/>ĐÃ XONG: dùng model gốc"]
 
     B --> E["GĐ E — Dùng hằng ngày + mở rộng<br/>tuổi nợ, khách thứ hai"]
     C --> E
@@ -70,6 +77,7 @@ flowchart TD
     style A fill:#c8e6c9
     style C fill:#ffcdd2
     style B fill:#fff9c4
+    style D fill:#c8e6c9
 ```
 
 `GĐ C` tô đỏ vì nó là điểm chặn **không gỡ được bằng code**.
@@ -111,7 +119,9 @@ sau là làm tốt hơn.
 |---|---|
 | Hai màn hình Dòng tiền + Cảnh báo sổ sách | ✅ chạy thật, 20/20 ca |
 | Nạp file qua giao diện | ✅ 4 loại file MISA |
-| Chạy trên máy mình | ✅ Brain 8000 + Body 3100 |
+| Chạy trên máy mình | ✅ Brain 8000 + Body 3100, đã đi hết luồng khách qua HTTP thật |
+| Xác thực chặn đúng | ✅ quét 24 endpoint: không token → 401, token sai → 401 |
+| Chỉ báo AI bật/tắt trên giao diện | ✅ chân sidebar, đỏ khi Brain không kiểm token |
 | **Đưa lên chỗ khách truy cập được** | ❌ chưa |
 | **Hướng dẫn cho người không phải kỹ thuật** | ❌ chưa |
 | Xoá file sau khi xử lý | ✅ file không ghi ra đĩa (P2) |
@@ -146,19 +156,44 @@ và nói từng phát hiện là đúng hay sai. Một buổi là đủ.
 
 ---
 
-## GĐ D — Đo lớp AI 🔴 CHƯA CÓ SỐ NÀO
+## GĐ D — Đo lớp AI ✅ XONG. Kết luận: **dùng model gốc**
 
-Không có `baseline.json`, `tuned.json`, hay bất kỳ file kết quả benchmark nào
-trong repo. Cổng "dùng bản fine-tune hay model gốc" **chưa từng được đưa ra**.
+Hai phiên đo đầy đủ trên Colab (15/08/2026), so **theo cặp** trên cùng bộ câu
+hỏi bằng phép thử McNemar.
 
-| Việc | Cần gì |
-|---|---|
-| Chạy một phiên Colab: baseline vs fine-tune | **một buổi của chủ dự án** |
-| So theo cặp, không so hai con số trung bình | đã có `compare_runs.py` |
-| Quyết: dùng fine-tune, hay model gốc, hay bỏ hẳn | có số rồi mới quyết |
+| Nhánh | Model gốc | Bản fine-tune | Hỏng | Sửa | p |
+|---|---|---|---|---|---|
+| extraction | 0,0% | **65,3%** | 0 | 64 | ~0 |
+| n8n | 50,0% | 67,6% | 6 | 12 | 0,2379 |
+| **narration** | **85,2%** | **44,4%** | **11** | **0** | **0,0010** |
+| agentic | 52,6% | 15,8% | 8 | 1 | 0,0391 |
+| bảng luật chọn tool | 40,0% | 40,0% | 0 | 0 | — *(mã tất định)* |
 
-**Đừng thuê GPU trước khi có số này.** Trả tiền hằng tháng cho một lớp chưa đo
-bao giờ là cách nhanh nhất để tốn tiền vào thứ có thể không cần.
+**Vì sao "thắng extraction" vẫn dẫn tới "dùng model gốc":** extraction là bóc
+tách yêu cầu **báo giá vận tải** (`origin`, `destination`, `vehicle_type`) —
+mảng đã hạ xuống nhánh phụ. Lõi kế toán khách đang dùng là Python tất định,
+**không có model nào tham gia**. Model chỉ còn hai việc trong luồng kế toán:
+diễn giải kết quả (narration) và gọi tool (agentic) — đúng hai nhánh thoái lui.
+
+`hỏng 11, sửa 0` ở narration là con số mạnh nhất cả bộ: bản fine-tune không cứu
+được câu nào bản gốc làm sai, chỉ phá. Trong đó **8 ca bịa số** (gốc: 4) — đúng
+thứ P1 sinh ra để chặn, và với sản phẩm kế toán là lỗi không được phép có.
+
+**Không train lại lúc này.** Bản AWQ giữ trên Drive; khi nào quay lại vận tải
+thì lấy ra. Chi tiết và cách đọc lại kết quả: [PHIEN_DO_COLAB.md](PHIEN_DO_COLAB.md).
+
+**Ba lỗi mã tìm ra nhờ phiên đo** (không phải lỗi model):
+
+1. `arguments_schema()` thiếu `additionalProperties: False` — lớp chặn model bịa
+   dữ liệu hệ thống cấp **chưa từng tồn tại**, ở benchmark lẫn production
+2. Trần token production **chặt hơn** trần benchmark → mọi tỷ lệ cắt cụt đo được
+   đều đẹp hơn thứ khách nhận
+3. Nhánh n8n trong file JSON là **bản sao y của extraction** — cả một nhánh mất
+   dữ liệu so cặp mà không dòng lỗi nào
+
+> Còn tồn: `render_tools()` vẫn quảng cáo `sales`/`lines*` cho model trong khi
+> `arguments_schema()` gạch chúng đi — hai hàm đọc cùng một nguồn mà trả lời trái
+> nhau. Chưa sửa.
 
 ---
 
@@ -182,8 +217,8 @@ Danh sách đầy đủ ở [HOANG_PHAT_DU_LIEU_CAN_XIN.md](HOANG_PHAT_DU_LIEU_C
 |---|---|---|---|
 | 1 | Sổ chi tiết công nợ (mở khoá tuổi nợ) | Khách | đã xin, chờ |
 | 2 | Kế toán thật rà kết quả | Chủ dự án tìm người | **chưa bắt đầu** |
-| 3 | Một buổi chạy Colab để đo model | Chủ dự án | chưa |
-| 4 | Chỗ đặt để khách truy cập | Chủ dự án | chưa |
+| 3 | ~~Một buổi chạy Colab để đo model~~ | Chủ dự án | ✅ xong 15/08, kết luận dùng model gốc |
+| 4 | Chỗ đặt để khách truy cập | Chủ dự án | đang mở tạm qua Cloudflare tunnel từ máy dựng |
 | 5 | Đội Body chốt schema mới | Đội Body | đã gửi `ERD_CHUAN.md` |
 
 ---
@@ -206,6 +241,25 @@ Danh sách đầy đủ ở [HOANG_PHAT_DU_LIEU_CAN_XIN.md](HOANG_PHAT_DU_LIEU_C
 
 1. **Kế toán thật rà một vòng** (GĐ C) — thứ duy nhất không mua được bằng code
 2. **Đưa lên chỗ khách bấm được** (GĐ B) — biến demo thành sản phẩm
-3. **Một buổi Colab đo model** (GĐ D) — để biết có nên trả tiền GPU không
+3. **Hướng dẫn cho người không phải kỹ thuật** — kế toán phải tự đi được từ đầu
+   đến cuối mà không hỏi ai
 
-Ba việc này độc lập nhau, làm song song được.
+Ba việc này độc lập nhau, làm song song được. *(Việc thứ ba cũ — đo model — đã
+xong 15/08.)*
+
+---
+
+## Trước khi mở cho người ngoài — danh sách kiểm
+
+Máy dựng sắp mở tạm qua Cloudflare tunnel. Ba thứ phải đúng, và cả ba nay **nhìn
+ra được** thay vì phải tin:
+
+| Kiểm gì | Cách biết |
+|---|---|
+| Brain có thật sự kiểm token | `/health` trả `auth_enabled: true`, và chỉ báo ở chân sidebar Body **không** hiện dải đỏ |
+| Không endpoint nào lọt lưới | `pytest tests/test_auth_bao_phu.py` — hỏi toàn bộ bảng route, không phải danh sách viết tay |
+| Body gọi đúng đường Brain có | `pytest tests/test_body_contract.py -k duong_dan` — đọc thẳng `brain.ts` |
+
+> `auth_enabled` từng được Brain phát ra từ 13/08 mà **không ai đọc**: kiểu bên
+> Body thiếu trường, route health không chuyển tiếp, giao diện không hiện. Một
+> tín hiệu không có người nghe thì bằng không có tín hiệu.
