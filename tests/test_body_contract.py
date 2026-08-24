@@ -368,3 +368,56 @@ def test_health_co_du_truong_body_doc():
     body = client.get("/health").json()
     for key in ("status", "degraded", "engine_ready", "vision_ready", "load"):
         assert key in body, f"brain.ts đọc trường '{key}' nhưng /health không trả"
+
+
+# ---------------------------------------------------------------------------
+# DANH SÁCH ĐƯỜNG DẪN — đọc thẳng từ brain.ts, không chép tay
+# ---------------------------------------------------------------------------
+
+def _duong_dan_body_goi() -> list[str]:
+    """
+    Moi mọi chuỗi `"/..."` mà `brain.ts` dùng làm đường dẫn Brain.
+
+    Đọc THẲNG file TypeScript chứ không giữ một bản chép tay ở đây: bản chép
+    tay thì chính nó cũng phải nhớ cập nhật, tức là thêm đúng cái chỗ quên mà
+    test này sinh ra để chặn.
+    """
+    import os
+    import re
+    from pathlib import Path
+
+    mac_dinh = Path(__file__).resolve().parents[2] / "ANSER_Logistics"
+    goc = Path(os.getenv("ANSER_BODY_DIR", "").strip() or mac_dinh)
+    f = goc / "frontend" / "src" / "server" / "brain.ts"
+    if not f.is_file():
+        pytest.skip(
+            f"Không thấy Body ở {f}. Đặt ANSER_BODY_DIR để test này chạy — "
+            "nó là thứ duy nhất canh việc Brain đổi tên đường dẫn mà Body không biết."
+        )
+    noi_dung = f.read_text(encoding="utf-8")
+    # Chỉ lấy chuỗi truyền cho callBrain/uploadToBrain — tránh vớ phải đường dẫn
+    # nội bộ của Next.js ("/dashboard/...").
+    return sorted(set(re.findall(r'(?:callBrain|uploadToBrain)<[^>]*>\(\s*"([^"]+)"', noi_dung)))
+
+
+def test_moi_duong_dan_body_goi_deu_ton_tai_o_brain():
+    """
+    Đây là lớp lỗi đã cắn một lần: `docker-compose.yml` đặt `API_TOKEN` trong
+    khi mã đọc `API_AUTH_TOKEN`. Hai artefact, mỗi cái đúng khi đọc riêng, sai
+    khi ghép — và không có gì phát ra tín hiệu.
+
+    Đường dẫn cũng vậy. Brain đổi `/tools/partner-audit` thành `/tools/partners`
+    thì mọi test của Brain vẫn xanh, mọi test của Body (không có) cũng vậy, và
+    triệu chứng duy nhất là khách bấm nút rồi nhận 404.
+    """
+    from fastapi.routing import APIRoute
+
+    co_that = {r.path for r in app.routes if isinstance(r, APIRoute)}
+    body_goi = _duong_dan_body_goi()
+    assert body_goi, "không moi được đường dẫn nào từ brain.ts — regex hỏng?"
+
+    thieu = [p for p in body_goi if p not in co_that]
+    assert not thieu, (
+        f"Body gọi {thieu} nhưng Brain không có route đó.\n"
+        f"Brain đang có: {sorted(co_that)}"
+    )
