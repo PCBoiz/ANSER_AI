@@ -326,8 +326,17 @@ def test_task_chua_ton_tai_tra_404():
 
 
 def test_vong_doi_task_chay_duoc_den_cuoi():
-    """Đường đi thật của Body: POST /chat -> hỏi lại tới khi xong."""
-    task_id = client.post("/chat", json={
+    """
+    Đường đi thật của Body: POST /chat -> hỏi lại tới khi xong.
+
+    Gửi `X-User-Id` ở CẢ HAI lượt, đúng như `askBrain()` bên Body làm (nó truyền
+    `identity` cho cả POST lẫn GET). Từ 15/08/2026 `/api/v1/task/{id}` chỉ trả
+    kết quả cho chủ của task — nội dung nó trả về là câu trả lời đầy đủ của AI,
+    tức là tên khách, mã số thuế, số công nợ, nên một token chung không đủ tách
+    hai kế toán của cùng một doanh nghiệp.
+    """
+    dinh_danh = {"X-User-Id": USER_UUID, "X-Store-Id": WAREHOUSE_UUID}
+    task_id = client.post("/chat", headers=dinh_danh, json={
         "user_id": USER_UUID, "store_id": WAREHOUSE_UUID, "message": "doanh thu quý này",
     }).json()["task_id"]
 
@@ -338,7 +347,7 @@ def test_vong_doi_task_chay_duoc_den_cuoi():
     han = time.monotonic() + 15.0
     state = {"status": "chưa hỏi lần nào"}
     while time.monotonic() < han:
-        state = client.get(f"/api/v1/task/{task_id}").json()
+        state = client.get(f"/api/v1/task/{task_id}", headers=dinh_danh).json()
         if state.get("status") in ("completed", "failed"):
             break
         time.sleep(0.05)

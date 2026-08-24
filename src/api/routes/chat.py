@@ -416,10 +416,34 @@ async def _handle_logistics_quote(
 
 
 @router.get("/api/v1/task/{task_id}")
-async def get_task_status(task_id: str):
+async def get_task_status(task_id: str, x_user_id: Optional[str] = Header(None)):
+    """
+    Trạng thái + KẾT QUẢ của một lượt hỏi AI. Chỉ chủ của task đọc được.
+
+    Endpoint này trả về CÂU TRẢ LỜI đầy đủ — với sản phẩm kế toán thì đó là tên
+    khách, mã số thuế, số công nợ. Trước 15/08/2026 nó không kiểm gì cả: không
+    token (nay đã có `auth_guard` ở tầng router), và không hỏi người đọc là ai.
+    Body là hệ đa người dùng, nên một token chung không đủ tách hai kế toán.
+
+    404 chứ không 403 khi sai chủ: 403 xác nhận task đó CÓ TỒN TẠI, tức là biến
+    endpoint thành máy dò task id hợp lệ. Hai trường hợp phải trông y hệt nhau.
+
+    ĐỔI HÀNH VI: client tạo task bằng định danh trong THÂN request rồi hỏi kết
+    quả mà không kèm `X-User-Id` sẽ nhận 404. Body logistics đã gửi sẵn header
+    này ở mọi lượt hỏi (`askBrain` truyền `identity` cho cả POST lẫn GET) nên
+    không phải sửa gì; client nào còn đi đường cũ thì thêm đúng một header.
+    """
     task = TASK_REGISTRY.get(task_id)
     if task is None:
         raise HTTPException(status_code=404, detail="Task not found")
+
+    chu = task.pop("_owner", None)
+    if chu is not None and str(x_user_id) != chu:
+        logger.warning(
+            "Từ chối đọc task %s: người hỏi %r không phải chủ", task_id, x_user_id
+        )
+        raise HTTPException(status_code=404, detail="Task not found")
+
     task.pop("_created_at", None)
     return task
 
@@ -447,6 +471,9 @@ async def chat_endpoint(
     )
 
     task_id = str(uuid.uuid4())
+    # Ghi chủ TRƯỚC khi chạy nền: worker ghi đè cả bản ghi ở mỗi chặng, nên chủ
+    # phải có mặt từ đầu (TaskRegistry.set mang `_owner` theo qua các lần ghi).
+    TASK_REGISTRY.set(task_id, {"status": "processing", "_owner": str(user_id)})
 
     async def process_chat():
         timer = metrics.Timer().__enter__()

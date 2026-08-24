@@ -27,8 +27,19 @@ class TaskRegistry:
             return dict(entry)  # return a copy
 
     def set(self, task_id: str, data: dict):
+        """
+        Ghi trạng thái task. `_created_at` và `_owner` MANG THEO từ bản ghi cũ.
+
+        `_owner` phải bền qua mọi lần ghi đè vì worker nền ghi lại toàn bộ bản
+        ghi ở mỗi chặng (`running` -> `completed`), mà nó không biết ai là chủ.
+        Không mang theo thì chủ sở hữu biến mất ngay lần cập nhật đầu tiên, và
+        phép kiểm quyền đọc trở thành vô hiệu đúng lúc task có dữ liệu để giấu.
+        """
         with self._lock:
-            data["_created_at"] = data.get("_created_at", time.time())
+            cu = self._store.get(task_id) or {}
+            data["_created_at"] = data.get("_created_at", cu.get("_created_at", time.time()))
+            if "_owner" not in data and "_owner" in cu:
+                data["_owner"] = cu["_owner"]
             self._store[task_id] = data
             # FIFO eviction when over capacity
             while len(self._store) > self._max_size:

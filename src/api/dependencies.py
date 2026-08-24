@@ -10,7 +10,7 @@ import re
 from dataclasses import dataclass
 from typing import Optional, Union
 
-from fastapi import HTTPException
+from fastapi import Header, HTTPException
 from pydantic import BaseModel
 
 logger = logging.getLogger("projecta.api")
@@ -160,6 +160,34 @@ def require_api_token(x_api_token: Optional[str]) -> None:
         return
     if x_api_token != API_AUTH_TOKEN:
         raise HTTPException(status_code=401, detail="Unauthorized")
+
+
+async def auth_guard(x_api_token: Optional[str] = Header(None)) -> None:
+    """
+    CỔNG XÁC THỰC THẬT — gắn ở tầng router, không phải trong từng handler.
+
+    VÌ SAO ĐỔI (15/08/2026). Trước đây mỗi handler tự gọi `require_api_token`.
+    Cách đó hỏng theo hai kiểu, cả hai đều lộ ra khi quét từng endpoint qua HTTP
+    thật chứ không phải bằng TestClient:
+
+    1. QUÊN LÀ KHÔNG AI BÁO. `GET /tools` và `GET /api/v1/task/{id}` không hề
+       gọi, nên mở công khai. Cái đầu trả 16,6KB lược đồ nội bộ; cái sau trả
+       CÂU TRẢ LỜI của AI — tên khách, mã số thuế, số công nợ. Hai mươi endpoint
+       kia đều đúng, nên không có gì cho thấy hai cái này sai.
+
+    2. SAI THỨ TỰ. Gọi trong thân handler nghĩa là FastAPI đã validate xong thân
+       request trước đó, nên người CHƯA xác thực nhận 422 kèm tên từng trường
+       bắt buộc thay vì 401. Dò được lược đồ mà không cần token.
+
+    Là dependency thì cả hai biến mất: FastAPI giải dependency TRƯỚC khi validate
+    thân request (401 chạy trước 422), và endpoint mới không thể quên vì nó không
+    phải nhớ gì cả.
+
+    Lời gọi `require_api_token` trong các handler giữ nguyên — chúng vô hại và
+    thành lớp thứ hai. Cổng thật nằm ở đây; `tests/test_auth_bao_phu.py` canh
+    rằng KHÔNG endpoint nào thoát ra ngoài cổng này.
+    """
+    require_api_token(x_api_token)
 
 
 def _coerce_identity(raw: str) -> Union[int, str]:

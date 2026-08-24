@@ -8,11 +8,16 @@ import logging
 import os
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Request
+from fastapi import Depends, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from src.api.dependencies import API_AUTH_TOKEN, RUNTIME_PROFILE, runtime
+from src.api.dependencies import (
+    API_AUTH_TOKEN,
+    RUNTIME_PROFILE,
+    auth_guard,
+    runtime,
+)
 from src.core.serving import Overloaded
 
 logger = logging.getLogger("projecta.api")
@@ -123,8 +128,20 @@ from src.api.routes.knowledge import router as knowledge_router
 from src.api.routes.tools import mcp_router
 from src.api.routes.tools import router as tools_router
 
-app.include_router(chat_router)
-app.include_router(documents_router)
-app.include_router(tools_router)   # tầng tool tất định — n8n + agentic dùng chung
-app.include_router(knowledge_router)  # nạp/tra cứu kho tri thức (RAG), có workspace
-app.include_router(mcp_router)     # MCP bọc đúng manifest trên (không định nghĩa lại)
+# `auth_guard` gắn Ở ĐÂY, một chỗ cho mọi router — xem docstring của nó.
+#
+# Ngắn gọn: gọi tay trong từng handler thì quên là không ai báo, và `GET /tools`
+# lẫn `GET /api/v1/task/{id}` đã quên thật (15/08/2026). Danh sách dưới đây là
+# chỗ DUY NHẤT quyết định cái gì cần token, nên thêm router mới mà bỏ quên
+# `dependencies` thì nhìn ra ngay tại dòng thêm vào.
+#
+# `/health` KHÔNG nằm trong danh sách này (nó gắn thẳng vào `app`): nó phải trả
+# lời được cả khi người hỏi chưa có token — đó là chỗ để biết Brain sống hay
+# chết, và để nhìn `auth_enabled`.
+_CAN_TOKEN = [Depends(auth_guard)]
+
+app.include_router(chat_router, dependencies=_CAN_TOKEN)
+app.include_router(documents_router, dependencies=_CAN_TOKEN)
+app.include_router(tools_router, dependencies=_CAN_TOKEN)   # tầng tool tất định — n8n + agentic dùng chung
+app.include_router(knowledge_router, dependencies=_CAN_TOKEN)  # nạp/tra cứu kho tri thức (RAG), có workspace
+app.include_router(mcp_router, dependencies=_CAN_TOKEN)     # MCP bọc đúng manifest trên (không định nghĩa lại)

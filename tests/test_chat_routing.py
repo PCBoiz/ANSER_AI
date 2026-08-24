@@ -101,10 +101,13 @@ def moi_truong(monkeypatch):
 
 def _hoi(cau: str) -> str:
     """Gửi một câu vào /chat rồi lấy câu trả lời cuối."""
-    resp = client.post("/chat", json={"user_id": 1, "store_id": 1, "message": cau})
+    # `X-User-Id` ở cả hai lượt: từ 15/08/2026 chỉ chủ của task đọc được kết
+    # quả, vì kết quả là câu trả lời đầy đủ của AI. Body gửi header này sẵn.
+    ai = {"X-User-Id": "1", "X-Store-Id": "1"}
+    resp = client.post("/chat", headers=ai, json={"user_id": 1, "store_id": 1, "message": cau})
     assert resp.status_code == 200
     task_id = resp.json()["task_id"]
-    ket_qua = client.get(f"/api/v1/task/{task_id}").json()
+    ket_qua = client.get(f"/api/v1/task/{task_id}", headers=ai).json()
     assert ket_qua["status"] == "completed", ket_qua
     return ket_qua["result"]["answer"]
 

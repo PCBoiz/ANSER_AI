@@ -21,7 +21,10 @@ async def test_chat_background_task():
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
         # Step 1: Hit /chat endpoint
-        response = await client.post("/chat", json={
+        # Chỉ chủ của task đọc được kết quả (15/08/2026) — gửi định danh ở cả
+        # hai lượt, đúng như Body làm.
+        ai = {"X-User-Id": "1", "X-Store-Id": "1"}
+        response = await client.post("/chat", headers=ai, json={
             "user_id": 1,
             "store_id": 1,
             "message": "[USER REQUEST] Hello"
@@ -39,7 +42,7 @@ async def test_chat_background_task():
 
         for _ in range(max_retries):
             await asyncio.sleep(0.1)
-            status_resp = await client.get(f"/api/v1/task/{task_id}")
+            status_resp = await client.get(f"/api/v1/task/{task_id}", headers=ai)
             assert status_resp.status_code == 200
             status_data = status_resp.json()
 
