@@ -6,7 +6,7 @@ người tiếp quản, kèm danh sách việc để đưa nó thành sản ph�
 
 > **Đọc phần nào:** Phần A viết cho bất kỳ ai — nghiệp vụ, thị trường, vì sao có
 > quyết định này. Phần B cho người viết mã. Phần C là những chỗ **chưa ai biết**,
-> phải tự tìm. Phần D là danh sách việc.
+> phải tự tìm. Phần D là danh sách việc, Phần E là ba mảng nghiên cứu sâu.
 >
 > Nếu bạn không viết mã: đọc A → C → D, bỏ qua B.
 
@@ -392,6 +392,16 @@ không phải viết mã.
 | **12** | **Dựng bộ eval vận tải** như đội gốc làm cho kế toán | Gieo lỗi vào dữ liệu thật, đo bắt được / báo oan. Không có bộ đo thì không biết hôm nay có khác hôm qua không |
 | **13** | **Thêm `.gitattributes`** | Kết dòng Windows↔Linux đang gây xung đột giả hàng trăm dòng mỗi lần gộp |
 
+## Nhóm 5 — Ba mảng nghiên cứu sâu *(giao thêm 25/08/2026)*
+
+Ba mảng này lớn hơn một dòng việc, nên có phần riêng ở **Phần E**. Tóm tắt:
+
+| # | Việc | Vì sao đáng làm |
+|---|---|---|
+| **14** | **Đo model một cách kỹ lưỡng** | Bộ đo hiện có đo 4 nhánh trên dữ liệu SINH RA. Chưa nhánh nào đo trên câu hỏi thật của khách |
+| **15** | **Fine-tune VLM đọc hoá đơn nhà xe** | Đang dùng Qwen2.5-VL-3B chưa tinh chỉnh, chưa đo. Có ứng viên tiếng Việt tốt hơn hẳn |
+| **16** | **Làm RAG có hiệu quả đo được** | 571 dòng mã, có test đơn vị, **không một chỉ số truy hồi nào** |
+
 ## Nếu chỉ làm được ba việc
 
 1. **Việc 1** — xin báo giá lịch sử, chạy hiệu chỉnh. Không có nó thì mọi thứ
@@ -400,6 +410,203 @@ không phải viết mã.
    sản phẩm.
 3. **Việc 7** — giấy vận tải điện tử. Quy định bắt buộc, dữ liệu đã có sẵn, và
    không đối thủ nào trong bảng A.4 làm.
+
+---
+
+---
+
+# PHẦN E — Ba mảng nghiên cứu sâu
+
+*Giao thêm 25/08/2026. Tra cứu cùng ngày — kiểm lại trước khi dựa vào.*
+
+Ba mảng dưới đây có chung một hình dạng với `pricing.py`: **mã đã có, số chưa
+có**. Mỗi mảng đều mở đầu bằng việc dựng thước đo, không phải bằng việc cải tiến
+— vì không có thước thì "cải tiến" chỉ là cảm giác.
+
+---
+
+## E.1 — Đo model một cách kỹ lưỡng
+
+### Hiện trạng
+
+Bộ đo `benchmark_v3.py` đo 4 nhánh (extraction, n8n, narration, agentic), so
+theo cặp bằng McNemar, có khoảng tin cậy Wilson, có cổng chặn khi mẫu quá ít.
+Hạ tầng đo **tốt hơn hẳn mức trung bình** — đội gốc đã sửa nó tám lần.
+
+Nhưng nó có ba giới hạn chưa ai gỡ:
+
+| Giới hạn | Hệ quả |
+|---|---|
+| Đo trên dữ liệu **sinh ra**, không phải câu hỏi thật | 65,3% là con số của phòng thí nghiệm |
+| Nhánh nào cũng chỉ đo **một lần chạy** | `temperature > 0` thì kết quả xê dịch — narration lệch 5–7 câu giữa hai lần chạy giống hệt |
+| Không đo **độ trễ và chi phí** | Model đúng mà chờ 40 giây thì khách vẫn bỏ |
+
+### Việc phải làm
+
+**Bước 1 — Bộ eval từ câu hỏi thật.** Xin khách 50–100 tin nhắn Zalo thật, gõ
+tay đáp án (`origin`, `destination`, `vehicle_type`, `cargo_type`,
+`pickup_date`). Đây là **bộ vàng** — nó không thay bộ sinh ra, nó đứng cạnh.
+Chạy cả hai, báo cáo hai con số riêng và **đừng gộp lại**.
+
+**Bước 2 — Chạy nhiều lần, báo cả độ lệch.** Mỗi nhánh chạy 3 lần cùng tham số.
+Nhánh `temperature = 0` phải ra kết quả giống hệt — nếu không thì backend không
+tất định, và đó là phát hiện riêng. Nhánh `temperature > 0` báo trung bình ± độ
+lệch. Một con số đơn lẻ trên nhánh ngẫu nhiên là con số nói dối.
+
+**Bước 3 — Đo độ trễ cùng lúc.** Ghi p50 và p95 thời gian mỗi câu. Ngưỡng đề
+nghị: **p95 dưới 8 giây** cho trích xuất báo giá — quá đó người dùng nghĩ là hỏng.
+
+**Bước 4 — Đo trên đúng cấu hình production.** Đội gốc đã dính lỗi này: trần
+token benchmark rộng hơn production nên mọi tỷ lệ cắt cụt đo được đều đẹp hơn
+thực tế. Nay các hằng số đã dùng chung (`MAX_DECISION_TOKENS`,
+`MAX_REPORT_TOKENS`, `MAX_WORKFLOW_TOKENS`) — **giữ nguyên cách đó.**
+
+### Ngưỡng để biết là đạt
+
+| Chỉ số | Ngưỡng |
+|---|---|
+| `ready_rate` trên **bộ vàng** (3 trường bắt buộc đều đúng) | ≥ 80% |
+| Chênh lệch giữa bộ vàng và bộ sinh ra | < 15 điểm. Rộng hơn nghĩa là dữ liệu train không giống đời thật |
+| p95 độ trễ | < 8 giây |
+| Nhánh `temperature = 0` chạy lại | giống hệt tới từng câu |
+
+### Cạm bẫy
+
+`smoke_test_guided()` mới được nâng để kiểm ràng buộc có **thi hành** hay không,
+chứ không chỉ **dựng được**. Lý do: phiên 15/08 sửa `additionalProperties: False`
+mà kết quả **không đổi một đơn vị nào** — backend giải mã bỏ qua ràng buộc đó.
+Cả một vòng đo mất trắng, và nó chỉ lộ ra vì có người đọc tay mẫu đầu ra.
+**Đọc dòng cảnh báo khung đo trước khi đọc điểm số.**
+
+---
+
+## E.2 — Fine-tune VLM đọc hoá đơn nhà xe
+
+### Hiện trạng
+
+Đang dùng **Qwen2.5-VL-3B-Instruct**, chưa tinh chỉnh, **chưa đo lần nào**.
+`src/agents/vision.py` chỉ 124 dòng — nó gọi model và ép JSON, không có gì đặc
+thù cho hoá đơn Việt Nam.
+
+### Ứng viên đáng cân nhắc TRƯỚC khi fine-tune
+
+**Vintern-1B** — mô hình đa phương thức **làm riêng cho tiếng Việt**:
+
+- Ghép `Qwen2-0.5B-Instruct` (ngôn ngữ) với `InternViT-300M-448px` (thị giác)
+- Tinh chỉnh trên **hơn 3 triệu cặp ảnh–hỏi–đáp tiếng Việt**
+- Nhắm thẳng vào OCR, trích xuất tài liệu, hỏi đáp ngữ cảnh Việt
+- Đo trên **OpenViVQA** và **ViTextVQA**
+
+**1B so với 3B** là khác biệt lớn về VRAM — nó cho phép chạy VLM cùng lúc với
+model text mà không phải hoán đổi. Với hoá đơn tiếng Việt, một model bản địa 1B
+rất có thể hơn một model đa ngữ 3B.
+
+> **Đo trước khi đổi.** Chạy cả Qwen2.5-VL-3B và Vintern-1B trên cùng 20–30 ảnh
+> hoá đơn thật, so theo cặp — đúng cách `compare_runs.py` đã làm cho model text.
+> Đổi model vì "nghe hợp lý hơn" là cách nhanh nhất để đi lùi mà không biết.
+
+### Nếu quyết định fine-tune
+
+**QLoRA**: nạp model gốc ở 4-bit, huấn luyện adapter LoRA bên trên.
+
+> ⚠️ **VRAM dưới 18GB là gặp OOM liên tục** khi lưới ảnh và adapter LoRA cùng
+> hoạt động. Colab **T4 (16GB) không đủ** — phải L4 (22,5GB) hoặc A100. Đây
+> chính là lý do phiên đo cũ luôn yêu cầu L4.
+
+Kỹ thuật kèm theo: gradient accumulation, early stopping theo chỉ số validation,
+checkpoint đều đặn.
+
+**Dữ liệu.** Bộ chuẩn quốc tế cho trích xuất hoá đơn là **CORD**, nhưng đó là
+hoá đơn Indonesia — dùng để mồi thì được, không thay được hoá đơn nhà xe Việt
+Nam. Cần **200–500 ảnh thật gán nhãn tay** để tinh chỉnh có ý nghĩa; 20–30 ảnh
+chỉ đủ để **đo**, không đủ để **train**.
+
+**Tham khảo:** *A Survey on Vietnamese Document Analysis and Recognition*
+(arXiv 2506.05061) — khảo sát 2025, đọc trước khi chọn hướng.
+
+### Ngưỡng để biết là đạt
+
+| Chỉ số | Ngưỡng |
+|---|---|
+| Đọc đúng **tổng tiền** trên hoá đơn | ≥ 95% — sai số tiền là sai nghiêm trọng nhất |
+| Đọc đúng từng dòng cước | ≥ 85% |
+| **Nói "không đọc được"** khi ảnh mờ | phải có. Đoán bừa tệ hơn từ chối |
+
+Nguyên tắc "chưa biết ≠ 0" áp dụng đặc biệt nặng ở đây: một hoá đơn mờ mà model
+đoán ra số tiền là lỗi tệ hơn hẳn việc nó nói không đọc được.
+
+---
+
+## E.3 — Làm RAG có hiệu quả đo được
+
+### Hiện trạng
+
+`src/core/knowledge.py` — 571 dòng. Nhúng bằng **BAAI/bge-m3** (MIT), xếp lại
+bằng **namdp-ptit/ViRanker** (Apache-2.0). Cả hai chọn có lý do rõ: MiniLM cũ
+giới hạn 128 token nên **cắt cụt im lặng** quá nửa mỗi đoạn, còn ms-marco là
+model **tiếng Anh** mà điểm của nó lại dùng làm ngưỡng lọc.
+
+Có `test_knowledge.py`, `test_knowledge_api.py`, `test_retrieval_policy.py` —
+nhưng đó là test **đơn vị**, không phải **thước đo chất lượng truy hồi**. Không
+một chỉ số recall, precision hay MRR nào tồn tại.
+
+### Đo cái gì
+
+Khuyến nghị hiện hành: theo dõi **ít nhất một chỉ số ở tầng truy hồi và ít nhất
+một ở tầng sinh**.
+
+| Tầng | Chỉ số | Ngưỡng khởi điểm |
+|---|---|---|
+| Truy hồi | **Recall@20** | **≥ 0,8** cho tra cứu trên kho rộng |
+| Truy hồi | **MRR** — tài liệu đúng đầu tiên nằm ở vị trí nào | càng gần 1 càng tốt |
+| Sinh | **Faithfulness** — tỷ lệ khẳng định trong câu trả lời kiểm chứng được từ đoạn đã truy hồi | **ưu tiên số một** |
+
+> *"Nếu chỉ theo dõi được một chỉ số, hãy chọn faithfulness"* — vì bịa đặt gây
+> thiệt hại thực tế lớn nhất.
+
+**Tin tốt: ANSER đã có một dạng faithfulness rồi.** `grounding.py` bắt mọi số ≥4
+chữ số trong câu trả lời phải xuất hiện trong ngữ cảnh. Đó là faithfulness thu
+hẹp về **con số** — chặt hơn bản tổng quát ở đúng chỗ quan trọng nhất với sản
+phẩm tài chính. Việc cần làm là **mở rộng nó thành chỉ số báo cáo được**, không
+phải thay bằng thứ khác.
+
+### Dựng bộ eval thế nào
+
+Cách làm hiện hành: **sinh câu hỏi tổng hợp từ chính kho tài liệu đã nạp**, rồi
+người rà lại một mẫu. Cụ thể:
+
+1. Lấy tài liệu đã nạp thật (hợp đồng, bảng giá cước, chính sách công nợ).
+2. Với mỗi đoạn, sinh 2–3 câu hỏi mà **đoạn đó là câu trả lời đúng** — dùng
+   DeepSeek như đội gốc đã làm cho bộ eval kế toán.
+3. Đáp án đúng = id của đoạn đó. Nay có nhãn để tính recall@k và MRR.
+4. **Người rà lại 20% mẫu.** Câu hỏi sinh máy có thể tự trả lời được mà không
+   cần truy hồi — những câu đó phải loại.
+
+Bộ eval kết hợp ba nguồn: dữ liệu vàng, câu hỏi tổng hợp, và người rà.
+
+### Ba việc cải tiến đáng thử, theo thứ tự
+
+| # | Việc | Vì sao trước/sau |
+|---|---|---|
+| 1 | **Chỉnh cách chia đoạn** | Rẻ nhất, ảnh hưởng lớn nhất. bge-m3 nhận tới 8192 token — chia đoạn theo 128 token của model cũ là phí |
+| 2 | **Bật/tắt ViRanker rồi so** | Xếp lại tốn thời gian. Phải biết nó đổi recall bao nhiêu điểm |
+| 3 | **Tìm lai (từ khoá + vector)** | Mã hàng như `VT00039`, `KM00028` là chuỗi chính xác — tìm theo vector rất kém với loại này |
+
+Việc 3 đáng chú ý với ANSER hơn hầu hết hệ thống khác: khách tra cứu bằng **mã
+hàng** và **biển số xe**, hai thứ mà nhúng vector xử lý tệ.
+
+### Cạm bẫy đã ghi trong mã
+
+> **Đừng đưa giá dầu vào kho tri thức.** Giá đổi hằng tuần, embedding cũ nằm lại
+> và vẫn bị truy hồi ra. Dữ liệu realtime phải đi đường tra cứu tất định.
+
+Cùng nguyên tắc đó áp cho: bảng giá cước còn hiệu lực, số dư công nợ, tồn kho.
+**RAG dành cho tài liệu ổn định** — hợp đồng, chính sách, quy định.
+
+Một cạm bẫy nữa: khoá phạm vi kho tri thức (`kb_workspace_id`) **tách hẳn khỏi
+`store_id`**. Đội gốc đã sửa lỗi này — tài liệu nạp lúc đứng ở kho A từng vô
+hình khi hỏi lúc đứng ở kho B, và biểu hiện duy nhất là "không tìm thấy", không
+có lỗi nào cả. Giữ nguyên cách tách đó.
 
 ---
 

@@ -215,6 +215,7 @@
       <a href="#b"><span class="ky">B</span>Bàn giao kỹ thuật</a>
       <a href="#c"><span class="ky">C</span>Chưa ai biết</a>
       <a href="#d"><span class="ky">D</span>Danh sách việc</a>
+      <a href="#e"><span class="ky">E</span>Ba mảng nghiên cứu sâu</a>
       <a href="#pl"><span class="ky">·</span>Bài học đắt nhất</a>
     </nav>
     <div style="font-size:12px;color:var(--muc-3);line-height:1.5;border-top:1px solid var(--vien);padding-top:16px;">
@@ -600,12 +601,171 @@ AG0003: không luật nào khớp (cần 'carrier_selection')</code></pre>
         <p class="viec-ten">Thêm <code>.gitattributes</code></p>
         <p>Kết dòng Windows↔Linux đang gây xung đột giả hàng trăm dòng mỗi lần gộp.</p></div></div>
 
+      <p class="nhom">Nhóm 5 · Ba mảng nghiên cứu sâu <span style="text-transform:none;letter-spacing:0">— giao thêm 25/08</span></p>
+      <div class="viec"><div class="viec-so">14</div><div class="viec-noi">
+        <p class="viec-ten">Đo model một cách kỹ lưỡng</p>
+        <p>Bộ đo hiện đo 4 nhánh trên dữ liệu <strong>sinh ra</strong>. Chưa nhánh nào đo trên câu hỏi thật của khách. Chi tiết ở <a href="#e1">E.1</a>.</p></div></div>
+      <div class="viec"><div class="viec-so">15</div><div class="viec-noi">
+        <p class="viec-ten">Fine-tune VLM đọc hoá đơn nhà xe</p>
+        <p>Đang dùng Qwen2.5-VL-3B chưa tinh chỉnh, chưa đo. Có ứng viên tiếng Việt tốt hơn hẳn. Chi tiết ở <a href="#e2">E.2</a>.</p></div></div>
+      <div class="viec"><div class="viec-so">16</div><div class="viec-noi">
+        <p class="viec-ten">Làm RAG có hiệu quả đo được</p>
+        <p>571 dòng mã, có test đơn vị, <strong>không một chỉ số truy hồi nào</strong>. Chi tiết ở <a href="#e3">E.3</a>.</p></div></div>
+
       <h3>Nếu chỉ làm được ba việc</h3>
       <ol>
         <li><strong>Việc 1</strong> — xin báo giá lịch sử, chạy hiệu chỉnh. Không có nó thì mọi thứ khác xây trên cát.</li>
         <li><strong>Việc 4</strong> — dựng màn hình báo giá. Không có nó thì khách không chạm được vào sản phẩm.</li>
         <li><strong>Việc 7</strong> — giấy vận tải điện tử. Quy định bắt buộc, dữ liệu đã có sẵn, và không đối thủ nào làm.</li>
       </ol>
+    </div>
+
+    <!-- ================= E ================= -->
+    <section id="e" class="phan">
+      <p class="phan-ky">Phần E</p>
+      <h2>Ba mảng nghiên cứu sâu</h2>
+      <p class="phan-mo">Giao thêm 25/08/2026. Cả ba có chung hình dạng với <code>pricing.py</code>: mã đã có, số chưa có. Mỗi mảng mở đầu bằng việc dựng thước đo, không phải bằng việc cải tiến — vì không có thước thì “cải tiến” chỉ là cảm giác.</p>
+    </section>
+
+    <div class="doc">
+      <h3 id="e1">E.1 · Đo model một cách kỹ lưỡng</h3>
+      <p>Bộ đo <code>benchmark_v3.py</code> so theo cặp bằng McNemar, có khoảng tin cậy Wilson, có
+      cổng chặn khi mẫu quá ít — <strong>tốt hơn hẳn mức trung bình</strong>. Nhưng còn ba giới hạn:</p>
+    </div>
+    <div class="doc rong">
+      <div class="bang-boc"><table>
+        <thead><tr><th>Giới hạn</th><th>Hệ quả</th></tr></thead>
+        <tbody>
+          <tr><td>Đo trên dữ liệu <strong>sinh ra</strong>, không phải câu hỏi thật</td><td>65,3% là con số của phòng thí nghiệm</td></tr>
+          <tr><td>Mỗi nhánh chỉ đo <strong>một lần chạy</strong></td><td><code>temperature &gt; 0</code> thì kết quả xê dịch — narration lệch 5–7 câu giữa hai lần chạy giống hệt</td></tr>
+          <tr><td>Không đo <strong>độ trễ</strong></td><td>Model đúng mà chờ 40 giây thì khách vẫn bỏ</td></tr>
+        </tbody>
+      </table></div>
+    </div>
+    <div class="doc">
+      <p><strong>Bốn bước:</strong> ① xin 50–100 tin Zalo thật, gõ tay đáp án → <strong>bộ vàng</strong>
+      đứng cạnh bộ sinh ra, báo cáo hai con số riêng và <strong>đừng gộp lại</strong>;
+      ② mỗi nhánh chạy 3 lần — nhánh <code>temperature = 0</code> phải ra giống hệt, nếu không thì
+      backend không tất định và đó là phát hiện riêng; ③ ghi p50/p95 độ trễ;
+      ④ đo trên <em>đúng</em> cấu hình production.</p>
+    </div>
+    <div class="doc rong">
+      <div class="bang-boc"><table>
+        <thead><tr><th>Ngưỡng để biết là đạt</th><th class="so">Mức</th></tr></thead>
+        <tbody>
+          <tr><td><code>ready_rate</code> trên bộ vàng</td><td class="so">≥ 80%</td></tr>
+          <tr><td>Chênh lệch bộ vàng ↔ bộ sinh ra</td><td class="so">&lt; 15 điểm</td></tr>
+          <tr><td>p95 độ trễ</td><td class="so">&lt; 8 giây</td></tr>
+          <tr><td>Nhánh <code>temperature = 0</code> chạy lại</td><td class="so">giống hệt</td></tr>
+        </tbody>
+      </table></div>
+    </div>
+    <div class="doc">
+      <div class="luuy">
+        <span class="dau">Đọc cảnh báo khung đo trước khi đọc điểm số</span>
+        <p>Phiên 15/08 sửa <code>additionalProperties: False</code> mà kết quả <strong>không đổi một
+        đơn vị nào</strong> — backend giải mã bỏ qua ràng buộc đó. Cả một vòng đo mất trắng, và nó
+        chỉ lộ ra vì có người đọc tay mẫu đầu ra. <code>smoke_test_guided()</code> nay kiểm ràng buộc
+        có <strong>thi hành</strong> hay không, chứ không chỉ <strong>dựng được</strong>.</p>
+      </div>
+
+      <h3 id="e2">E.2 · Fine-tune VLM đọc hoá đơn nhà xe</h3>
+      <p>Đang dùng <strong>Qwen2.5-VL-3B-Instruct</strong>, chưa tinh chỉnh, <strong>chưa đo lần
+      nào</strong>. <code>vision.py</code> chỉ 124 dòng — gọi model và ép JSON, không có gì đặc thù
+      cho hoá đơn Việt Nam.</p>
+
+      <h4>Ứng viên đáng cân nhắc <em>trước</em> khi fine-tune</h4>
+      <p><strong>Vintern-1B</strong> — mô hình đa phương thức làm riêng cho tiếng Việt: ghép
+      <code>Qwen2-0.5B-Instruct</code> với <code>InternViT-300M-448px</code>, tinh chỉnh trên
+      <strong>hơn 3 triệu cặp ảnh–hỏi–đáp tiếng Việt</strong>, nhắm thẳng vào OCR và trích xuất tài
+      liệu, đo trên OpenViVQA và ViTextVQA.</p>
+      <p><strong>1B so với 3B</strong> là khác biệt lớn về VRAM — nó cho phép chạy VLM cùng lúc với
+      model text mà không phải hoán đổi. Với hoá đơn tiếng Việt, một model bản địa 1B rất có thể hơn
+      một model đa ngữ 3B.</p>
+      <div class="dan"><p><strong>Đo trước khi đổi.</strong> Chạy cả hai trên cùng 20–30 ảnh hoá đơn
+      thật, so theo cặp — đúng cách <code>compare_runs.py</code> đã làm cho model text. Đổi model vì
+      “nghe hợp lý hơn” là cách nhanh nhất để đi lùi mà không biết.</p></div>
+
+      <h4>Nếu quyết định fine-tune</h4>
+      <p><strong>QLoRA</strong>: nạp model gốc ở 4-bit, huấn luyện adapter LoRA bên trên.</p>
+      <div class="luuy">
+        <span class="dau">Ràng buộc phần cứng</span>
+        <p><strong>VRAM dưới 18GB là gặp OOM liên tục</strong> khi lưới ảnh và adapter LoRA cùng hoạt
+        động. Colab <strong>T4 (16GB) không đủ</strong> — phải L4 (22,5GB) hoặc A100. Đây chính là lý
+        do phiên đo cũ luôn yêu cầu L4.</p>
+      </div>
+      <p><strong>Dữ liệu:</strong> bộ chuẩn quốc tế là <strong>CORD</strong>, nhưng đó là hoá đơn
+      Indonesia — mồi thì được, không thay được hoá đơn nhà xe Việt Nam. Cần <strong>200–500 ảnh thật
+      gán nhãn tay</strong> để tinh chỉnh có ý nghĩa; 20–30 ảnh chỉ đủ để <em>đo</em>, không đủ để
+      <em>train</em>.</p>
+    </div>
+    <div class="doc rong">
+      <div class="bang-boc"><table>
+        <thead><tr><th>Ngưỡng để biết là đạt</th><th class="so">Mức</th></tr></thead>
+        <tbody>
+          <tr><td>Đọc đúng <strong>tổng tiền</strong></td><td class="so">≥ 95%</td></tr>
+          <tr><td>Đọc đúng từng dòng cước</td><td class="so">≥ 85%</td></tr>
+          <tr><td><strong>Nói “không đọc được”</strong> khi ảnh mờ</td><td class="so">phải có</td></tr>
+        </tbody>
+      </table></div>
+    </div>
+    <div class="doc">
+      <p>Nguyên tắc <strong>“chưa biết ≠ 0”</strong> áp dụng đặc biệt nặng ở đây: một hoá đơn mờ mà
+      model đoán ra số tiền là lỗi tệ hơn hẳn việc nó nói không đọc được.</p>
+
+      <h3 id="e3">E.3 · Làm RAG có hiệu quả đo được</h3>
+      <p><code>knowledge.py</code> — 571 dòng. Nhúng bằng <strong>BAAI/bge-m3</strong> (MIT), xếp lại
+      bằng <strong>namdp-ptit/ViRanker</strong> (Apache-2.0). Cả hai chọn có lý do rõ: MiniLM cũ giới
+      hạn 128 token nên <strong>cắt cụt im lặng</strong> quá nửa mỗi đoạn, còn ms-marco là model
+      <strong>tiếng Anh</strong> mà điểm của nó lại dùng làm ngưỡng lọc.</p>
+      <p>Có ba file test — nhưng đó là test <strong>đơn vị</strong>, không phải thước đo chất lượng
+      truy hồi. <strong>Không một chỉ số recall, precision hay MRR nào tồn tại.</strong></p>
+    </div>
+    <div class="doc rong">
+      <div class="bang-boc"><table>
+        <thead><tr><th>Tầng</th><th>Chỉ số</th><th>Ngưỡng khởi điểm</th></tr></thead>
+        <tbody>
+          <tr><td>Truy hồi</td><td class="manh">Recall@20</td><td class="so">≥ 0,8</td></tr>
+          <tr><td>Truy hồi</td><td class="manh">MRR</td><td>tài liệu đúng đầu tiên nằm ở vị trí nào — càng gần 1 càng tốt</td></tr>
+          <tr style="background:var(--biet-nen)"><td>Sinh</td><td class="manh">Faithfulness</td><td><strong>ưu tiên số một</strong></td></tr>
+        </tbody>
+      </table></div>
+    </div>
+    <div class="doc">
+      <div class="dan"><p>“Nếu chỉ theo dõi được một chỉ số, hãy chọn <strong>faithfulness</strong>”
+      — vì bịa đặt gây thiệt hại thực tế lớn nhất.</p></div>
+      <p><strong>Tin tốt: ANSER đã có một dạng faithfulness rồi.</strong> <code>grounding.py</code>
+      bắt mọi số ≥4 chữ số trong câu trả lời phải xuất hiện trong ngữ cảnh. Đó là faithfulness thu hẹp
+      về <strong>con số</strong> — chặt hơn bản tổng quát ở đúng chỗ quan trọng nhất với sản phẩm tài
+      chính. Việc cần làm là <strong>mở rộng nó thành chỉ số báo cáo được</strong>, không phải thay
+      bằng thứ khác.</p>
+
+      <h4>Dựng bộ eval thế nào</h4>
+      <ol>
+        <li>Lấy tài liệu đã nạp thật — hợp đồng, bảng giá cước, chính sách công nợ.</li>
+        <li>Với mỗi đoạn, sinh 2–3 câu hỏi mà <strong>đoạn đó là câu trả lời đúng</strong> — dùng DeepSeek như đội gốc đã làm cho bộ eval kế toán.</li>
+        <li>Đáp án đúng = id của đoạn đó. Nay có nhãn để tính recall@k và MRR.</li>
+        <li><strong>Người rà lại 20% mẫu.</strong> Câu hỏi sinh máy có thể tự trả lời được mà không cần truy hồi — những câu đó phải loại.</li>
+      </ol>
+
+      <h4>Ba việc cải tiến, theo thứ tự</h4>
+      <ol>
+        <li><strong>Chỉnh cách chia đoạn</strong> — rẻ nhất, ảnh hưởng lớn nhất. bge-m3 nhận tới 8192 token; chia đoạn theo 128 token của model cũ là phí.</li>
+        <li><strong>Bật/tắt ViRanker rồi so</strong> — xếp lại tốn thời gian, phải biết nó đổi recall bao nhiêu điểm.</li>
+        <li><strong>Tìm lai (từ khoá + vector)</strong> — mã hàng như <code>VT00039</code>, <code>KM00028</code> là chuỗi chính xác; tìm theo vector rất kém với loại này.</li>
+      </ol>
+      <p>Việc 3 đáng chú ý với ANSER hơn hầu hết hệ thống khác: khách tra cứu bằng <strong>mã hàng</strong>
+      và <strong>biển số xe</strong> — hai thứ mà nhúng vector xử lý tệ.</p>
+
+      <div class="luuy">
+        <span class="dau">Cạm bẫy đã ghi trong mã</span>
+        <p><strong>Đừng đưa giá dầu vào kho tri thức.</strong> Giá đổi hằng tuần, embedding cũ nằm lại
+        và vẫn bị truy hồi ra. Cùng nguyên tắc đó áp cho bảng giá cước còn hiệu lực, số dư công nợ,
+        tồn kho. <strong>RAG dành cho tài liệu ổn định</strong> — hợp đồng, chính sách, quy định.</p>
+      </div>
+      <p>Một cạm bẫy nữa: khoá phạm vi kho tri thức <code>kb_workspace_id</code> <strong>tách hẳn khỏi
+      <code>store_id</code></strong>. Tài liệu nạp lúc đứng ở kho A từng vô hình khi hỏi lúc đứng ở kho
+      B, và biểu hiện duy nhất là “không tìm thấy”, không có lỗi nào cả. Giữ nguyên cách tách đó.</p>
     </div>
 
     <!-- ================= phụ lục ================= -->
