@@ -1,0 +1,642 @@
+<title>Bàn giao mảng vận tải</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bitter:ital,wght@0,500;0,700;1,500&family=Be+Vietnam+Pro:wght@300;400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap&subset=vietnamese,latin,latin-ext">
+
+<style>
+  :root {
+    --nen:        #F5F7F9;
+    --nen-2:      #EAEEF2;
+    --the:        #FFFFFF;
+    --muc:        #16212B;
+    --muc-2:      #4A5B6B;
+    --muc-3:      #74858F;
+    --vien:       #D8E0E7;
+    --vien-dam:   #B9C6D0;
+    --nhan:       #B45F06;
+    --nhan-nen:   #FDF3E7;
+    --biet:       #2C6E63;
+    --biet-nen:   #E4F0ED;
+    --chua:       #9E3B2E;
+    --chua-nen:   #FAEAE7;
+    --bong:       0 1px 2px rgba(22,33,43,.05), 0 8px 24px -12px rgba(22,33,43,.16);
+
+    --do-rong:    68ch;
+    --rail:       248px;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --nen:      #0F1419;
+      --nen-2:    #161D24;
+      --the:      #151C23;
+      --muc:      #E4EBF1;
+      --muc-2:    #A3B2BF;
+      --muc-3:    #76858F;
+      --vien:     #26313A;
+      --vien-dam: #384652;
+      --nhan:     #E0913F;
+      --nhan-nen: #2A1E10;
+      --biet:     #64B3A4;
+      --biet-nen: #12241F;
+      --chua:     #D9776A;
+      --chua-nen: #251311;
+      --bong:     0 1px 2px rgba(0,0,0,.4), 0 8px 24px -12px rgba(0,0,0,.7);
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --nen:      #0F1419;
+    --nen-2:    #161D24;
+    --the:      #151C23;
+    --muc:      #E4EBF1;
+    --muc-2:    #A3B2BF;
+    --muc-3:    #76858F;
+    --vien:     #26313A;
+    --vien-dam: #384652;
+    --nhan:     #E0913F;
+    --nhan-nen: #2A1E10;
+    --biet:     #64B3A4;
+    --biet-nen: #12241F;
+    --chua:     #D9776A;
+    --chua-nen: #251311;
+    --bong:     0 1px 2px rgba(0,0,0,.4), 0 8px 24px -12px rgba(0,0,0,.7);
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--nen);
+    color: var(--muc);
+    font-family: "Be Vietnam Pro", system-ui, -apple-system, "Segoe UI", sans-serif;
+    font-weight: 400;
+    font-size: 16px;
+    line-height: 1.68;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .khung {
+    display: grid;
+    grid-template-columns: var(--rail) minmax(0, 1fr);
+    gap: 56px;
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: 0 32px;
+  }
+
+  /* ---------- rail ---------- */
+  .rail { position: sticky; top: 0; align-self: start; height: 100vh; overflow-y: auto;
+          padding: 40px 0 40px; display: flex; flex-direction: column; gap: 26px; }
+  .rail-nhan { font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: 10.5px;
+               letter-spacing: .14em; text-transform: uppercase; color: var(--muc-3); }
+  .rail nav { display: flex; flex-direction: column; gap: 2px; }
+  .rail a { color: var(--muc-2); text-decoration: none; font-size: 13.5px; line-height: 1.45;
+            padding: 6px 12px 6px 13px; border-left: 2px solid var(--vien);
+            transition: color .15s, border-color .15s, background .15s; }
+  .rail a:hover { color: var(--muc); border-left-color: var(--nhan); background: var(--nen-2); }
+  .rail a:focus-visible { outline: 2px solid var(--nhan); outline-offset: -2px; }
+  .rail a .ky { font-family: "IBM Plex Mono", monospace; color: var(--muc-3); margin-right: 7px; font-size: 12px; }
+
+  /* ---------- nội dung ---------- */
+  main { padding: 40px 0 140px; min-width: 0; }
+  .doc { max-width: var(--do-rong); }
+  .rong { max-width: 100%; }
+
+  h1 { font-family: Bitter, Georgia, serif; font-weight: 700; font-size: clamp(34px, 5vw, 46px);
+       line-height: 1.1; letter-spacing: -.02em; margin: 0 0 18px; text-wrap: balance; }
+  h2 { font-family: Bitter, Georgia, serif; font-weight: 700; font-size: 27px; line-height: 1.24;
+       letter-spacing: -.012em; margin: 0 0 6px; text-wrap: balance; }
+  h3 { font-family: Bitter, Georgia, serif; font-weight: 500; font-size: 19px; line-height: 1.34;
+       margin: 38px 0 10px; text-wrap: balance; }
+  h4 { font-family: "Be Vietnam Pro", sans-serif; font-weight: 600; font-size: 15px;
+       margin: 26px 0 8px; }
+  p { margin: 0 0 15px; }
+  a { color: var(--nhan); }
+
+  .phan { margin: 0 0 22px; padding-top: 78px; border-top: 1px solid var(--vien); }
+  .phan:first-of-type { padding-top: 44px; border-top: 0; }
+  .phan-ky { font-family: "IBM Plex Mono", monospace; font-size: 11px; letter-spacing: .16em;
+             text-transform: uppercase; color: var(--nhan); margin: 0 0 10px; }
+  .phan-mo { color: var(--muc-2); font-size: 15px; margin: 10px 0 0; max-width: var(--do-rong); }
+
+  /* ---------- chip ---------- */
+  .chip { display: inline-flex; align-items: center; gap: 6px; font-family: "IBM Plex Mono", monospace;
+          font-size: 11px; letter-spacing: .04em; padding: 3px 9px; border-radius: 3px;
+          border: 1px solid; white-space: nowrap; vertical-align: middle; }
+  .chip.biet { color: var(--biet); background: var(--biet-nen); border-color: color-mix(in srgb, var(--biet) 32%, transparent); }
+  .chip.chua { color: var(--chua); background: var(--chua-nen); border-color: color-mix(in srgb, var(--chua) 32%, transparent); }
+  .chip.trung { color: var(--nhan); background: var(--nhan-nen); border-color: color-mix(in srgb, var(--nhan) 32%, transparent); }
+
+  /* ---------- khối dẫn ---------- */
+  .dan { border-left: 3px solid var(--vien-dam); padding: 4px 0 4px 18px; margin: 22px 0;
+         color: var(--muc-2); font-style: italic; }
+  .dan strong { color: var(--muc); font-style: normal; }
+  .luuy { border: 1px solid color-mix(in srgb, var(--nhan) 30%, transparent); background: var(--nhan-nen);
+          border-radius: 5px; padding: 15px 18px; margin: 22px 0; font-size: 14.5px; }
+  .luuy .dau { font-family: "IBM Plex Mono", monospace; font-size: 10.5px; letter-spacing: .13em;
+               text-transform: uppercase; color: var(--nhan); display: block; margin-bottom: 6px; }
+  .luuy p:last-child, .dan p:last-child { margin-bottom: 0; }
+
+  /* ---------- bảng ---------- */
+  .bang-boc { overflow-x: auto; margin: 22px 0; border: 1px solid var(--vien);
+              border-radius: 6px; background: var(--the); }
+  table { border-collapse: collapse; width: 100%; font-size: 14px; }
+  th { text-align: left; font-family: "IBM Plex Mono", monospace; font-weight: 500; font-size: 10.5px;
+       letter-spacing: .1em; text-transform: uppercase; color: var(--muc-3);
+       padding: 11px 15px; border-bottom: 1px solid var(--vien); background: var(--nen-2);
+       white-space: nowrap; }
+  td { padding: 12px 15px; border-bottom: 1px solid var(--vien); vertical-align: top; line-height: 1.55; }
+  tr:last-child td { border-bottom: 0; }
+  td.so { font-family: "IBM Plex Mono", monospace; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .manh { font-weight: 600; }
+
+  code { font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: .88em;
+         background: var(--nen-2); border: 1px solid var(--vien); border-radius: 3px;
+         padding: 1px 5px; }
+  pre { font-family: "IBM Plex Mono", monospace; font-size: 13px; line-height: 1.6;
+        background: var(--the); border: 1px solid var(--vien); border-radius: 6px;
+        padding: 16px 18px; overflow-x: auto; margin: 20px 0; }
+  pre code { background: none; border: 0; padding: 0; font-size: inherit; }
+
+  ul, ol { margin: 0 0 15px; padding-left: 22px; }
+  li { margin-bottom: 7px; }
+  li::marker { color: var(--muc-3); }
+
+  /* ---------- thẻ module ---------- */
+  .luoi { display: grid; gap: 14px; margin: 24px 0; }
+  .the { border: 1px solid var(--vien); border-radius: 6px; background: var(--the);
+         padding: 16px 18px; box-shadow: var(--bong); }
+  .the-dau { display: flex; align-items: baseline; justify-content: space-between; gap: 14px;
+             flex-wrap: wrap; margin-bottom: 7px; }
+  .the-ten { font-family: "IBM Plex Mono", monospace; font-size: 13.5px; font-weight: 500; color: var(--muc); }
+  .the p { margin: 0; font-size: 14px; color: var(--muc-2); }
+
+  /* ---------- việc ---------- */
+  .viec { display: flex; gap: 16px; padding: 16px 0; border-bottom: 1px solid var(--vien); }
+  .viec:last-child { border-bottom: 0; }
+  .viec-so { font-family: "IBM Plex Mono", monospace; font-variant-numeric: tabular-nums;
+             font-size: 13px; font-weight: 500; color: var(--nhan); background: var(--nhan-nen);
+             border: 1px solid color-mix(in srgb, var(--nhan) 26%, transparent); border-radius: 4px;
+             width: 30px; height: 30px; display: grid; place-items: center; flex: 0 0 auto; }
+  .viec-noi { min-width: 0; }
+  .viec-ten { font-weight: 600; margin: 3px 0 4px; }
+  .viec p { margin: 0; font-size: 14px; color: var(--muc-2); }
+
+  .nhom { font-family: "IBM Plex Mono", monospace; font-size: 11px; letter-spacing: .13em;
+          text-transform: uppercase; color: var(--muc-3); margin: 34px 0 4px;
+          padding-bottom: 7px; border-bottom: 1px solid var(--vien-dam); }
+
+  hr { border: 0; border-top: 1px solid var(--vien); margin: 46px 0; }
+
+  .chan { margin-top: 80px; padding-top: 26px; border-top: 1px solid var(--vien);
+          font-size: 13px; color: var(--muc-3); max-width: var(--do-rong); }
+
+  @media (max-width: 900px) {
+    .khung { grid-template-columns: 1fr; gap: 0; padding: 0 22px; }
+    .rail { position: static; height: auto; padding: 28px 0 0; }
+    .rail nav { flex-direction: row; flex-wrap: wrap; gap: 6px; }
+    .rail a { border-left: 0; border: 1px solid var(--vien); border-radius: 4px; padding: 5px 10px; }
+    main { padding-top: 24px; }
+    .phan { padding-top: 50px; }
+  }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+</style>
+
+<div class="khung">
+  <aside class="rail">
+    <div>
+      <div class="rail-nhan">Bàn giao</div>
+      <div style="font-family:Bitter,serif;font-weight:700;font-size:17px;line-height:1.25;margin-top:5px;">Mảng vận tải</div>
+      <div style="font-size:12.5px;color:var(--muc-3);margin-top:3px;">ANSER · 25/08/2026</div>
+    </div>
+    <nav>
+      <a href="#a"><span class="ky">A</span>Bối cảnh &amp; thị trường</a>
+      <a href="#b"><span class="ky">B</span>Bàn giao kỹ thuật</a>
+      <a href="#c"><span class="ky">C</span>Chưa ai biết</a>
+      <a href="#d"><span class="ky">D</span>Danh sách việc</a>
+      <a href="#pl"><span class="ky">·</span>Bài học đắt nhất</a>
+    </nav>
+    <div style="font-size:12px;color:var(--muc-3);line-height:1.5;border-top:1px solid var(--vien);padding-top:16px;">
+      Không viết mã? Đọc <strong style="color:var(--muc-2)">A → C → D</strong>, bỏ qua B.
+    </div>
+  </aside>
+
+  <main>
+    <div class="doc">
+      <h1>Bàn giao mảng vận tải</h1>
+      <p style="font-size:18px;color:var(--muc-2);line-height:1.6;">
+        Báo giá cước, chọn nhà xe, đọc hoá đơn nhà xe, và model trích xuất yêu cầu
+        báo giá — toàn bộ giao cho người tiếp quản, kèm danh sách việc để đưa nó
+        thành sản phẩm bán được.
+      </p>
+
+      <div class="luuy">
+        <span class="dau">Điều quan trọng nhất</span>
+        <p>Mã đã viết xong và có <strong>82 test</strong>, nhưng <strong>chưa một con số nào
+        được xác nhận bằng dữ liệu thật</strong>. Bạn không tiếp quản một sản phẩm đã chạy —
+        bạn tiếp quản một bộ máy đã lắp mà chưa nổ.</p>
+      </div>
+    </div>
+
+    <!-- ================= A ================= -->
+    <section id="a" class="phan">
+      <p class="phan-ky">Phần A</p>
+      <h2>Bối cảnh &amp; thị trường</h2>
+      <p class="phan-mo">Viết cho mọi người đọc — không cần biết mã.</p>
+    </section>
+
+    <div class="doc">
+      <h3>Sản phẩm này làm gì</h3>
+      <p>Một <strong>nhà môi giới vận tải</strong> nhận yêu cầu từ chủ hàng, đi hỏi giá vài nhà xe,
+      cộng biên lợi nhuận rồi báo lại cho khách. Ba việc lặp đi lặp lại:</p>
+      <ol>
+        <li><strong>Đọc yêu cầu</strong> khách nhắn bằng lời thường → ra dữ liệu có cấu trúc
+        (lấy ở đâu, giao ở đâu, loại xe, loại hàng, ngày lấy).</li>
+        <li><strong>Tính giá báo khách</strong> = giá nhà xe + điều chỉnh theo giá dầu + phụ phí + biên.</li>
+        <li><strong>Chọn nhà xe</strong> theo nhiều tiêu chí, không chỉ giá rẻ nhất.</li>
+      </ol>
+      <p>Cộng một việc phụ: <strong>đọc hoá đơn nhà xe gửi về</strong> (ảnh chụp) rồi đối chiếu
+      xem có tính đúng không.</p>
+
+      <h3>Vì sao mảng này bị hạ xuống nhánh phụ — và vì sao đó không phải thất bại</h3>
+      <p>Khách thí điểm số 1 (Hoàng Phát) nói thẳng ngày 13/08/2026:</p>
+      <div class="dan"><p>“hiện tại công ty chú là <strong>chuyên bán dầu</strong>, chưa phải là công ty về vận tải”</p></div>
+      <p>Kế hoạch cũ chặn ở một cánh cổng: <strong>hiệu chỉnh công thức giá trên 15–20 báo giá
+      lịch sử</strong>. Khách không làm vận tải thì không có báo giá lịch sử nào, nên cổng đó
+      không bao giờ mở được. Trong khi phần kế toán — vốn không nằm trong kế hoạch một dòng
+      nào — lại chạy được trên dữ liệu thật.</p>
+      <p>Nên đội gốc đổi hướng. <strong>Mã vận tải không hỏng, không bị bỏ</strong> — nó chỉ chưa
+      có ai để hiệu chỉnh. Giờ đã có khách vận tải thật đang chờ.</p>
+
+      <h3>Thị trường — tra ngày 25/08/2026</h3>
+      <p><strong>Xăng dầu chiếm 35–40% tổng cước phí</strong> đường bộ. Con số này xác nhận tham số
+      <code>fuel_sensitivity = 0.35</code> mặc định trong mã không phải bịa. Nhưng đó là
+      <em>trung bình ngành</em> — tuyến ngắn nội thành và tuyến dài Bắc–Nam có tỷ trọng khác nhau.</p>
+      <p><strong>Giá dầu đổi mỗi 7 ngày</strong>, chiều thứ Năm hằng tuần, ~52 kỳ/năm (NĐ 80/2023,
+      rút từ 15 → 10 → 7 ngày). Hệ quả trực tiếp: <strong>một báo giá phát hành thứ Hai có thể
+      sai vào 15:00 thứ Năm.</strong> Báo giá phải có hạn hiệu lực.</p>
+      <p>Bảng giá công bố thường <strong>chưa gồm</strong>: bảo hiểm, dừng đỗ, bốc xếp, chứng từ,
+      chờ giờ. Đây chính là chỗ <code>Surcharge</code> sinh ra để xử lý — và cũng là chỗ hay
+      tranh cãi với khách nhất.</p>
+
+      <h3>Ai đang làm gì trên thị trường này</h3>
+    </div>
+
+    <div class="doc rong">
+      <div class="bang-boc">
+        <table>
+          <thead><tr><th>Bên</th><th>Họ giải bài toán gì</th><th>Có đụng ANSER không</th></tr></thead>
+          <tbody>
+            <tr><td class="manh">Logivan</td><td>Sàn ghép chủ hàng với <strong>xe rỗng chiều về</strong>. Hai ứng dụng Chủ Hàng / Chủ Xe.</td><td>Không — họ <em>ghép</em> xe, không <em>báo giá</em> thay nhà môi giới</td></tr>
+            <tr><td class="manh">Abivin</td><td>Tối ưu lộ trình cho hàng trăm xe, hàng nghìn đơn, bằng thuật toán</td><td>Không — họ giải <em>đi đường nào</em>, không phải <em>báo bao nhiêu tiền</em></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="doc">
+      <p><strong>Chỗ trống ANSER đứng:</strong> không bên nào làm <strong>báo giá cho nhà môi giới</strong> —
+      tính giá bán từ giá vốn nhà xe, có biên, có điều chỉnh nhiên liệu, và giải thích được vì sao
+      ra con số đó. Đó là việc hằng ngày của forwarder mà hiện họ làm bằng Excel và trí nhớ.</p>
+      <p>Đây là điểm mạnh, cũng là cảnh báo: ngách hơn nhiều so với sàn vận tải. Ít khách tiềm năng
+      hơn, nhưng mỗi khách gắn bó hơn.</p>
+
+      <h3>Quy định phải biết</h3>
+    </div>
+
+    <div class="doc rong">
+      <div class="bang-boc">
+        <table>
+          <thead><tr><th>Văn bản</th><th>Nội dung</th><th>Ý nghĩa với sản phẩm</th></tr></thead>
+          <tbody>
+            <tr><td class="manh">NĐ 158/2024</td><td>Phân loại hình thức kinh doanh vận tải hàng hoá đường bộ</td><td>Xác định khách thuộc loại nào — điều kiện kinh doanh khác nhau</td></tr>
+            <tr><td class="manh">Giấy vận tải</td><td>Phát cho tài xế <strong>trước khi xe chạy</strong>, giấy hoặc điện tử. Tối thiểu: tên đơn vị vận tải, biển số, tên chủ hàng, hành trình, số hợp đồng, loại hàng, khối lượng</td><td><strong>Cơ hội sản phẩm rõ nhất.</strong> Danh sách trường gần trùng dữ liệu đã có sau khi chốt báo giá</td></tr>
+            <tr><td class="manh">NĐ 70/2025</td><td>Thời điểm lập hoá đơn điện tử và nội dung bắt buộc</td><td>Ảnh hưởng phần đối chiếu hoá đơn nhà xe</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="doc">
+        <div class="dan"><p>Ba văn bản tra ngày 25/08/2026. <strong>Kiểm lại trước khi dựa vào</strong> — quy định vận tải đổi thường xuyên.</p></div>
+      </div>
+    </div>
+
+    <!-- ================= B ================= -->
+    <section id="b" class="phan">
+      <p class="phan-ky">Phần B</p>
+      <h2>Bàn giao kỹ thuật</h2>
+      <p class="phan-mo">Cho người viết mã. Không viết mã thì nhảy sang phần C.</p>
+    </section>
+
+    <div class="doc">
+      <p>Toàn bộ nằm ở repo Brain (<code>PCBoiz/ANSER_AI</code>), nhánh
+      <code>feat/workflow-format-and-deterministic-core</code>. Body (Next.js) <strong>hầu như không
+      có gì</strong> cho vận tải ngoài màn hình đọc tài liệu — nghĩa là <strong>chưa có giao diện
+      báo giá nào cả</strong>.</p>
+
+      <div class="luoi">
+        <div class="the">
+          <div class="the-dau"><span class="the-ten">pricing.py · 162 dòng</span><span class="chip chua">hệ số chưa hiệu chỉnh</span></div>
+          <p>Tính giá báo khách từ giá nhà xe. Logic có test, nhưng chưa ai kiểm nó ra giá giống người thật báo hay không.</p>
+        </div>
+        <div class="the">
+          <div class="the-dau"><span class="the-ten">carrier_selection.py · 386 dòng</span><span class="chip chua">trọng số tự đặt</span></div>
+          <p>Xếp hạng nhà xe theo 6 tiêu chí có trọng số. Thuật toán chạy đúng; sáu con số trọng số do đội gốc đặt ra.</p>
+        </div>
+        <div class="the">
+          <div class="the-dau"><span class="the-ten">calibration.py · 603 dòng</span><span class="chip chua">chưa có dữ liệu</span></div>
+          <p>Chạy lại công thức trên báo giá lịch sử, đo sai lệch. Công cụ sẵn sàng — chưa có một dòng dữ liệu nào để chạy.</p>
+        </div>
+        <div class="the">
+          <div class="the-dau"><span class="the-ten">freight_invoice.py · 169 dòng</span><span class="chip chua">chưa hoá đơn thật</span></div>
+          <p>Đối chiếu hoá đơn nhà xe. Chưa đo trên một tờ hoá đơn thật nào.</p>
+        </div>
+        <div class="the">
+          <div class="the-dau"><span class="the-ten">grounding.py · 140 dòng</span><span class="chip biet">chạy tốt</span></div>
+          <p>Chặn model bịa số — mọi số ≥4 chữ số phải có trong ngữ cảnh. Dùng chung cả bên kế toán.</p>
+        </div>
+        <div class="the">
+          <div class="the-dau"><span class="the-ten">schemas.py · 96 dòng</span><span class="chip biet">ổn định</span></div>
+          <p><code>QuoteExtraction</code>: origin, destination, vehicle_type, cargo_type, pickup_date, customer_name, customer_email.</p>
+        </div>
+      </div>
+
+      <h3>Công thức giá</h3>
+      <pre><code>giá khách =  giá nhà xe
+           + điều chỉnh nhiên liệu  (chênh lệch giá dầu so với giá gốc)
+           + phụ phí                 (cố định hoặc %)
+           + biên lợi nhuận          (% trên CHI PHÍ ĐÃ HIỆU CHỈNH, có sàn tuyệt đối)
+           → làm tròn lên bội số</code></pre>
+      <p>Trả về <strong>hai khối</strong>: <code>quote</code> (đưa khách) và <code>internal</code>
+      (nội bộ, có biên). Model được diễn giải từ <code>internal</code> cho <strong>chủ doanh
+      nghiệp</strong>, nhưng nội dung gửi <strong>khách cuối</strong> chỉ được lấy từ <code>quote</code>.</p>
+
+      <div class="luuy">
+        <span class="dau">Bảng nhạy cảm nhất hệ thống</span>
+        <p>Chú thích trong mã ghi rõ: bảng chứa <code>PricingRule</code> là biên lợi nhuận của khách.
+        Rò rỉ bảng này ra ngoài là <strong>mất khách</strong>, không phải mất dữ liệu.</p>
+      </div>
+
+      <h3>Sáu tiêu chí chọn nhà xe</h3>
+    </div>
+
+    <div class="doc rong">
+      <div class="bang-boc">
+        <table>
+          <thead><tr><th>Tiêu chí</th><th class="so">Trọng số</th><th>Vì sao có mặt</th></tr></thead>
+          <tbody>
+            <tr><td><code>price</code></td><td class="so">0,30</td><td>giá chào cho tuyến này</td></tr>
+            <tr><td><code>proximity</code></td><td class="so">0,20</td><td>bãi xe gần điểm lấy hàng → ít chạy rỗng, dễ điều xe gấp</td></tr>
+            <tr><td><code>credit</code></td><td class="so">0,20</td><td>số ngày công nợ → ảnh hưởng thẳng dòng tiền</td></tr>
+            <tr><td><code>reliability</code></td><td class="so">0,15</td><td>tỷ lệ giao đúng hẹn, tính từ lịch sử</td></tr>
+            <tr><td><code>discount</code></td><td class="so">0,10</td><td>% ưu đãi thường xuyên</td></tr>
+            <tr><td><code>tenure</code></td><td class="so">0,05</td><td>số năm hợp tác</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="doc">
+      <p>Ngưỡng chuẩn hoá: <code>DISTANCE_KM 60</code>, <code>CREDIT_DAYS 45</code>,
+      <code>DISCOUNT_PCT 20</code>, <code>TENURE_YEARS 10</code>.
+      <strong>Mọi con số trên là do đội gốc đặt, không ai xác nhận.</strong> Kết quả trả về có
+      <code>breakdown</code> truy vết từng tiêu chí — dùng nó ngồi với khách và hỏi “chỗ này chấm
+      thế đúng chưa”.</p>
+
+      <h3>Cánh cổng chưa bao giờ mở</h3>
+      <p><code>calibration.replay_pricing()</code> nhận danh sách <code>HistoricalQuote</code>, chạy
+      lại công thức trên từng dòng, tính <strong>MAPE</strong> và phân vị sai lệch.</p>
+      <pre><code>HistoricalQuote(
+    quote_id, carrier_cost,
+    actual_price,      # giá khách THẬT SỰ thu — không phải giá dự tính
+    date, route, vehicle_type,
+    fuel_price,        # giá dầu ngày báo giá
+    surcharges, note,
+)</code></pre>
+      <p><strong>Không có 15–20 dòng này thì mọi thứ khác chỉ là giả định.</strong></p>
+
+      <h3>Model — kết luận đã đo, đừng đo lại từ đầu</h3>
+      <p>Hai phiên Colab đầy đủ (15/08/2026), so theo cặp bằng McNemar:</p>
+    </div>
+
+    <div class="doc rong">
+      <div class="bang-boc">
+        <table>
+          <thead><tr><th>Nhánh</th><th class="so">Model gốc</th><th class="so">Fine-tune</th><th class="so">Hỏng</th><th class="so">Sửa</th><th class="so">p</th></tr></thead>
+          <tbody>
+            <tr style="background:var(--biet-nen)"><td class="manh">extraction <span style="color:var(--muc-3);font-weight:400">— việc của vận tải</span></td><td class="so">0,0%</td><td class="so manh">65,3%</td><td class="so">0</td><td class="so manh">64</td><td class="so">~0</td></tr>
+            <tr><td>n8n</td><td class="so">50,0%</td><td class="so">67,6%</td><td class="so">6</td><td class="so">12</td><td class="so">0,2379</td></tr>
+            <tr><td>narration</td><td class="so">85,2%</td><td class="so">44,4%</td><td class="so">11</td><td class="so">0</td><td class="so">0,0010</td></tr>
+            <tr><td>agentic</td><td class="so">52,6%</td><td class="so">15,8%</td><td class="so">8</td><td class="so">1</td><td class="so">0,0391</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="doc">
+      <p><strong>Đọc kỹ dòng đầu.</strong> Model gốc <strong>không làm được một câu nào</strong> — nó
+      bỏ trống <code>origin</code> 80/98 lần. Bản fine-tune sửa 64 câu, làm hỏng 0. Đây là kết quả
+      mạnh nhất cả bộ, và nó nằm <strong>đúng ở nhánh của bạn</strong>.</p>
+      <p>Đội gốc kết luận “dùng model gốc” vì họ chuyển sang kế toán, nơi extraction không được dùng.
+      <strong>Với bạn thì ngược lại: bản fine-tune là thứ đáng dùng.</strong></p>
+      <p>Bản AWQ đo được là bản 01/08, train trên dữ liệu <em>cũ hơn</em> tập 1.482 mẫu sinh ngày 15/08.
+      Train lại nhiều khả năng còn hơn nữa.</p>
+
+      <h3>Bốn nguyên tắc — giữ nguyên, đừng thương lượng</h3>
+      <p><strong>P1 — Số tài chính ra từ mã tất định, không từ model.</strong> Model làm đúng hai việc:
+      đọc lời người dùng thành cấu trúc, và diễn giải kết quả thành câu. Nó <strong>không</strong>
+      được tính tiền. Đã có sự cố thật (23/08/2026): model tự nhẩm <code>5.000.000 + 500.000</code>
+      rồi so trong đầu — và ra <strong>đúng</strong>. Đó mới là chỗ nguy, vì lần sau sai cũng không
+      có gì báo.</p>
+      <p><strong>P2 — Dữ liệu khách không rời khỏi chỗ nó cần ở.</strong> File xử lý trong bộ nhớ,
+      không ghi ra đĩa.</p>
+      <p><strong>P4 — Một nguồn sự thật.</strong> Cùng một con số không được khai ở hai chỗ.
+      Đã dính ba lần, xem phần cuối.</p>
+      <p><strong>“Chưa biết” khác “bằng 0”.</strong> <code>None</code> là chưa biết, <code>0</code>
+      là biết và bằng không. Gộp hai thứ này là cách tạo ra báo cáo sai mà nghe rất xuôi tai.</p>
+
+      <h3>Tách repo — mang gì theo</h3>
+      <p>Ngoài 6 file lõi, phải mang theo lớp nền, nếu không mã vận tải không chạy:
+      <code>findings.py</code> (hình dạng chung của mọi phát hiện),
+      <code>tool_planner.py</code> (bảng luật chọn tool),
+      <code>agentic.py</code> (vòng suy nghĩ–hành động),
+      <code>grounding.py</code>, khung <code>src/api/</code>, hạ tầng <code>tests/</code>,
+      và <code>AGENTS.md</code>.</p>
+
+      <div class="luuy">
+        <span class="dau">Bắt buộc mang theo</span>
+        <p>Bản vá xác thực <strong>15/08/2026</strong>. Trước đó <code>GET /tools</code> và
+        <code>GET /api/v1/task/{id}</code> <strong>không kiểm token</strong> — cái sau trả về câu
+        trả lời đầy đủ của AI: tên khách, mã số thuế, số tiền. Bản vá đưa <code>auth_guard</code>
+        thành dependency cấp router để endpoint mới không thể quên, kèm
+        <code>test_auth_bao_phu.py</code> hỏi toàn bộ bảng route.
+        <strong>Chép mã cũ mà bỏ bản vá này là dựng lại đúng lỗ hổng đó.</strong></p>
+      </div>
+
+      <p><strong>Đánh đổi của việc tách repo:</strong> sạch sẽ, nhưng từ hôm tách hai bản trôi xa nhau.
+      Sửa lỗi ở lớp nền phải chép tay sang. Cân nhắc định kỳ đồng bộ.</p>
+    </div>
+
+    <!-- ================= C ================= -->
+    <section id="c" class="phan">
+      <p class="phan-ky">Phần C</p>
+      <h2>Những gì chưa ai biết</h2>
+      <p class="phan-mo">Phần quan trọng nhất tài liệu này. Mỗi mục là một câu hỏi chưa có câu trả lời, kèm cách đi tìm.</p>
+    </section>
+
+    <div class="doc">
+      <h3>C.1 · Công thức giá có đúng không? <span class="chip chua">chặn mọi thứ khác</span></h3>
+      <p><code>pricing.py</code> chạy đúng như đã viết. Nhưng chưa ai kiểm nó có ra giá giống giá
+      người thật báo hay không.</p>
+      <p><strong>Cách trả lời:</strong> xin khách 15–20 báo giá đã chốt trong 6 tháng gần đây. Đổ vào
+      <code>calibration.replay_pricing()</code>. <strong>MAPE dưới 10%</strong> là dùng được;
+      <strong>trên 25%</strong> là mô hình sai bản chất, không phải sai tham số.</p>
+      <p><strong>Cạm bẫy:</strong> hỏi “giá báo khách” sẽ nhận về giá <em>dự tính</em>. Phải hỏi
+      <strong>giá thật sự thu</strong> — chênh lệch giữa hai con số này chính là thứ cần học.</p>
+
+      <h3>C.2 · Khách tính cước theo đơn vị nào?</h3>
+      <p>Mã hiện giả định giá theo <strong>chuyến</strong>. Thực tế Việt Nam có ít nhất bốn cách:
+      theo chuyến, theo tấn, theo km, theo khối. Có nhà xe tính theo tấn cho hàng nặng và theo khối
+      cho hàng cồng kềnh, lấy giá nào cao hơn.</p>
+      <p><strong>Cách trả lời:</strong> ngồi xem khách báo giá 5 lần liên tiếp. Đừng hỏi, hãy nhìn.</p>
+
+      <h3>C.3 · Sáu trọng số có phản ánh cách khách nghĩ không?</h3>
+      <p><strong>Cách trả lời:</strong> lấy 10 tình huống khách <strong>đã chọn nhà xe trong quá
+      khứ</strong>, chạy <code>carrier_selection</code> trên cùng dữ liệu, xem trùng bao nhiêu ca.
+      <code>calibration.py</code> đã có sẵn <code>CarrierChoiceCase</code> cho đúng việc này.</p>
+      <p>Nếu trùng dưới 6/10, <strong>đừng vội chỉnh trọng số</strong> — hỏi khách vì sao họ chọn.
+      Rất có thể có một <strong>tiêu chí thứ bảy</strong> không nằm trong mã: quan hệ cá nhân, loại
+      thùng phù hợp, nhà xe chịu ứng trước.</p>
+
+      <h3>C.4 · Giá dầu lấy ở đâu?</h3>
+      <p>Mã nhận giá dầu như tham số — <strong>không có đường nạp tự động</strong>. Mà giá đổi mỗi
+      thứ Năm. Nguồn công bố: Petrolimex và cổng Bộ Công Thương.</p>
+      <div class="luuy">
+        <span class="dau">Đừng đưa giá dầu vào kho tri thức RAG</span>
+        <p>Đội gốc đã ghi rõ lý do: giá đổi hằng tuần, embedding cũ nằm lại và vẫn bị truy hồi ra.
+        Giá dầu là dữ liệu realtime, phải đi đường tra cứu tất định.</p>
+      </div>
+
+      <h3>C.5 · Đọc hoá đơn nhà xe chính xác tới đâu?</h3>
+      <p>Đã viết xong, <strong>chưa có một hoá đơn thật nào để đo</strong>. Xin 20–30 ảnh thật, gõ tay
+      đáp án, rồi đo. Trước khi đo thì <strong>không được nói với khách rằng tính năng này dùng
+      được</strong>.</p>
+
+      <h3>C.6 · Model chịu được cách khách nhắn thật không?</h3>
+      <p>65,3% đo trên dữ liệu <strong>sinh ra</strong>, không phải tin nhắn thật. Người thật viết tắt,
+      sai chính tả, nhắn nhiều tin rời rạc, gửi ảnh kèm chữ. Xin 50–100 tin Zalo thật, gõ tay đáp án,
+      đo lại. Con số sẽ thấp hơn — và khoảng cách đó chính là việc phải làm.</p>
+
+      <h3>C.7 · Bảng luật chọn tool đang 40%</h3>
+      <pre><code>AG0001: kế hoạch ['report'], đúng phải có 'quote'
+AG0003: không luật nào khớp (cần 'carrier_selection')</code></pre>
+      <p>Đây là <strong>mã tất định</strong> (<code>tool_planner.py</code>), sai thì sửa bằng regex chứ
+      không phải huấn luyện lại. Đội gốc để nguyên vì không dùng nhánh này nữa. Với bạn thì
+      40% nghĩa là <strong>cứ 5 câu hỏi báo giá thì 3 câu đi nhầm đường</strong>.</p>
+
+      <h3>C.8 · Chưa có giao diện nào cho vận tải</h3>
+      <p>Body có Dòng tiền, Cảnh báo sổ sách, Sản phẩm, Kho, Bán hàng — <strong>không có màn hình báo
+      giá</strong>. Toàn bộ mã vận tải hiện chỉ gọi được qua API.</p>
+    </div>
+
+    <!-- ================= D ================= -->
+    <section id="d" class="phan">
+      <p class="phan-ky">Phần D</p>
+      <h2>Danh sách việc</h2>
+      <p class="phan-mo">Xếp theo nguyên tắc đã tự chứng minh nhiều lần: việc nào sớm phát hiện được sai lầm đắt tiền nhất thì làm trước. Vì đã có khách thật đang chờ, ba việc đầu đều là đi lấy dữ liệu của họ — không phải viết mã.</p>
+    </section>
+
+    <div class="doc">
+      <p class="nhom">Nhóm 1 · Mở cánh cổng chưa bao giờ mở</p>
+      <div class="viec"><div class="viec-so">1</div><div class="viec-noi">
+        <p class="viec-ten">Xin 15–20 báo giá đã chốt, chạy <code>replay_pricing()</code></p>
+        <p>Một buổi ngồi với khách. Xong thì biết công thức giá sai bao nhiêu %. <strong>Đây là số quyết định mọi thứ sau.</strong></p></div></div>
+      <div class="viec"><div class="viec-so">2</div><div class="viec-noi">
+        <p class="viec-ten">Xin 10 tình huống chọn nhà xe trong quá khứ</p>
+        <p>Cùng buổi trên. Chạy <code>CarrierChoiceCase</code> — biết 6 trọng số có đúng cách khách nghĩ không.</p></div></div>
+      <div class="viec"><div class="viec-so">3</div><div class="viec-noi">
+        <p class="viec-ten">Xem khách báo giá 5 lần, ghi lại đơn vị tính</p>
+        <p>Nửa ngày quan sát. Cước theo chuyến / tấn / km / khối.</p></div></div>
+
+      <div class="luuy">
+        <span class="dau">Vì sao ba việc này đứng đầu</span>
+        <p>Chúng <strong>không viết một dòng mã nào</strong> và quyết định toàn bộ phần còn lại. Làm
+        ngược thứ tự là nguy cơ viết ba tháng cho một công thức sai bản chất.</p>
+      </div>
+
+      <p class="nhom">Nhóm 2 · Làm cho dùng được hằng ngày</p>
+      <div class="viec"><div class="viec-so">4</div><div class="viec-noi">
+        <p class="viec-ten">Dựng màn hình báo giá ở Body</p>
+        <p>Hiện chưa có gì. Nhập yêu cầu → ra giá → có nút gửi khách. Tách rõ khối <code>quote</code> và <code>internal</code>.</p></div></div>
+      <div class="viec"><div class="viec-so">5</div><div class="viec-noi">
+        <p class="viec-ten">Nối giá dầu tự động</p>
+        <p>Petrolimex / moit.gov.vn, cập nhật chiều thứ Năm. Báo giá phải có <strong>hạn hiệu lực</strong>.</p></div></div>
+      <div class="viec"><div class="viec-so">6</div><div class="viec-noi">
+        <p class="viec-ten">Sửa bảng luật chọn tool từ 40% lên</p>
+        <p>Regex trong <code>tool_planner.py</code>. Xem C.7.</p></div></div>
+      <div class="viec"><div class="viec-so">7</div><div class="viec-noi">
+        <p class="viec-ten">Sinh giấy vận tải điện tử</p>
+        <p>Theo NĐ 158/2024. Dữ liệu gần như đã có sau khi chốt báo giá. <strong>Có thể là tính năng bán được nhất.</strong></p></div></div>
+
+      <p class="nhom">Nhóm 3 · Đo những thứ chưa ai đo</p>
+      <div class="viec"><div class="viec-so">8</div><div class="viec-noi">
+        <p class="viec-ten">Đo trích xuất trên tin nhắn thật</p>
+        <p>50–100 tin Zalo, gõ tay đáp án. Xem C.6.</p></div></div>
+      <div class="viec"><div class="viec-so">9</div><div class="viec-noi">
+        <p class="viec-ten">Đo đọc hoá đơn nhà xe</p>
+        <p>20–30 ảnh thật. Xem C.5. <strong>Chưa đo thì đừng bán.</strong></p></div></div>
+      <div class="viec"><div class="viec-so">10</div><div class="viec-noi">
+        <p class="viec-ten">Train lại model trên tập 1.482 mẫu</p>
+        <p>Bản đang có là 01/08, train trên dữ liệu cũ hơn. Chỉ làm <em>sau</em> khi việc 8 cho biết khoảng cách thật.</p></div></div>
+
+      <p class="nhom">Nhóm 4 · Nền móng, làm song song được</p>
+      <div class="viec"><div class="viec-so">11</div><div class="viec-noi">
+        <p class="viec-ten">Tách repo, mang đủ lớp nền</p>
+        <p>Xem phần B. <strong>Nhớ bản vá xác thực 15/08.</strong></p></div></div>
+      <div class="viec"><div class="viec-so">12</div><div class="viec-noi">
+        <p class="viec-ten">Dựng bộ eval vận tải</p>
+        <p>Gieo lỗi vào dữ liệu thật, đo bắt được / báo oan — như đội gốc đã làm cho kế toán. Không có bộ đo thì không biết hôm nay có khác hôm qua không.</p></div></div>
+      <div class="viec"><div class="viec-so">13</div><div class="viec-noi">
+        <p class="viec-ten">Thêm <code>.gitattributes</code></p>
+        <p>Kết dòng Windows↔Linux đang gây xung đột giả hàng trăm dòng mỗi lần gộp.</p></div></div>
+
+      <h3>Nếu chỉ làm được ba việc</h3>
+      <ol>
+        <li><strong>Việc 1</strong> — xin báo giá lịch sử, chạy hiệu chỉnh. Không có nó thì mọi thứ khác xây trên cát.</li>
+        <li><strong>Việc 4</strong> — dựng màn hình báo giá. Không có nó thì khách không chạm được vào sản phẩm.</li>
+        <li><strong>Việc 7</strong> — giấy vận tải điện tử. Quy định bắt buộc, dữ liệu đã có sẵn, và không đối thủ nào làm.</li>
+      </ol>
+    </div>
+
+    <!-- ================= phụ lục ================= -->
+    <section id="pl" class="phan">
+      <p class="phan-ky">Phụ lục</p>
+      <h2>Bài học đắt nhất</h2>
+    </section>
+
+    <div class="doc">
+      <p>Ba lỗi nghiêm trọng nhất tìm được trong hai tháng đều cùng một hình dạng:
+      <strong>hai thứ đúng riêng lẻ, sai khi ghép, và không có gì phát ra tín hiệu.</strong></p>
+      <ul>
+        <li><code>docker-compose.yml</code> đặt <code>API_TOKEN</code>, mã đọc <code>API_AUTH_TOKEN</code>
+        → Brain triển khai theo README <strong>không kiểm token nào</strong> mà vẫn mở ra Internet</li>
+        <li><code>arguments_schema()</code> lọc trường khỏi lược đồ nhưng không đóng object → lớp
+        phòng thủ nó mô tả <strong>chưa từng tồn tại</strong></li>
+        <li>Trần token production chặt hơn trần benchmark → mọi tỷ lệ đo được <strong>đẹp hơn</strong>
+        thứ khách nhận</li>
+      </ul>
+      <p>Không test đơn vị nào bắt được cả ba. Cả ba lộ ra khi <strong>chạy thật qua HTTP</strong>
+      hoặc khi <strong>đọc tay đầu ra</strong>.</p>
+      <div class="dan">
+        <p>Đừng tin một lớp phòng thủ chỉ vì đã viết nó. Viết một phép thử chứng minh nó
+        <strong>thi hành</strong>, không chỉ <strong>tồn tại</strong>.</p>
+      </div>
+
+      <div class="chan">
+        <p>Bàn giao lập ngày 25/08/2026. Số liệu thị trường và văn bản pháp lý tra cùng ngày —
+        kiểm lại trước khi dựa vào. Bản đầy đủ kèm chi tiết mã: <code>BAN_GIAO_VAN_TAI.md</code>
+        trong repo Brain.</p>
+      </div>
+    </div>
+  </main>
+</div>
