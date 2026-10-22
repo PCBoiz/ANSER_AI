@@ -394,34 +394,34 @@ cả là fixture giả dùng để test chính bộ quét secret:</p>
 </thead>
 <tbody>
 <tr>
-<td><code>postgresql://admin:Xk9$mQ2pLw@ep-cool-1.neon.tech/db</code></td>
+<td><code>postgresql://admin:***@ep-cool-1.neon.tech/db</code></td>
 <td><code>tests/test_training_pipeline_v3.py</code></td>
 <td>fixture, bắt buộc <code>scan_secrets</code> phải bắt được</td>
 </tr>
 <tr>
-<td><code>postgres://read_replica_user:pass@replica_host</code></td>
+<td><code>postgres://read_replica_user:***@replica_host</code></td>
 <td>cùng file</td>
 <td>fixture, bắt buộc <code>scan_secrets</code> <strong>không</strong>
-được báo oan</td>
+được báo oan, vì mật khẩu là chữ <code>pass</code></td>
 </tr>
 <tr>
-<td><code>npg_abc123XYZ</code></td>
+<td><code>npg_</code> kèm chuỗi giả</td>
 <td>cùng file</td>
 <td>fixture</td>
 </tr>
 <tr>
-<td><code>postgresql://admin:Xk9mQ2pLw@ep-x.neon.tech/db</code></td>
+<td><code>postgresql://admin:***@ep-x.neon.tech/db</code></td>
 <td><code>tests/test_assistant_upgrades.py</code></td>
 <td>fixture</td>
 </tr>
-<tr>
-<td>mẫu <code>postgres://.*:.*@</code>, <code>npg_</code>,
-<code>sk-</code></td>
-<td><code>AGENTS.md</code> dòng 60</td>
-<td>văn bản quy tắc</td>
-</tr>
 </tbody>
 </table>
+<p>Mật khẩu trong bảng trên đã che. Chúng là chuỗi bịa, không phải
+credential thật, nhưng chép nguyên vào một file nữa chỉ làm bộ quét kêu
+thêm một chỗ mà không cho ai biết thêm điều gì. Cần đối chiếu chính xác
+thì mở hai file test nêu ở cột giữa. | mẫu
+<code>postgres://.*:.*@</code>, <code>npg_</code>, <code>sk-</code> |
+<code>AGENTS.md</code> dòng 60 | văn bản quy tắc |</p>
 <p>Đợt dọn <code>01aba0b</code> ngày 27/07/2026 đã gỡ hết credential
 thật khỏi 12 file.</p>
 <blockquote>

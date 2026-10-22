@@ -48,10 +48,12 @@ Kiểm từng cái thì **không có credential thật nào**. Tất cả là fi
 
 | Chuỗi | Ở đâu | Là gì |
 |---|---|---|
-| `postgresql://admin:Xk9$mQ2pLw@ep-cool-1.neon.tech/db` | `tests/test_training_pipeline_v3.py` | fixture, bắt buộc `scan_secrets` phải bắt được |
-| `postgres://read_replica_user:pass@replica_host` | cùng file | fixture, bắt buộc `scan_secrets` **không** được báo oan |
-| `npg_abc123XYZ` | cùng file | fixture |
-| `postgresql://admin:Xk9mQ2pLw@ep-x.neon.tech/db` | `tests/test_assistant_upgrades.py` | fixture |
+| `postgresql://admin:***@ep-cool-1.neon.tech/db` | `tests/test_training_pipeline_v3.py` | fixture, bắt buộc `scan_secrets` phải bắt được |
+| `postgres://read_replica_user:***@replica_host` | cùng file | fixture, bắt buộc `scan_secrets` **không** được báo oan, vì mật khẩu là chữ `pass` |
+| `npg_` kèm chuỗi giả | cùng file | fixture |
+| `postgresql://admin:***@ep-x.neon.tech/db` | `tests/test_assistant_upgrades.py` | fixture |
+
+Mật khẩu trong bảng trên đã che. Chúng là chuỗi bịa, không phải credential thật, nhưng chép nguyên vào một file nữa chỉ làm bộ quét kêu thêm một chỗ mà không cho ai biết thêm điều gì. Cần đối chiếu chính xác thì mở hai file test nêu ở cột giữa.
 | mẫu `postgres://.*:.*@`, `npg_`, `sk-` | `AGENTS.md` dòng 60 | văn bản quy tắc |
 
 Đợt dọn `01aba0b` ngày 27/07/2026 đã gỡ hết credential thật khỏi 12 file.
