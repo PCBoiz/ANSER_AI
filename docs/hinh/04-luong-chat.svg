@@ -1,0 +1,115 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 940 700" width="940" height="700" font-family="Segoe UI, Helvetica, Arial, sans-serif">
+  <rect width="940" height="700" fill="#ffffff"/>
+  <style>
+    .tb  { font-size: 15px; font-weight: 600; fill: #1a1a1a; }
+    .t   { font-size: 13.5px; fill: #1a1a1a; }
+    .ts  { font-size: 11.5px; fill: #5a5a5a; }
+    .mono{ font-family: Consolas, "Courier New", monospace; font-size: 11.5px; fill: #2b2b2b; }
+    .num { font-size: 12px; font-weight: 700; fill: #ffffff; }
+    .ar  { stroke: #5a6570; stroke-width: 1.8; fill: none; marker-end: url(#a); }
+    .arg { stroke: #5a9a5a; stroke-width: 1.8; fill: none; marker-end: url(#ag); }
+    .arr { stroke: #c0392b; stroke-width: 1.8; fill: none; marker-end: url(#arr); }
+  </style>
+  <defs>
+    <marker id="a" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="#5a6570"/></marker>
+    <marker id="ag" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="#5a9a5a"/></marker>
+    <marker id="arr" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="#c0392b"/></marker>
+  </defs>
+
+  <text x="16" y="26" class="tb" font-size="16">Luồng có model: POST /chat</text>
+  <text x="16" y="46" class="ts">Luồng phức tạp nhất trong repo. Đọc kèm src/api/routes/chat.py mở bên cạnh.</text>
+
+  <!-- 1 -->
+  <circle cx="34" cy="86" r="13" fill="#4a7fb5"/><text x="34" y="91" class="num" text-anchor="middle">1</text>
+  <rect x="58" y="66" width="400" height="42" rx="5" fill="#f7f8fa" stroke="#9aa3ad" stroke-width="1.3"/>
+  <text x="72" y="84" class="t">Trả ngay task_id, xử lý chạy nền</text>
+  <text x="72" y="100" class="ts">ghi chủ sở hữu vào registry TRƯỚC khi chạy nền</text>
+  <rect x="478" y="66" width="446" height="42" rx="5" fill="#fdfbf0" stroke="#c9b23f" stroke-width="1.3"/>
+  <text x="492" y="84" class="ts">GET /api/v1/task/{id} sai chủ trả 404, không trả 403.</text>
+  <text x="492" y="100" class="ts">403 xác nhận task có tồn tại, tức biến endpoint thành máy dò task id hợp lệ.</text>
+
+  <!-- 2 -->
+  <circle cx="34" cy="146" r="13" fill="#4a7fb5"/><text x="34" y="151" class="num" text-anchor="middle">2</text>
+  <rect x="58" y="126" width="400" height="42" rx="5" fill="#f7f8fa" stroke="#9aa3ad" stroke-width="1.3"/>
+  <text x="72" y="144" class="t">Đọc lịch sử hội thoại</text>
+  <text x="72" y="160" class="mono">_load_history(user_id)</text>
+  <rect x="478" y="126" width="446" height="42" rx="5" fill="#f7f8fa" stroke="#d0d4d8" stroke-width="1.2"/>
+  <text x="492" y="144" class="ts">Thiếu nó thì mỗi tin nhắn là một phiên độc lập, và câu</text>
+  <text x="492" y="160" class="ts">"thế xe 3 tấn thì sao?" không hiểu được. DB lỗi thì trả [] và vẫn trả lời.</text>
+
+  <!-- 3 -->
+  <circle cx="34" cy="206" r="13" fill="#4a7fb5"/><text x="34" y="211" class="num" text-anchor="middle">3</text>
+  <rect x="58" y="186" width="400" height="42" rx="5" fill="#f7f8fa" stroke="#9aa3ad" stroke-width="1.3"/>
+  <text x="72" y="204" class="t">SemanticRouter chọn 1 trong 7 nhánh</text>
+  <text x="72" y="220" class="ts">từ khoá → cosine → kiểm biên</text>
+  <rect x="478" y="186" width="446" height="42" rx="5" fill="#f7f8fa" stroke="#d0d4d8" stroke-width="1.2"/>
+  <text x="492" y="202" class="ts">LOGISTICS · TECHNICAL · REPORT · EXPLAIN · DATA_INTERNAL · RETRIEVAL</text>
+  <text x="492" y="218" class="ts">GENERAL. Biên hẹp thì hạ về GENERAL chứ không đoán bừa.</text>
+
+  <!-- 4 -->
+  <circle cx="34" cy="266" r="13" fill="#5a9a5a"/><text x="34" y="271" class="num" text-anchor="middle">4</text>
+  <rect x="58" y="246" width="400" height="42" rx="5" fill="#dff0df" stroke="#5a9a5a" stroke-width="1.6"/>
+  <text x="72" y="264" class="t" font-weight="600">plan_tools: chọn tool bằng LUẬT, không bằng model</text>
+  <text x="72" y="280" class="mono">tool_planner.py · regex · trần 3 tool</text>
+  <rect x="478" y="246" width="446" height="42" rx="5" fill="#f7f8fa" stroke="#d0d4d8" stroke-width="1.2"/>
+  <text x="492" y="264" class="ts">"có nên nhập thêm hàng không" luôn ứng với forecast_reorder.</text>
+  <text x="492" y="280" class="ts">Không ngữ cảnh nào làm nó thành tool khác, nên đây là bảng tra.</text>
+
+  <!-- 5 -->
+  <circle cx="34" cy="332" r="13" fill="#5a9a5a"/><text x="34" y="337" class="num" text-anchor="middle">5</text>
+  <rect x="58" y="304" width="400" height="80" rx="5" fill="#dff0df" stroke="#5a9a5a" stroke-width="1.6"/>
+  <text x="72" y="324" class="t" font-weight="600">AgenticLoop: hai chốt chặn ở tầng sampling</text>
+  <text x="72" y="344" class="ts">còn kế hoạch → enum tool thu về ĐÚNG MỘT tên</text>
+  <text x="72" y="362" class="ts">còn kế hoạch → nhánh answer KHÔNG có trong lược đồ,</text>
+  <text x="72" y="378" class="ts">chỉ còn tool và hoi_lai</text>
+  <rect x="478" y="304" width="446" height="80" rx="5" fill="#fdeedb" stroke="#c9913f" stroke-width="1.4"/>
+  <text x="492" y="324" class="ts" font-weight="600">Sự cố 23/08/2026</text>
+  <text x="492" y="344" class="ts">Câu soát hoá đơn có kế hoạch ["vat"] nhưng tool_calls = 0.</text>
+  <text x="492" y="362" class="ts">Model tự nhẩm 5.000.000 + 500.000 rồi so với 6.500.000 trong đầu.</text>
+  <text x="492" y="378" class="ts">Lần đó ra ĐÚNG, và đó mới là chỗ nguy: lần sau sai cũng không có gì báo.</text>
+
+  <!-- 6 -->
+  <circle cx="34" cy="426" r="13" fill="#5a9a5a"/><text x="34" y="431" class="num" text-anchor="middle">6</text>
+  <rect x="58" y="400" width="400" height="60" rx="5" fill="#dff0df" stroke="#5a9a5a" stroke-width="1.6"/>
+  <text x="72" y="420" class="t" font-weight="600">data_provider bơm dữ liệu thật và GHI ĐÈ</text>
+  <text x="72" y="438" class="ts">report cần dòng bán hàng, inventory_audit cần bảng tồn kho</text>
+  <text x="72" y="454" class="ts">chưa có nguồn thì vòng lặp DỪNG và nói thẳng</text>
+  <rect x="478" y="400" width="446" height="60" rx="5" fill="#f7f8fa" stroke="#d0d4d8" stroke-width="1.2"/>
+  <text x="492" y="420" class="ts">Vì sao phải ghi đè: chốt chặn neo số liệu chỉ đối chiếu CÂU TRẢ LỜI</text>
+  <text x="492" y="438" class="ts">với KẾT QUẢ TOOL. Số bịa lọt vào từ đầu vào thì mọi con số</text>
+  <text x="492" y="454" class="ts">sau đó đều "có nguồn".</text>
+
+  <!-- 7 -->
+  <circle cx="34" cy="500" r="13" fill="#c0392b"/><text x="34" y="505" class="num" text-anchor="middle">7</text>
+  <rect x="58" y="476" width="400" height="60" rx="5" fill="#fbeaea" stroke="#c0392b" stroke-width="1.6"/>
+  <text x="72" y="496" class="t" font-weight="600">guard_answer: chốt chặn neo số liệu</text>
+  <text x="72" y="514" class="ts">mọi số ≥ 4 chữ số trong câu trả lời phải có trong dữ liệu gốc</text>
+  <text x="72" y="530" class="ts">chặn thì thay bằng câu an toàn và ghi log</text>
+  <rect x="478" y="476" width="446" height="60" rx="5" fill="#f7f8fa" stroke="#d0d4d8" stroke-width="1.2"/>
+  <text x="492" y="496" class="ts">CHỈ chạy khi có grounding_ctx. GENERAL và LOGISTICS không có,</text>
+  <text x="492" y="514" class="ts">chặn ở đó là chặn oan cả con số người dùng vừa tự nhắc trong câu hỏi.</text>
+  <text x="492" y="530" class="ts">Hàm có từ lâu, nhưng tới 05/08/2026 mới được nối vào đường phục vụ.</text>
+
+  <!-- 8 -->
+  <circle cx="34" cy="574" r="13" fill="#4a7fb5"/><text x="34" y="579" class="num" text-anchor="middle">8</text>
+  <rect x="58" y="552" width="400" height="44" rx="5" fill="#f7f8fa" stroke="#9aa3ad" stroke-width="1.3"/>
+  <text x="72" y="572" class="t">Ghi metric, lưu lượt, gọi webhook về Body</text>
+  <text x="72" y="588" class="mono">ai_metrics_log.jsonl · TASK_REGISTRY</text>
+  <rect x="478" y="552" width="446" height="44" rx="5" fill="#f7f8fa" stroke="#d0d4d8" stroke-width="1.2"/>
+  <text x="492" y="572" class="ts">TASK_REGISTRY còn là dict trong RAM, nên restart là mất task đang chạy,</text>
+  <text x="492" y="588" class="ts">và KHÔNG được nâng --workers của uvicorn.</text>
+
+  <path d="M34,99 L34,133" class="ar"/>
+  <path d="M34,159 L34,193" class="ar"/>
+  <path d="M34,219 L34,253" class="ar"/>
+  <path d="M34,279 L34,319" class="arg"/>
+  <path d="M34,345 L34,413" class="arg"/>
+  <path d="M34,439 L34,487" class="arg"/>
+  <path d="M34,513 L34,561" class="arr"/>
+
+  <text x="16" y="630" class="ts" font-weight="600">Ranh giới R1 nằm ở bước 4, 5 và 6.</text>
+  <text x="248" y="630" class="ts">Model còn đúng hai việc: điền tham số cho tool đã chọn sẵn, và viết câu trả lời từ kết quả tool.</text>
+  <text x="16" y="654" class="ts">Chọn tool, chạy tool, và lấy dữ liệu đều là code tất định. Grammar không cho model sinh ra một quyết định mang theo kết quả nó tự tính.</text>
+  <text x="16" y="678" class="ts">Cấm tiệt cả hai nhánh lại sai theo cách khác: "tính thuế giúp tôi" không kèm số tiền mà bị ép gọi vat thì model phải bịa stated_total. Nên chia đôi:</text>
+  <text x="16" y="694" class="ts">đủ tham số thì gọi tool, thiếu thì hoi_lai. Cái không còn tồn tại là nhánh thứ ba: tự tính rồi tuyên bố đáp án.</text>
+</svg>

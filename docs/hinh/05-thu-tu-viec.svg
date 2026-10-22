@@ -1,0 +1,82 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 940 540" width="940" height="540" font-family="Segoe UI, Helvetica, Arial, sans-serif">
+  <rect width="940" height="540" fill="#ffffff"/>
+  <style>
+    .tb  { font-size: 15px; font-weight: 600; fill: #1a1a1a; }
+    .t   { font-size: 13.5px; font-weight: 600; fill: #1a1a1a; }
+    .ts  { font-size: 11.5px; fill: #5a5a5a; }
+    .ar  { stroke: #5a6570; stroke-width: 1.8; fill: none; marker-end: url(#a); }
+  </style>
+  <defs>
+    <marker id="a" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="#5a6570"/></marker>
+  </defs>
+
+  <text x="16" y="26" class="tb" font-size="16">Thứ tự bảy việc, và cái gì làm song song được</text>
+  <text x="16" y="46" class="ts">Xếp theo nguyên tắc đã tự chứng minh bốn lần: việc nào sớm phát hiện được sai lầm đắt tiền nhất thì làm trước.</text>
+
+  <!-- V1 -->
+  <rect x="16" y="76" width="230" height="74" rx="6" fill="#dff0df" stroke="#5a9a5a" stroke-width="2"/>
+  <text x="32" y="100" class="t">V1 · Vá nền tài liệu và config</text>
+  <text x="32" y="120" class="ts">nửa ngày · không chờ ai · 0đ/tháng</text>
+  <text x="32" y="138" class="ts">đóng một lỗ R5 thật trong config.py</text>
+
+  <!-- V2 -->
+  <rect x="330" y="76" width="276" height="74" rx="6" fill="#fdeedb" stroke="#c9913f" stroke-width="2"/>
+  <text x="346" y="100" class="t">V2 · Nối VLLMServerClient vào engine</text>
+  <text x="346" y="120" class="ts">việc nặng nhất · 3 đến 5 ngày · 0đ/tháng tăng thêm</text>
+  <text x="346" y="138" class="ts">nghiệm thu trên Colab Pro, chưa thuê GPU</text>
+
+  <!-- V3 -->
+  <rect x="330" y="166" width="276" height="74" rx="6" fill="#f7f8fa" stroke="#9aa3ad" stroke-width="1.5"/>
+  <text x="346" y="190" class="t">V3 · SCHEMA MAP khớp ERD Body</text>
+  <text x="346" y="210" class="ts">2 đến 3 ngày · lược đồ 13 bảng đã có trong hồ sơ</text>
+  <text x="346" y="228" class="ts">kèm get_report_lines, mở khoá nhánh REPORT</text>
+
+  <!-- V4 -->
+  <rect x="330" y="256" width="276" height="62" rx="6" fill="#f7f8fa" stroke="#9aa3ad" stroke-width="1.5"/>
+  <text x="346" y="280" class="t">V4 · Bộ đo RAG</text>
+  <text x="346" y="300" class="ts">3 đến 5 ngày · KHÔNG cần GPU</text>
+
+  <!-- V5 -->
+  <rect x="330" y="334" width="276" height="62" rx="6" fill="#f7f8fa" stroke="#9aa3ad" stroke-width="1.5"/>
+  <text x="346" y="358" class="t">V5 · Phiên đo lại trên Colab</text>
+  <text x="346" y="378" class="ts">1 buổi · cần L4 hoặc A100, T4 không đủ</text>
+
+  <!-- V6 -->
+  <rect x="330" y="412" width="276" height="62" rx="6" fill="#fbeaea" stroke="#c0392b" stroke-width="1.8"/>
+  <text x="346" y="436" class="t">V6 · Hai việc chỉ người thật gỡ được</text>
+  <text x="346" y="456" class="ts">chủ dự án · chạy song song từ ngày đầu</text>
+
+  <!-- V7 -->
+  <rect x="330" y="490" width="276" height="40" rx="6" fill="#efeaf6" stroke="#8b76ad" stroke-width="1.6"/>
+  <text x="346" y="514" class="t">V7 · Vận tải, nay ở lại repo này</text>
+
+  <path d="M246,113 L326,113" class="ar"/>
+  <path d="M131,150 C 131,200 240,200 326,200" class="ar"/>
+  <path d="M131,150 C 131,287 240,287 326,287" class="ar"/>
+  <path d="M131,150 C 131,365 240,365 326,365" class="ar"/>
+
+  <!-- cot phai -->
+  <rect x="648" y="76" width="276" height="74" rx="6" fill="#f7f8fa" stroke="#d0d4d8" stroke-width="1.2"/>
+  <text x="664" y="98" class="ts" font-weight="600">Vì sao V1 trước tất cả</text>
+  <text x="664" y="118" class="ts">Rẻ, không chờ ai, và cho phép tin vào</text>
+  <text x="664" y="136" class="ts">tài liệu khi làm năm việc sau.</text>
+
+  <rect x="648" y="166" width="276" height="152" rx="6" fill="#fdfbf0" stroke="#c9b23f" stroke-width="1.4"/>
+  <text x="664" y="188" class="ts" font-weight="600">Nếu chỉ làm được ba việc</text>
+  <text x="664" y="212" class="ts">1. V1, vá nền</text>
+  <text x="664" y="234" class="ts">2. V6, kế toán thật rà một vòng</text>
+  <text x="664" y="256" class="ts">3. V3, nối dữ liệu bán hàng thật</text>
+  <text x="664" y="282" class="ts">V6 rẻ hơn mọi việc còn lại và đang</text>
+  <text x="664" y="298" class="ts">chặn nhiều thứ nhất.</text>
+
+  <rect x="648" y="334" width="276" height="196" rx="6" fill="#f7f8fa" stroke="#d0d4d8" stroke-width="1.2"/>
+  <text x="664" y="356" class="ts" font-weight="600">Chặn bởi cái gì</text>
+  <text x="664" y="378" class="ts">V1, V3, V4: không chặn bởi gì cả.</text>
+  <text x="664" y="400" class="ts">V2, V5: một buổi Colab Pro.</text>
+  <text x="664" y="422" class="ts">V6: lịch của một kế toán có nghề,</text>
+  <text x="664" y="438" class="ts">và dữ liệu khách còn phải xin.</text>
+  <text x="664" y="462" class="ts">V7: chặn bởi KHÁCH. Hoàng Phát</text>
+  <text x="664" y="478" class="ts">hiện chưa làm vận tải, nên chỉ việc</text>
+  <text x="664" y="494" class="ts">sửa bảng luật chọn tool từ 40% lên</text>
+  <text x="664" y="510" class="ts">là làm được ngay.</text>
+</svg>
