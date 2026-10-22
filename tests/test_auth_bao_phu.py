@@ -20,7 +20,6 @@ from __future__ import annotations
 
 import pytest
 from fastapi.routing import APIRoute
-
 from fastapi.testclient import TestClient  # noqa: E402
 
 import src.api.dependencies as deps  # noqa: E402

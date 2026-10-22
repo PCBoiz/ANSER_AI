@@ -48,13 +48,13 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable
 
+from offline_training.stats import wilson
 from src.core.inventory import audit_inventory
 from src.core.inventory_import import parse_inventory_table
 from src.core.partner_import import parse_partner_table
 from src.core.period_diff import doi_chieu_hai_lan_xuat
 from src.core.receivables import audit_partners
 from src.core.vat_catalog import audit_vat_catalog, parse_product_table
-from offline_training.stats import wilson
 
 GOC = Path(__file__).resolve().parent.parent
 DU_LIEU = GOC / "tests" / "du_lieu_eval"

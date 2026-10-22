@@ -82,7 +82,7 @@ def _finding(
 
 
 def _lap_chi_muc(lines: list[InventoryLine]) -> dict[str, InventoryLine]:
-    return {str(l.code).strip(): l for l in lines if str(l.code or "").strip()}
+    return {str(d.code).strip(): d for d in lines if str(d.code or "").strip()}
 
 
 def _so_sanh_duoc(truoc: ParseResult, sau: ParseResult) -> list[str]:

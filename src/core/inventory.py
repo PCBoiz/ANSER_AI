@@ -444,11 +444,12 @@ def _kho_von_khong_co_gia_tri(lines: list[InventoryLine]) -> bool:
     kiểu ("KHO KHUYẾN MẠI", "Kho hàng tặng", "KHO KM"), còn hình dạng dữ liệu thì
     giống nhau ở mọi nơi.
     """
-    co_hang = [l for l in lines if l.closing_qty > _QTY_TOL]
+    co_hang = [dong for dong in lines if dong.closing_qty > _QTY_TOL]
     if len(co_hang) < 5:
         return False        # quá ít dòng để nói được gì về tính chất cả kho
-    khong_gia = sum(1 for l in co_hang
-                    if l.closing_value is not None and abs(l.closing_value) <= _VALUE_TOL)
+    khong_gia = sum(1 for dong in co_hang
+                    if dong.closing_value is not None
+                    and abs(dong.closing_value) <= _VALUE_TOL)
     return khong_gia >= len(co_hang) * 0.5
 
 
@@ -513,15 +514,15 @@ def audit_inventory(
         # Tắt phép kiểm từng dòng KHÔNG có nghĩa là im hẳn. Cả kho không ghi
         # nhận đồng giá vốn nào vẫn là chuyện chủ doanh nghiệp cần biết — chỉ
         # là nó đáng MỘT phát hiện ở mức kho, không phải ba mươi ở mức dòng.
-        khong_gia = [l for l in lines
-                     if l.closing_qty > _QTY_TOL and l.closing_value is not None
-                     and abs(l.closing_value) <= _VALUE_TOL]
+        khong_gia = [dong for dong in lines
+                     if dong.closing_qty > _QTY_TOL and dong.closing_value is not None
+                     and abs(dong.closing_value) <= _VALUE_TOL]
         if khong_gia:
             findings.append(_finding(
                 "warehouse_zero_valued", "trung bình", None,
                 f"Cả kho không ghi nhận giá vốn — {len(khong_gia)} mã đang có hàng",
                 {"số_mã": len(khong_gia),
-                 "tổng_số_lượng": round(sum(l.closing_qty for l in khong_gia), 2),
+                 "tổng_số_lượng": round(sum(d.closing_qty for d in khong_gia), 2),
                  "kho": warehouse or None},
                 "Bình thường nếu là hàng nhà cung cấp tặng kèm. Nếu công ty TỰ MUA "
                 "để khuyến mại thì chi phí đang nằm ngoài sổ, và lãi gộp đang cao "
