@@ -174,7 +174,7 @@ Bẫy 2 và 3 không làm chương trình đổ. Chúng làm chất lượng sin
 
 ### BR-01. `/tools/vat` phải từ chối trường lạ thay vì tính bằng 0
 
-**Ưu tiên** P0 · **Người làm** Brain-1 · **Hạn** Thứ Ba 27/10 · **Phụ thuộc** không
+**Ưu tiên** P0 · **Người làm** Thành · **Hạn** Thứ Ba 27/10 · **Phụ thuộc** không
 
 **Vì sao.** `VatRequest.items` khai là `list[dict]` ([`tools.py:152`](src/api/routes/tools.py#L152)) nên pydantic không kiểm gì bên trong. Đo ngày 24/10/2026 trên chính endpoint đang chạy:
 
@@ -213,7 +213,7 @@ Kèm test hồi quy phủ cả ba ca trong bảng. `pytest -q` PHẢI vẫn xanh
 
 ### BR-02. Thêm đường chat cho `VLLMServerClient`
 
-**Ưu tiên** P0 · **Người làm** Brain-2 · **Hạn** Thứ Tư 28/10 · **Phụ thuộc** không
+**Ưu tiên** P0 · **Người làm** Thành · **Hạn** Thứ Năm 29/10 · **Phụ thuộc** không
 
 **Vì sao.** Bẫy 1, 2 và 3 ở §3.3. Client hiện chỉ có `complete()` gọi `/v1/completions` với prompt thô, trong khi `generate_chat` cần chat template, và template đó đang lấy từ tokenizer của chính đối tượng `vllm.LLM` trong tiến trình. Không có đường chat thì không nối được gì.
 
@@ -233,7 +233,7 @@ Kèm test hồi quy phủ cả ba ca trong bảng. `pytest -q` PHẢI vẫn xanh
 
 ### BR-03. Cho `engine.py` rẽ nhánh theo backend, và chứng minh đường HTTP thi hành
 
-**Ưu tiên** P0 · **Người làm** Brain-2 cặp với Brain-1 · **Hạn** Thứ Năm 29/10 · **Phụ thuộc** BR-02
+**Ưu tiên** P0 · **Người làm** Thành · **Hạn** Thứ Hai 02/11 · **Phụ thuộc** BR-02
 
 **Vì sao.** Đây là việc trung tâm của S2. `VLLMServerClient` đã dựng xong, có test, được khai trong `docker-compose.yml`, và **không caller nào gọi nó**. Đây là lần thứ tư dự án dính hình dạng lỗi "một lớp phòng thủ trông như đã có mà chưa nối"; ba lần trước là `API_TOKEN` so với `API_AUTH_TOKEN`, `arguments_schema()` không đóng object, và trần token benchmark rộng hơn production.
 
@@ -261,7 +261,7 @@ Và trên Colab ở BR-04: một câu hỏi thật đi trọn vòng qua `VLLM_BA
 
 ### BR-04. Dựng vLLM server Qwen3-8B trên Colab L4 và đo ngân sách ngữ cảnh
 
-**Ưu tiên** P0 · **Người làm** Brain-2 và Brain-1 cùng ngồi · **Hạn** Thứ Sáu 30/10 · **Phụ thuộc** BR-03
+**Ưu tiên** P0 · **Người làm** Thành · **Hạn** Thứ Tư 04/11 · **Phụ thuộc** BR-03
 
 **Vì sao.** S2 đòi **ctx 32k**, và [ARCHITECTURE.md §9.3](ARCHITECTURE.md) giải thích vì sao đó là điều kiện cần: vòng agentic nạp lại kết quả tool ở mỗi bước, nên ở `max_model_len` nhỏ thì context tràn sau khoảng ba lần gọi tool có kèm đoạn RAG. Chưa ai đo 32k trên phần cứng thật.
 
@@ -279,11 +279,12 @@ Nên đánh đổi cần đo là **ctx so với số request đồng thời**, x
 4. PHẢI đo và ghi lại ít nhất **ba mức `max_model_len`**: 8192, 16384, 32768. Mỗi mức ghi: server có dựng nổi không, VRAM đỉnh theo `nvidia-smi`, và **số token KV cache vLLM báo lúc khởi động** (dòng `GPU KV cache size`).
 5. PHẢI quy số token KV cache đó ra **số request 32k chạy song song được**, vì đó là con số quyết định `ANSER_TEXT_MAX_CONCURRENT`.
 6. PHẢI đo `inference_latency_p95` ở mức đồng thời mà yêu cầu 5 cho ra, không phải ở một con số đặt sẵn. Ngưỡng tham chiếu ARCHITECTURE §13 là 5.000ms.
-7. Nếu 32k không vừa, PHẢI nêu phương án theo thứ tự rẻ trước, và chọn có lý do ghi lại:
-   - hạ `gpu_memory_utilization` rồi đo lại, vì weights AWQ chỉ ~6 GB nên phần giữ chỗ 12,4 GB có thể rộng hơn mức cần;
-   - hạ `max_model_len` xuống mức vừa, kèm con số bao nhiêu lần gọi tool thì tràn;
-   - đẩy vision sang tiến trình riêng qua `vllm-vision`, vốn đã khai trong compose mà chưa nối.
-8. Kết quả PHẢI thành một quyết định ghi vào [ARCHITECTURE.md](ARCHITECTURE.md) trong cùng PR, **kèm sửa bảng §5.1 đang lỗi thời** như §2.3 nêu.
+7. Nếu 32k không vừa, hướng xử đã chốt ngày 24/10 là **hạ ctx**, không phải đẩy vision sang tiến trình riêng. Lý do: dự án cần dựng được một môi trường **giả lập production để thử Brain**, và một tiến trình vLLM cộng vision nạp trong tiến trình thì dựng lại dễ hơn hẳn hai dịch vụ GPU trên cùng một máy. Thứ tự thử:
+   - hạ `gpu_memory_utilization` rồi đo lại **trước**, vì weights AWQ chỉ ~6 GB nên phần giữ chỗ 12,4 GB có thể rộng hơn mức cần;
+   - rồi mới hạ `max_model_len`.
+8. Ctx chọn ra PHẢI **đủ cho một kế hoạch 3 tool kèm đoạn RAG**, đo bằng một ca thật chứ không chọn theo con số tròn. `MAX_PLAN` là 3 và `DEFAULT_MAX_STEPS` là 4, nên cửa sổ phải chứa: system prompt, lịch sử hội thoại, ba kết quả tool, các đoạn RAG, và chỗ cho câu trả lời. [ARCHITECTURE.md §9.3](ARCHITECTURE.md) ghi ở 4096 thì tràn sau khoảng ba lần gọi tool có kèm RAG, nên đó là sàn tuyệt đối chứ không phải mức dùng được.
+9. Kết quả PHẢI thành một quyết định ghi vào [ARCHITECTURE.md](ARCHITECTURE.md) trong cùng PR, **kèm sửa bảng §5.1 đang lỗi thời** như §2.3 nêu.
+10. Cấu hình chốt lại PHẢI viết thành **runbook dựng lại được**, vì nó là nền của môi trường giả lập production. Một cấu hình chỉ dựng được một lần bởi một người thì không dùng để thử lặp đi lặp lại.
 
 **Nghiệm thu.** Một bảng trong PR, mỗi dòng một mức `max_model_len`, các cột: dựng được hay không, VRAM đỉnh, `GPU KV cache size`, số request 32k song song suy ra, p95. Kèm một đoạn log vLLM server cho thấy request của Brain đi tới nơi.
 
@@ -293,7 +294,7 @@ Nên đánh đổi cần đo là **ctx so với số request đồng thời**, x
 
 ### BR-05. Chạy lại phiên đo trên đường server, đóng việc treo số 1 và số 2
 
-**Ưu tiên** P1 · **Người làm** Brain-1 · **Hạn** Thứ Tư 04/11 · **Phụ thuộc** BR-04
+**Ưu tiên** P1 · **Người làm** Thành · **Hạn** Thứ Năm 05/11 · **Phụ thuộc** BR-04
 
 **Vì sao.** Chủ dự án chốt ngày 24/10: đo **bản fine-tune `anser-v3-awq`**, và mục đích là *"xem hổng chỗ nào để còn biết mà cải tiến"*. Nên việc này là **chẩn đoán**, không phải chấm điểm. Đầu ra có giá trị của nó là một **danh sách lỗ hổng theo loại**, đủ cụ thể để quyết vòng cải tiến sau sửa cái gì.
 
@@ -329,9 +330,12 @@ Runbook đầy đủ ở [PHIEN_DO_COLAB.md](PHIEN_DO_COLAB.md). Khoảng một 
 
 ---
 
-### BR-06. Bộ đo RAG
+### BR-06. Bộ đo RAG (đã chuyển sang chu kỳ 02)
 
-**Ưu tiên** P1 · **Người làm** Brain-1 · **Hạn** Thứ Năm 05/11 · **Phụ thuộc** không
+> **Không làm trong chu kỳ 01.** Chủ dự án chốt ngày 24/10 là một người gánh toàn bộ phần Brain, và việc này cần khoảng 3 ngày mà không nằm trên đường găng. Giữ nó lại chỉ làm cả chu kỳ trượt. Đặc tả giữ nguyên ở đây để chu kỳ 02 dùng lại mà không phải viết lại.
+
+
+**Ưu tiên** P1 · **Người làm** chu kỳ 02 · **Hạn** ngoài chu kỳ này · **Phụ thuộc** không
 
 **Vì sao.** `src/core/knowledge.py` có 571 dòng và 70 test đơn vị, và **không một chỉ số recall, MRR hay faithfulness nào**. TIEN_TRINH §7 xếp việc này thứ hai và ghi rõ nó không cần GPU, nên nó chạy song song với mọi thứ trên.
 
@@ -352,7 +356,7 @@ Bốn lỗ hổng chức năng mà [ARCHITECTURE.md §13b.3](ARCHITECTURE.md) li
 
 ### BR-07. Mở rộng cổng lint của CI
 
-**Ưu tiên** P2 · **Người làm** Brain-1 · **Hạn** Thứ Sáu 06/11 · **Phụ thuộc** không
+**Ưu tiên** P2 · **Người làm** Thành · **Hạn** Thứ Sáu 06/11 · **Phụ thuộc** không
 
 **Vì sao.** CI chỉ chạy `ruff` trên chín file viết tay, nên nó không nhìn thấy tám lỗi đã sửa ngày 22/10. Trong đó có một lỗi `F821` làm ô 4.2 của notebook Colab ném `NameError` giữa phiên đo, sau khi đã nạp xong model. Chu kỳ này có tới hai việc chạy trên Colab, nên lỗi loại đó đắt gấp đôi.
 
@@ -380,20 +384,28 @@ Bốn lỗ hổng chức năng mà [ARCHITECTURE.md §13b.3](ARCHITECTURE.md) li
 
 ## 6. Phân công và lịch
 
-### 6.1. Hai luồng việc, chia theo năng lực chứ không theo tên
+### 6.1. Một người, và hệ quả của việc đó
 
-Nhân sự chu kỳ này chưa chốt, nên lịch chia theo **loại việc**. Ai nhận luồng nào thì điền vào bảng lúc bắt đầu, và lịch không đổi theo.
+Chủ dự án chốt ngày 24/10: **Thành** nhận toàn bộ phần Brain của chu kỳ này.
 
-| Luồng | Tính chất | Việc |
+Nghĩa là đường găng `BR-02 → BR-03 → BR-04 → BR-05` là một chuỗi **nối tiếp trên một người**, không có ai chạy song song để bù khi một mắt xích trượt. Lịch dưới đây xếp theo đúng thực tế đó, không giả vờ có hai luồng.
+
+| Việc | Công ước lượng | Vì sao xếp ở đó |
 |---|---|---|
-| **A, đường găng** | Cần ngữ cảnh sẵn có về `serving.py`, `engine.py` và vòng agentic. Sai ở đây làm hỏng cả chu kỳ | BR-02 → BR-03 → BR-04 → BR-05 |
-| **B, biên rõ** | Phạm vi hẹp, đáp án kiểm được bằng lệnh, hỏng cũng không lan. An toàn cho người mới nhận repo | BR-01, BR-06, BR-07 |
+| BR-01 | 1 ngày | Ngày đầu. Phạm vi hẹp, đáp án kiểm được bằng lệnh, và nó cho người làm chạm vào lớp tất định trước khi đụng tầng model |
+| BR-02 | 2 ngày | Đầu đường găng |
+| BR-03 | 2 đến 3 ngày | Việc nặng nhất chu kỳ |
+| BR-04 | 1 đến 2 ngày | Một buổi Colab, cộng thời gian dựng lại nếu phiên ngắt |
+| BR-05 | 1 ngày | Một buổi Colab nữa, cộng thời gian dựng bảng phân loại lỗi |
+| **Tổng** | **7 đến 9 ngày** | trên 10 ngày làm việc |
 
-**Nếu chỉ có một người làm cả hai luồng:** chạy luồng A theo đúng thứ tự, chèn BR-01 vào ngày đầu vì nó mất khoảng một ngày và cho người làm chạm vào lớp tất định trước khi đụng tầng model. BR-06 và BR-07 đẩy sang chu kỳ 02, không cần giải trình, vì chúng là P1 và P2.
+Biên dự phòng còn 1 đến 3 ngày. Nó mỏng, và phần lớn rủi ro ở §8.1 đều ăn vào đúng phần biên đó.
 
-**Nếu có hai người và một người sắp nghỉ:** người sắp nghỉ nhận luồng A và **dồn hết vào tuần 1**. Giá trị lớn nhất họ để lại là thứ chưa nằm trong tài liệu, nên BR-03 và BR-04 làm **theo cặp**, và người ở lại là người **viết tài liệu ngay trong lúc nghe**, không để sau. Từ ngày họ nghỉ, kế hoạch giả định không hỏi được ai nữa.
+**Vì vậy BR-06 chuyển sang chu kỳ 02**, xem §9. Bộ đo RAG cần khoảng 3 ngày và nó không nằm trên đường găng, nên giữ nó lại chỉ làm cả chu kỳ trượt. **BR-07 giữ ở mức P2**, làm nếu còn ngày, bỏ nếu không, không cần giải trình.
 
-Chủ dự án: chốt §8.3, cấp Colab Pro và quyền đọc Drive `ANSER_AI_Logistics/`.
+Thà chở năm việc tới nơi còn hơn bảy việc dở dang.
+
+Chủ dự án: chốt §8.4, cấp Colab Pro và quyền đọc Drive `ANSER_AI_Logistics/`.
 
 ### 6.2. Đường găng
 
@@ -407,31 +419,33 @@ Cả bốn việc đầu nằm trên một đường. **BR-02 trượt là cả 
 
 ### 6.3. Tuần 1: Thứ Hai 26/10 đến Thứ Sáu 30/10
 
-| Ngày | Luồng A, đường găng | Luồng B, biên rõ |
-|---|---|---|
-| **T2 26/10** | Đọc `serving.py` và `engine.py`, chốt thiết kế rẽ nhánh backend | Dựng môi trường theo [sổ tay §2](SO_TAY_NGUOI_MOI.md), ra 1003 passed. Làm bài tập 1 và 2 |
-| **T3 27/10** | **BR-02** | **BR-01** |
-| **T4 28/10** | **BR-02 hạn.** Bắt đầu **BR-03** | **BR-01** xong, có test hồi quy |
-| **T5 29/10** | **BR-03 hạn** | Cặp trên **BR-03**, và là người **viết tài liệu** |
-| **T6 30/10** | **BR-04 hạn** | Cùng ngồi **BR-04** trên Colab, tự tay chạy một lượt |
+| Ngày | Thành |
+|---|---|
+| **T2 26/10** | Dựng môi trường theo [sổ tay §2](SO_TAY_NGUOI_MOI.md), ra 1003 passed. **BR-01** |
+| **T3 27/10** | **BR-01 hạn**, có test hồi quy. Đọc `serving.py` và `engine.py`, chốt thiết kế rẽ nhánh backend |
+| **T4 28/10** | **BR-02** |
+| **T5 29/10** | **BR-02 hạn**. Bắt đầu **BR-03** |
+| **T6 30/10** | **BR-03** |
 
 ### 6.4. Tuần 2: Thứ Hai 02/11 đến Thứ Sáu 06/11
 
-Tuần 2 giả định người của luồng A có thể đã nghỉ, nên mọi việc dồn về người ở lại.
-
-| Ngày | Việc |
+| Ngày | Thành |
 |---|---|
-| **T2 02/11** | Đọc lại tài liệu đã viết tuần 1. Chạy lại BR-04 **một mình** để chắc là làm được mà không cần hỏi ai |
-| **T3 03/11** | **BR-06** dựng bộ câu hỏi và nhãn |
-| **T4 04/11** | **BR-05 hạn.** Phiên đo trên Colab. Đọc cảnh báo khung đo trước điểm số, rồi dựng bảng phân loại lỗi |
-| **T5 05/11** | **BR-06 hạn.** Báo cáo chỉ số RAG |
-| **T6 06/11** | **BR-07.** Viết biên bản chu kỳ, cập nhật TIEN_TRINH_BRAIN và ARCHITECTURE |
+| **T2 02/11** | **BR-03 hạn**, kèm phép thử chứng minh server nhận được request |
+| **T3 03/11** | **BR-04**, dựng vLLM server trên Colab L4 |
+| **T4 04/11** | **BR-04 hạn**, đo ba mức `max_model_len` với vision đang nạp, ghi quyết định vào ARCHITECTURE |
+| **T5 05/11** | **BR-05 hạn**, phiên đo bản fine-tune, dựng bảng phân loại lỗi |
+| **T6 06/11** | **BR-07** nếu còn ngày. Viết biên bản chu kỳ, cập nhật TIEN_TRINH_BRAIN |
+
+> **Hạn của BR-03 và BR-04 lùi so với bản trước**, vì bản trước giả định hai người chạy song song. Một người thì chuỗi `BR-02 → BR-03 → BR-04` phải nối tiếp, và dồn cả ba vào tuần 1 là đặt một hạn không ai giữ được.
 
 ### 6.5. Hai mốc kiểm
 
-**M1, Thứ Sáu 30/10 cuối ngày.** Trả lời đúng một câu: *một câu hỏi thật có đi trọn vòng từ `/chat` qua `VLLM_BASE_URL` tới vLLM server trên L4 và quay về không, và log của server có ghi nhận request đó không?*
+**M1, Thứ Sáu 30/10 cuối ngày.** Trả lời đúng một câu: *`VLLMServerClient` đã có đường chat chưa, và ba phép thử payload đã xanh chưa?* Tức là `chat_template_kwargs` có mặt, `guided_json` có mặt, và `repetition_penalty == 1.0` khi bật grammar.
 
-Không đạt thì **dừng BR-06 và BR-07**, dồn toàn bộ tuần 2 vào đường găng.
+Đây là mốc giữa đường, không phải mốc "chạy được đầu cuối". Với một người thì BR-03 chưa thể xong trong tuần 1.
+
+Không đạt thì **bỏ BR-07 khỏi chu kỳ** và báo ngay, vì nó nghĩa là đường găng đã ăn hết biên dự phòng.
 
 **M2, Thứ Sáu 06/11.** Cổng ra chu kỳ, xem §7.
 
@@ -439,7 +453,7 @@ Không đạt thì **dừng BR-06 và BR-07**, dồn toàn bộ tuần 2 vào đ
 
 ## 7. Cổng ra chu kỳ
 
-Chu kỳ 01 đạt khi đủ cả sáu:
+Chu kỳ 01 đạt khi đủ cả bảy:
 
 - [ ] `/chat` chạy qua **vLLM server** chứ không phải `vllm.LLM` trong tiến trình, và có một phép thử **chứng minh server nhận được request**, không phải chỉ chứng minh biến môi trường được đọc (BR-03)
 - [ ] Ba bẫy ở §3.3 đều có phép thử riêng và đều xanh: chat template, `enable_thinking=False`, `repetition_penalty=1.0` khi bật grammar (BR-02)
@@ -448,7 +462,7 @@ Chu kỳ 01 đạt khi đủ cả sáu:
 - [ ] Có **bảng phân loại lỗi** của bản fine-tune theo nhánh, mỗi loại kèm số ca và một ví dụ nguyên văn, và mỗi loại đã quy về một trong ba nguyên nhân: dữ liệu, lược đồ, hay mã khung đo (BR-05)
 - [ ] `/tools/vat` trả 422 cho trường lạ, không còn tính bằng 0 rồi buộc tội sổ sách (BR-01)
 - [ ] `pytest -q` xanh và `ruff` sạch, đo trên đúng mã đã chạy phiên đo
-- [ ] Biên bản chu kỳ ghi: việc treo 1 và 2 đóng hay mở, chỉ số RAG nếu có, chi phí thật, và danh sách đẩy sang chu kỳ 02
+- [ ] Biên bản chu kỳ ghi: việc treo 1 và 2 đóng hay mở, chi phí thật, và danh sách đẩy sang chu kỳ 02
 
 Mỗi mục chưa đạt PHẢI có một dòng nêu lý do và người chịu trách nhiệm đẩy tiếp.
 
@@ -463,7 +477,7 @@ Mỗi mục chưa đạt PHẢI có một dòng nêu lý do và người chịu 
 | Colab cấp T4 thay vì L4 | Ô kiểm GPU ở đầu notebook | Đổi phiên, hoặc đợi. T4 16GB không đủ cho Qwen3-8B AWQ |
 | ctx 32k không vừa cùng vision trên L4 | BR-04 cấu hình thứ ba không dựng nổi | Đây là **kết quả đo**, không phải thất bại. Ghi đánh đổi vào ARCHITECTURE rồi chọn |
 | Phiên bản vLLM trên Colab trôi khỏi khoảng ghim | `guided_json` bị bỏ qua im lặng | BR-05 yêu cầu 4 bắt được. Ghim phiên bản ngay lúc `pip install` |
-| Brain-2 nghỉ sớm hơn dự kiến | không có dấu hiệu báo trước | Dồn BR-02 và BR-03 lên sớm. Brain-1 viết tài liệu **trong lúc** nghe, không để sau |
+| **Một người gánh cả đường găng** | BR-02 trượt hạn Thứ Năm 29/10 | Biên dự phòng chỉ 1 đến 3 ngày (§6.1). Trượt BR-02 thì bỏ BR-07 ngay, và báo để tính lại hạn BR-05 thay vì để nó trượt im lặng |
 | Phiên Colab hết giờ giữa chừng | Runtime ngắt | `bat_lai_brain.py` đã có để dựng lại. Chạy bằng `%run -i`, không phải `!python` |
 
 ### 8.2. Giả định
@@ -482,14 +496,21 @@ Mỗi mục chưa đạt PHẢI có một dòng nêu lý do và người chịu 
 | 3 | Có tắt vision để lấy ctx 32k không | **Không.** ANSER cần vision cho một số tác vụ | BR-04 bỏ hẳn phương án tắt vision, đo với vision **đang nạp** ở mọi cấu hình. Đánh đổi chuyển sang ctx so với số request đồng thời |
 | 4 | Khi nào tìm kế toán rà sổ | **Tính sau**, tập trung vào việc làm được ngay | Gỡ khỏi §9. Nó vẫn nằm ở [GIAO_VIEC_BRAIN.md](GIAO_VIEC_BRAIN.md) V6 |
 
-### 8.4. Còn để ngỏ
+### 8.4. Bốn quyết định bổ sung, chốt ngày 24/10/2026
+
+| # | Câu hỏi | Quyết định | Đổi gì |
+|---|---|---|---|
+| 5 | Ai nhận phần Brain | **Thành**, một người, cả hai luồng | §6.1 xếp lại theo chuỗi nối tiếp. **BR-06 chuyển sang chu kỳ 02**, BR-07 giữ P2. Hạn BR-03 lùi sang 02/11, BR-04 sang 04/11 |
+| 6 | Nếu ctx 32k không vừa thì hạ ctx hay đẩy vision sang tiến trình riêng | **Hạ ctx**, vì dự án cần dựng được môi trường giả lập production để thử Brain | BR-04 yêu cầu 7 bỏ phương án tách tiến trình. Thêm yêu cầu 8 (ctx phải đủ cho kế hoạch 3 tool kèm RAG) và yêu cầu 10 (runbook dựng lại được) |
+| 7 | Nhánh `feat/brain-integration` của Body có gộp về `Dgsonn/ANSER-v2` không | **Có, gộp sớm nếu cần** | Xem [PHAN_VIEC_CHU_KY_01.md](PHAN_VIEC_CHU_KY_01.md) BD-01 |
+| 8 | Đội Body tuần này gồm ai | **Sĩ, Sơn, Nam** | Xem [PHAN_VIEC_CHU_KY_01.md](PHAN_VIEC_CHU_KY_01.md) §5 |
+
+### 8.5. Còn để ngỏ
 
 | # | Câu hỏi | Khi nào cần trả lời |
 |---|---|---|
-| 1 | **Ai nhận luồng A, ai nhận luồng B** | Sáng Thứ Hai 26/10, điền vào bảng §6.1. Chưa có người cho luồng B thì chạy phương án một người |
-| 2 | **Nếu BR-04 cho thấy 32k không vừa, chấp nhận ctx thấp hơn hay đẩy vision sang tiến trình riêng?** | Khi có số đo, dự kiến Thứ Sáu 30/10. Hỏi trước lúc có số là đoán |
-
----
+| 1 | **Ctx chốt ở mức nào**, và `ANSER_TEXT_MAX_CONCURRENT` theo đó là bao nhiêu | Khi BR-04 có số đo, dự kiến Thứ Tư 04/11. Hỏi trước lúc có số là đoán |
+| 2 | **Môi trường giả lập production đặt ở đâu** khi rời Colab | Chu kỳ 02. Colab không phục vụ traffic thật được ([ARCHITECTURE.md §4.4](ARCHITECTURE.md)) |
 
 ## 9. Ngoài phạm vi chu kỳ 01
 
@@ -498,10 +519,11 @@ Nêu ra để không ai làm, và để biết chúng chưa chết.
 | Việc | Vì sao hoãn | Ở đâu |
 |---|---|---|
 | **Nối Redis cho `TASK_REGISTRY`** | Thuộc S2 nhưng TIEN_TRINH §7 xếp thứ 4 và ghi "chưa gấp". Chỉ cần khi chạy nhiều tiến trình | GIAO_VIEC V2 bước 5 |
-| **Nối `vllm-vision` qua HTTP** | TIEN_TRINH §7 thứ 5. Phụ thuộc kết quả đo ở BR-04 | TIEN_TRINH §3 treo 3 |
+| **Nối `vllm-vision` qua HTTP** | TIEN_TRINH §7 thứ 5. Chủ dự án chốt 24/10: nếu thiếu chỗ thì **hạ ctx** chứ không tách tiến trình, vì cần dựng lại được môi trường giả lập production | TIEN_TRINH §3 treo 3 |
 | **Cloudflare Tunnel** | Thuộc S2, nhưng phụ thuộc quyết định chỗ đặt mà chu kỳ này chưa có | ROADMAP điểm chặn 4 |
 | **Đưa lên chỗ khách truy cập được** | Ô đỏ duy nhất còn lại của Giai đoạn B, và nó **chưa chết**. Lớp kế toán chạy được không cần GPU: đã kiểm `RUNTIME_PROFILE=minimal` ngày 24/10, `/tools/inventory-audit` trả 2 phát hiện với `engine_ready: false`. Hoãn vì chu kỳ này dồn vào S2, không vì nó khó | ROADMAP GĐ B |
-| **`SCHEMA MAP` khớp ERD Body + `get_report_lines`** | ERD đã chốt nên nó sẵn sàng, nhưng nó không nằm trên đường găng của S2. Lấy làm việc đệm nếu BR-05 hoặc BR-06 xong sớm | GIAO_VIEC V3 |
+| **Bộ đo RAG (BR-06)** | Cần khoảng 3 ngày, không nằm trên đường găng, và chu kỳ này chỉ có một người. Đặc tả giữ nguyên tại chỗ để chu kỳ 02 dùng lại | §BR-06 của chính tài liệu này |
+| **`SCHEMA MAP` khớp lược đồ Body + `get_report_lines`** | Chờ Body chốt một bản lược đồ duy nhất, xem PHAN_VIEC BD-02. Lấy làm việc đệm nếu BR-05 xong sớm | GIAO_VIEC V3 |
 | **Mảng vận tải** | Chặn bởi khách. Hoàng Phát chưa làm vận tải | GIAO_VIEC V7 |
 | **Huấn luyện lại model** | Bảng phân loại lỗi của BR-05 là **đầu vào** cho quyết định này, nên phải có nó trước | ROADMAP GĐ D |
 | **Kế toán thật rà sổ** | Chủ dự án chốt 24/10: tính sau, tập trung vào việc làm được ngay | GIAO_VIEC V6 |

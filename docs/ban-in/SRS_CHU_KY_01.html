@@ -291,8 +291,8 @@ cảnh</a></li>
 <li><a href="#br-05-chạy-lại-phiên-đo-trên-đường-server-đóng-việc-treo-số-1-và-số-2" id="toc-br-05-chạy-lại-phiên-đo-trên-đường-server-đóng-việc-treo-số-1-và-số-2">BR-05.
 Chạy lại phiên đo trên đường server, đóng việc treo số 1 và số
 2</a></li>
-<li><a href="#br-06-bộ-đo-rag" id="toc-br-06-bộ-đo-rag">BR-06. Bộ đo
-RAG</a></li>
+<li><a href="#br-06-bộ-đo-rag-đã-chuyển-sang-chu-kỳ-02" id="toc-br-06-bộ-đo-rag-đã-chuyển-sang-chu-kỳ-02">BR-06. Bộ đo RAG (đã
+chuyển sang chu kỳ 02)</a></li>
 <li><a href="#br-07-mở-rộng-cổng-lint-của-ci" id="toc-br-07-mở-rộng-cổng-lint-của-ci">BR-07. Mở rộng cổng lint của
 CI</a></li>
 </ul></li>
@@ -300,8 +300,8 @@ CI</a></li>
 <li><a href="#6-phân-công-và-lịch" id="toc-6-phân-công-và-lịch">6. Phân
 công và lịch</a>
 <ul>
-<li><a href="#61-hai-luồng-việc-chia-theo-năng-lực-chứ-không-theo-tên" id="toc-61-hai-luồng-việc-chia-theo-năng-lực-chứ-không-theo-tên">6.1.
-Hai luồng việc, chia theo năng lực chứ không theo tên</a></li>
+<li><a href="#61-một-người-và-hệ-quả-của-việc-đó" id="toc-61-một-người-và-hệ-quả-của-việc-đó">6.1. Một người, và hệ quả
+của việc đó</a></li>
 <li><a href="#62-đường-găng" id="toc-62-đường-găng">6.2. Đường
 găng</a></li>
 <li><a href="#63-tuần-1-thứ-hai-2610-đến-thứ-sáu-3010" id="toc-63-tuần-1-thứ-hai-2610-đến-thứ-sáu-3010">6.3. Tuần 1: Thứ Hai
@@ -320,7 +320,9 @@ chốt</a>
 <li><a href="#82-giả-định" id="toc-82-giả-định">8.2. Giả định</a></li>
 <li><a href="#83-bốn-quyết-định-của-chủ-dự-án-chốt-ngày-24102026" id="toc-83-bốn-quyết-định-của-chủ-dự-án-chốt-ngày-24102026">8.3. Bốn
 quyết định của chủ dự án, chốt ngày 24/10/2026</a></li>
-<li><a href="#84-còn-để-ngỏ" id="toc-84-còn-để-ngỏ">8.4. Còn để
+<li><a href="#84-bốn-quyết-định-bổ-sung-chốt-ngày-24102026" id="toc-84-bốn-quyết-định-bổ-sung-chốt-ngày-24102026">8.4. Bốn quyết
+định bổ sung, chốt ngày 24/10/2026</a></li>
+<li><a href="#85-còn-để-ngỏ" id="toc-85-còn-để-ngỏ">8.5. Còn để
 ngỏ</a></li>
 </ul></li>
 <li><a href="#9-ngoài-phạm-vi-chu-kỳ-01" id="toc-9-ngoài-phạm-vi-chu-kỳ-01">9. Ngoài phạm vi chu kỳ 01</a></li>
@@ -684,7 +686,7 @@ kết quả không đổi một đơn vị nào, vì backend giải mã bỏ qua
 <h2 id="4-yêu-cầu-chức-năng">4. Yêu cầu chức năng</h2>
 <h3 id="br-01-toolsvat-phải-từ-chối-trường-lạ-thay-vì-tính-bằng-0">BR-01.
 <code>/tools/vat</code> phải từ chối trường lạ thay vì tính bằng 0</h3>
-<p><strong>Ưu tiên</strong> P0 · <strong>Người làm</strong> Brain-1 ·
+<p><strong>Ưu tiên</strong> P0 · <strong>Người làm</strong> Thành ·
 <strong>Hạn</strong> Thứ Ba 27/10 · <strong>Phụ thuộc</strong> không</p>
 <p><strong>Vì sao.</strong> <code>VatRequest.items</code> khai là
 <code>list[dict]</code> (<a href="src/api/routes/tools.py#L152"><code>tools.py:152</code></a>) nên
@@ -755,8 +757,9 @@ vẫn xanh.</p>
 <hr />
 <h3 id="br-02-thêm-đường-chat-cho-vllmserverclient">BR-02. Thêm đường
 chat cho <code>VLLMServerClient</code></h3>
-<p><strong>Ưu tiên</strong> P0 · <strong>Người làm</strong> Brain-2 ·
-<strong>Hạn</strong> Thứ Tư 28/10 · <strong>Phụ thuộc</strong> không</p>
+<p><strong>Ưu tiên</strong> P0 · <strong>Người làm</strong> Thành ·
+<strong>Hạn</strong> Thứ Năm 29/10 · <strong>Phụ thuộc</strong>
+không</p>
 <p><strong>Vì sao.</strong> Bẫy 1, 2 và 3 ở §3.3. Client hiện chỉ có
 <code>complete()</code> gọi <code>/v1/completions</code> với prompt thô,
 trong khi <code>generate_chat</code> cần chat template, và template đó
@@ -797,9 +800,9 @@ yêu cầu này, đó là BR-03. Không làm đường vision.</p>
 <h3 id="br-03-cho-enginepy-rẽ-nhánh-theo-backend-và-chứng-minh-đường-http-thi-hành">BR-03.
 Cho <code>engine.py</code> rẽ nhánh theo backend, và chứng minh đường
 HTTP thi hành</h3>
-<p><strong>Ưu tiên</strong> P0 · <strong>Người làm</strong> Brain-2 cặp
-với Brain-1 · <strong>Hạn</strong> Thứ Năm 29/10 · <strong>Phụ
-thuộc</strong> BR-02</p>
+<p><strong>Ưu tiên</strong> P0 · <strong>Người làm</strong> Thành ·
+<strong>Hạn</strong> Thứ Hai 02/11 · <strong>Phụ thuộc</strong>
+BR-02</p>
 <p><strong>Vì sao.</strong> Đây là việc trung tâm của S2.
 <code>VLLMServerClient</code> đã dựng xong, có test, được khai trong
 <code>docker-compose.yml</code>, và <strong>không caller nào gọi
@@ -849,9 +852,8 @@ HTTP. Không dựng Cloudflare Tunnel.</p>
 <hr />
 <h3 id="br-04-dựng-vllm-server-qwen3-8b-trên-colab-l4-và-đo-ngân-sách-ngữ-cảnh">BR-04.
 Dựng vLLM server Qwen3-8B trên Colab L4 và đo ngân sách ngữ cảnh</h3>
-<p><strong>Ưu tiên</strong> P0 · <strong>Người làm</strong> Brain-2 và
-Brain-1 cùng ngồi · <strong>Hạn</strong> Thứ Sáu 30/10 · <strong>Phụ
-thuộc</strong> BR-03</p>
+<p><strong>Ưu tiên</strong> P0 · <strong>Người làm</strong> Thành ·
+<strong>Hạn</strong> Thứ Tư 04/11 · <strong>Phụ thuộc</strong> BR-03</p>
 <p><strong>Vì sao.</strong> S2 đòi <strong>ctx 32k</strong>, và <a href="ARCHITECTURE.md">ARCHITECTURE.md §9.3</a> giải thích vì sao đó là
 điều kiện cần: vòng agentic nạp lại kết quả tool ở mỗi bước, nên ở
 <code>max_model_len</code> nhỏ thì context tràn sau khoảng ba lần gọi
@@ -890,18 +892,30 @@ song được</strong>, vì đó là con số quyết định
 <li>PHẢI đo <code>inference_latency_p95</code> ở mức đồng thời mà yêu
 cầu 5 cho ra, không phải ở một con số đặt sẵn. Ngưỡng tham chiếu
 ARCHITECTURE §13 là 5.000ms.</li>
-<li>Nếu 32k không vừa, PHẢI nêu phương án theo thứ tự rẻ trước, và chọn
-có lý do ghi lại:
+<li>Nếu 32k không vừa, hướng xử đã chốt ngày 24/10 là <strong>hạ
+ctx</strong>, không phải đẩy vision sang tiến trình riêng. Lý do: dự án
+cần dựng được một môi trường <strong>giả lập production để thử
+Brain</strong>, và một tiến trình vLLM cộng vision nạp trong tiến trình
+thì dựng lại dễ hơn hẳn hai dịch vụ GPU trên cùng một máy. Thứ tự thử:
 <ul>
-<li>hạ <code>gpu_memory_utilization</code> rồi đo lại, vì weights AWQ
-chỉ ~6 GB nên phần giữ chỗ 12,4 GB có thể rộng hơn mức cần;</li>
-<li>hạ <code>max_model_len</code> xuống mức vừa, kèm con số bao nhiêu
-lần gọi tool thì tràn;</li>
-<li>đẩy vision sang tiến trình riêng qua <code>vllm-vision</code>, vốn
-đã khai trong compose mà chưa nối.</li>
+<li>hạ <code>gpu_memory_utilization</code> rồi đo lại
+<strong>trước</strong>, vì weights AWQ chỉ ~6 GB nên phần giữ chỗ 12,4
+GB có thể rộng hơn mức cần;</li>
+<li>rồi mới hạ <code>max_model_len</code>.</li>
 </ul></li>
+<li>Ctx chọn ra PHẢI <strong>đủ cho một kế hoạch 3 tool kèm đoạn
+RAG</strong>, đo bằng một ca thật chứ không chọn theo con số tròn.
+<code>MAX_PLAN</code> là 3 và <code>DEFAULT_MAX_STEPS</code> là 4, nên
+cửa sổ phải chứa: system prompt, lịch sử hội thoại, ba kết quả tool, các
+đoạn RAG, và chỗ cho câu trả lời. <a href="ARCHITECTURE.md">ARCHITECTURE.md §9.3</a> ghi ở 4096 thì tràn sau
+khoảng ba lần gọi tool có kèm RAG, nên đó là sàn tuyệt đối chứ không
+phải mức dùng được.</li>
 <li>Kết quả PHẢI thành một quyết định ghi vào <a href="ARCHITECTURE.md">ARCHITECTURE.md</a> trong cùng PR, <strong>kèm
 sửa bảng §5.1 đang lỗi thời</strong> như §2.3 nêu.</li>
+<li>Cấu hình chốt lại PHẢI viết thành <strong>runbook dựng lại
+được</strong>, vì nó là nền của môi trường giả lập production. Một cấu
+hình chỉ dựng được một lần bởi một người thì không dùng để thử lặp đi
+lặp lại.</li>
 </ol>
 <p><strong>Nghiệm thu.</strong> Một bảng trong PR, mỗi dòng một mức
 <code>max_model_len</code>, các cột: dựng được hay không, VRAM đỉnh,
@@ -914,8 +928,9 @@ Không đổi model vision trong chu kỳ này.</p>
 <hr />
 <h3 id="br-05-chạy-lại-phiên-đo-trên-đường-server-đóng-việc-treo-số-1-và-số-2">BR-05.
 Chạy lại phiên đo trên đường server, đóng việc treo số 1 và số 2</h3>
-<p><strong>Ưu tiên</strong> P1 · <strong>Người làm</strong> Brain-1 ·
-<strong>Hạn</strong> Thứ Tư 04/11 · <strong>Phụ thuộc</strong> BR-04</p>
+<p><strong>Ưu tiên</strong> P1 · <strong>Người làm</strong> Thành ·
+<strong>Hạn</strong> Thứ Năm 05/11 · <strong>Phụ thuộc</strong>
+BR-04</p>
 <p><strong>Vì sao.</strong> Chủ dự án chốt ngày 24/10: đo <strong>bản
 fine-tune <code>anser-v3-awq</code></strong>, và mục đích là <em>&quot;xem
 hổng chỗ nào để còn biết mà cải tiến&quot;</em>. Nên việc này là <strong>chẩn
@@ -1013,9 +1028,16 @@ phân loại lỗi</strong> theo yêu cầu 5 đến 7, đính vào PR. Dòng
 kỳ này. Bảng phân loại lỗi là <strong>đầu vào</strong> cho quyết định
 huấn luyện lại, không phải quyết định đó.</p>
 <hr />
-<h3 id="br-06-bộ-đo-rag">BR-06. Bộ đo RAG</h3>
-<p><strong>Ưu tiên</strong> P1 · <strong>Người làm</strong> Brain-1 ·
-<strong>Hạn</strong> Thứ Năm 05/11 · <strong>Phụ thuộc</strong>
+<h3 id="br-06-bộ-đo-rag-đã-chuyển-sang-chu-kỳ-02">BR-06. Bộ đo RAG (đã
+chuyển sang chu kỳ 02)</h3>
+<blockquote>
+<p><strong>Không làm trong chu kỳ 01.</strong> Chủ dự án chốt ngày 24/10
+là một người gánh toàn bộ phần Brain, và việc này cần khoảng 3 ngày mà
+không nằm trên đường găng. Giữ nó lại chỉ làm cả chu kỳ trượt. Đặc tả
+giữ nguyên ở đây để chu kỳ 02 dùng lại mà không phải viết lại.</p>
+</blockquote>
+<p><strong>Ưu tiên</strong> P1 · <strong>Người làm</strong> chu kỳ 02 ·
+<strong>Hạn</strong> ngoài chu kỳ này · <strong>Phụ thuộc</strong>
 không</p>
 <p><strong>Vì sao.</strong> <code>src/core/knowledge.py</code> có 571
 dòng và 70 test đơn vị, và <strong>không một chỉ số recall, MRR hay
@@ -1054,7 +1076,7 @@ Không nạp thêm nguồn tài liệu mới.</p>
 <hr />
 <h3 id="br-07-mở-rộng-cổng-lint-của-ci">BR-07. Mở rộng cổng lint của
 CI</h3>
-<p><strong>Ưu tiên</strong> P2 · <strong>Người làm</strong> Brain-1 ·
+<p><strong>Ưu tiên</strong> P2 · <strong>Người làm</strong> Thành ·
 <strong>Hạn</strong> Thứ Sáu 06/11 · <strong>Phụ thuộc</strong>
 không</p>
 <p><strong>Vì sao.</strong> CI chỉ chạy <code>ruff</code> trên chín file
@@ -1131,47 +1153,64 @@ PHẢI là <code>None</code>, không phải <code>0</code></td>
 </table>
 <hr />
 <h2 id="6-phân-công-và-lịch">6. Phân công và lịch</h2>
-<h3 id="61-hai-luồng-việc-chia-theo-năng-lực-chứ-không-theo-tên">6.1.
-Hai luồng việc, chia theo năng lực chứ không theo tên</h3>
-<p>Nhân sự chu kỳ này chưa chốt, nên lịch chia theo <strong>loại
-việc</strong>. Ai nhận luồng nào thì điền vào bảng lúc bắt đầu, và lịch
-không đổi theo.</p>
+<h3 id="61-một-người-và-hệ-quả-của-việc-đó">6.1. Một người, và hệ quả
+của việc đó</h3>
+<p>Chủ dự án chốt ngày 24/10: <strong>Thành</strong> nhận toàn bộ phần
+Brain của chu kỳ này.</p>
+<p>Nghĩa là đường găng <code>BR-02 → BR-03 → BR-04 → BR-05</code> là một
+chuỗi <strong>nối tiếp trên một người</strong>, không có ai chạy song
+song để bù khi một mắt xích trượt. Lịch dưới đây xếp theo đúng thực tế
+đó, không giả vờ có hai luồng.</p>
 <table>
 <thead>
 <tr>
-<th>Luồng</th>
-<th>Tính chất</th>
 <th>Việc</th>
+<th>Công ước lượng</th>
+<th>Vì sao xếp ở đó</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td><strong>A, đường găng</strong></td>
-<td>Cần ngữ cảnh sẵn có về <code>serving.py</code>,
-<code>engine.py</code> và vòng agentic. Sai ở đây làm hỏng cả chu
-kỳ</td>
-<td>BR-02 → BR-03 → BR-04 → BR-05</td>
+<td>BR-01</td>
+<td>1 ngày</td>
+<td>Ngày đầu. Phạm vi hẹp, đáp án kiểm được bằng lệnh, và nó cho người
+làm chạm vào lớp tất định trước khi đụng tầng model</td>
 </tr>
 <tr>
-<td><strong>B, biên rõ</strong></td>
-<td>Phạm vi hẹp, đáp án kiểm được bằng lệnh, hỏng cũng không lan. An
-toàn cho người mới nhận repo</td>
-<td>BR-01, BR-06, BR-07</td>
+<td>BR-02</td>
+<td>2 ngày</td>
+<td>Đầu đường găng</td>
+</tr>
+<tr>
+<td>BR-03</td>
+<td>2 đến 3 ngày</td>
+<td>Việc nặng nhất chu kỳ</td>
+</tr>
+<tr>
+<td>BR-04</td>
+<td>1 đến 2 ngày</td>
+<td>Một buổi Colab, cộng thời gian dựng lại nếu phiên ngắt</td>
+</tr>
+<tr>
+<td>BR-05</td>
+<td>1 ngày</td>
+<td>Một buổi Colab nữa, cộng thời gian dựng bảng phân loại lỗi</td>
+</tr>
+<tr>
+<td><strong>Tổng</strong></td>
+<td><strong>7 đến 9 ngày</strong></td>
+<td>trên 10 ngày làm việc</td>
 </tr>
 </tbody>
 </table>
-<p><strong>Nếu chỉ có một người làm cả hai luồng:</strong> chạy luồng A
-theo đúng thứ tự, chèn BR-01 vào ngày đầu vì nó mất khoảng một ngày và
-cho người làm chạm vào lớp tất định trước khi đụng tầng model. BR-06 và
-BR-07 đẩy sang chu kỳ 02, không cần giải trình, vì chúng là P1 và
-P2.</p>
-<p><strong>Nếu có hai người và một người sắp nghỉ:</strong> người sắp
-nghỉ nhận luồng A và <strong>dồn hết vào tuần 1</strong>. Giá trị lớn
-nhất họ để lại là thứ chưa nằm trong tài liệu, nên BR-03 và BR-04 làm
-<strong>theo cặp</strong>, và người ở lại là người <strong>viết tài liệu
-ngay trong lúc nghe</strong>, không để sau. Từ ngày họ nghỉ, kế hoạch
-giả định không hỏi được ai nữa.</p>
-<p>Chủ dự án: chốt §8.3, cấp Colab Pro và quyền đọc Drive
+<p>Biên dự phòng còn 1 đến 3 ngày. Nó mỏng, và phần lớn rủi ro ở §8.1
+đều ăn vào đúng phần biên đó.</p>
+<p><strong>Vì vậy BR-06 chuyển sang chu kỳ 02</strong>, xem §9. Bộ đo
+RAG cần khoảng 3 ngày và nó không nằm trên đường găng, nên giữ nó lại
+chỉ làm cả chu kỳ trượt. <strong>BR-07 giữ ở mức P2</strong>, làm nếu
+còn ngày, bỏ nếu không, không cần giải trình.</p>
+<p>Thà chở năm việc tới nơi còn hơn bảy việc dở dang.</p>
+<p>Chủ dự án: chốt §8.4, cấp Colab Pro và quyền đọc Drive
 <code>ANSER_AI_Logistics/</code>.</p>
 <h3 id="62-đường-găng">6.2. Đường găng</h3>
 <pre><code>BR-02 (đường chat cho client) ─► BR-03 (nối engine) ─► BR-04 (dựng + đo trên L4) ─► BR-05 (phiên đo)
@@ -1185,90 +1224,91 @@ trượt</strong>, nên nó hạn sớm nhất và giao cho người có ngữ c
 <thead>
 <tr>
 <th>Ngày</th>
-<th>Luồng A, đường găng</th>
-<th>Luồng B, biên rõ</th>
+<th>Thành</th>
 </tr>
 </thead>
 <tbody>
 <tr>
 <td><strong>T2 26/10</strong></td>
-<td>Đọc <code>serving.py</code> và <code>engine.py</code>, chốt thiết kế
-rẽ nhánh backend</td>
 <td>Dựng môi trường theo <a href="SO_TAY_NGUOI_MOI.md">sổ tay §2</a>, ra
-1003 passed. Làm bài tập 1 và 2</td>
+1003 passed. <strong>BR-01</strong></td>
 </tr>
 <tr>
 <td><strong>T3 27/10</strong></td>
-<td><strong>BR-02</strong></td>
-<td><strong>BR-01</strong></td>
+<td><strong>BR-01 hạn</strong>, có test hồi quy. Đọc
+<code>serving.py</code> và <code>engine.py</code>, chốt thiết kế rẽ
+nhánh backend</td>
 </tr>
 <tr>
 <td><strong>T4 28/10</strong></td>
-<td><strong>BR-02 hạn.</strong> Bắt đầu <strong>BR-03</strong></td>
-<td><strong>BR-01</strong> xong, có test hồi quy</td>
+<td><strong>BR-02</strong></td>
 </tr>
 <tr>
 <td><strong>T5 29/10</strong></td>
-<td><strong>BR-03 hạn</strong></td>
-<td>Cặp trên <strong>BR-03</strong>, và là người <strong>viết tài
-liệu</strong></td>
+<td><strong>BR-02 hạn</strong>. Bắt đầu <strong>BR-03</strong></td>
 </tr>
 <tr>
 <td><strong>T6 30/10</strong></td>
-<td><strong>BR-04 hạn</strong></td>
-<td>Cùng ngồi <strong>BR-04</strong> trên Colab, tự tay chạy một
-lượt</td>
+<td><strong>BR-03</strong></td>
 </tr>
 </tbody>
 </table>
 <h3 id="64-tuần-2-thứ-hai-0211-đến-thứ-sáu-0611">6.4. Tuần 2: Thứ Hai
 02/11 đến Thứ Sáu 06/11</h3>
-<p>Tuần 2 giả định người của luồng A có thể đã nghỉ, nên mọi việc dồn về
-người ở lại.</p>
 <table>
 <thead>
 <tr>
 <th>Ngày</th>
-<th>Việc</th>
+<th>Thành</th>
 </tr>
 </thead>
 <tbody>
 <tr>
 <td><strong>T2 02/11</strong></td>
-<td>Đọc lại tài liệu đã viết tuần 1. Chạy lại BR-04 <strong>một
-mình</strong> để chắc là làm được mà không cần hỏi ai</td>
+<td><strong>BR-03 hạn</strong>, kèm phép thử chứng minh server nhận được
+request</td>
 </tr>
 <tr>
 <td><strong>T3 03/11</strong></td>
-<td><strong>BR-06</strong> dựng bộ câu hỏi và nhãn</td>
+<td><strong>BR-04</strong>, dựng vLLM server trên Colab L4</td>
 </tr>
 <tr>
 <td><strong>T4 04/11</strong></td>
-<td><strong>BR-05 hạn.</strong> Phiên đo trên Colab. Đọc cảnh báo khung
-đo trước điểm số, rồi dựng bảng phân loại lỗi</td>
+<td><strong>BR-04 hạn</strong>, đo ba mức <code>max_model_len</code> với
+vision đang nạp, ghi quyết định vào ARCHITECTURE</td>
 </tr>
 <tr>
 <td><strong>T5 05/11</strong></td>
-<td><strong>BR-06 hạn.</strong> Báo cáo chỉ số RAG</td>
+<td><strong>BR-05 hạn</strong>, phiên đo bản fine-tune, dựng bảng phân
+loại lỗi</td>
 </tr>
 <tr>
 <td><strong>T6 06/11</strong></td>
-<td><strong>BR-07.</strong> Viết biên bản chu kỳ, cập nhật
-TIEN_TRINH_BRAIN và ARCHITECTURE</td>
+<td><strong>BR-07</strong> nếu còn ngày. Viết biên bản chu kỳ, cập nhật
+TIEN_TRINH_BRAIN</td>
 </tr>
 </tbody>
 </table>
+<blockquote>
+<p><strong>Hạn của BR-03 và BR-04 lùi so với bản trước</strong>, vì bản
+trước giả định hai người chạy song song. Một người thì chuỗi
+<code>BR-02 → BR-03 → BR-04</code> phải nối tiếp, và dồn cả ba vào tuần
+1 là đặt một hạn không ai giữ được.</p>
+</blockquote>
 <h3 id="65-hai-mốc-kiểm">6.5. Hai mốc kiểm</h3>
 <p><strong>M1, Thứ Sáu 30/10 cuối ngày.</strong> Trả lời đúng một câu:
-<em>một câu hỏi thật có đi trọn vòng từ <code>/chat</code> qua
-<code>VLLM_BASE_URL</code> tới vLLM server trên L4 và quay về không, và
-log của server có ghi nhận request đó không?</em></p>
-<p>Không đạt thì <strong>dừng BR-06 và BR-07</strong>, dồn toàn bộ tuần
-2 vào đường găng.</p>
+<em><code>VLLMServerClient</code> đã có đường chat chưa, và ba phép thử
+payload đã xanh chưa?</em> Tức là <code>chat_template_kwargs</code> có
+mặt, <code>guided_json</code> có mặt, và
+<code>repetition_penalty == 1.0</code> khi bật grammar.</p>
+<p>Đây là mốc giữa đường, không phải mốc &quot;chạy được đầu cuối&quot;. Với một
+người thì BR-03 chưa thể xong trong tuần 1.</p>
+<p>Không đạt thì <strong>bỏ BR-07 khỏi chu kỳ</strong> và báo ngay, vì
+nó nghĩa là đường găng đã ăn hết biên dự phòng.</p>
 <p><strong>M2, Thứ Sáu 06/11.</strong> Cổng ra chu kỳ, xem §7.</p>
 <hr />
 <h2 id="7-cổng-ra-chu-kỳ">7. Cổng ra chu kỳ</h2>
-<p>Chu kỳ 01 đạt khi đủ cả sáu:</p>
+<p>Chu kỳ 01 đạt khi đủ cả bảy:</p>
 <ul class="task-list">
 <li><label><input type="checkbox"></input><code>/chat</code> chạy qua
 <strong>vLLM server</strong> chứ không phải <code>vllm.LLM</code> trong
@@ -1296,8 +1336,8 @@ trường lạ, không còn tính bằng 0 rồi buộc tội sổ sách
 <li><label><input type="checkbox"></input><code>pytest -q</code> xanh và
 <code>ruff</code> sạch, đo trên đúng mã đã chạy phiên đo</label></li>
 <li><label><input type="checkbox"></input>Biên bản chu kỳ ghi: việc treo 1 và
-2 đóng hay mở, chỉ số RAG nếu có, chi phí thật, và danh sách đẩy sang
-chu kỳ 02</label></li>
+2 đóng hay mở, chi phí thật, và danh sách đẩy sang chu kỳ
+02</label></li>
 </ul>
 <p>Mỗi mục chưa đạt PHẢI có một dòng nêu lý do và người chịu trách nhiệm
 đẩy tiếp.</p>
@@ -1332,10 +1372,10 @@ chốt</h2>
 <code>pip install</code></td>
 </tr>
 <tr>
-<td>Brain-2 nghỉ sớm hơn dự kiến</td>
-<td>không có dấu hiệu báo trước</td>
-<td>Dồn BR-02 và BR-03 lên sớm. Brain-1 viết tài liệu <strong>trong
-lúc</strong> nghe, không để sau</td>
+<td><strong>Một người gánh cả đường găng</strong></td>
+<td>BR-02 trượt hạn Thứ Năm 29/10</td>
+<td>Biên dự phòng chỉ 1 đến 3 ngày (§6.1). Trượt BR-02 thì bỏ BR-07
+ngay, và báo để tính lại hạn BR-05 thay vì để nó trượt im lặng</td>
 </tr>
 <tr>
 <td>Phiên Colab hết giờ giữa chừng</td>
@@ -1398,7 +1438,54 @@ nạp</strong> ở mọi cấu hình. Đánh đổi chuyển sang ctx so với s
 </tr>
 </tbody>
 </table>
-<h3 id="84-còn-để-ngỏ">8.4. Còn để ngỏ</h3>
+<h3 id="84-bốn-quyết-định-bổ-sung-chốt-ngày-24102026">8.4. Bốn quyết
+định bổ sung, chốt ngày 24/10/2026</h3>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Câu hỏi</th>
+<th>Quyết định</th>
+<th>Đổi gì</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>5</td>
+<td>Ai nhận phần Brain</td>
+<td><strong>Thành</strong>, một người, cả hai luồng</td>
+<td>§6.1 xếp lại theo chuỗi nối tiếp. <strong>BR-06 chuyển sang chu kỳ
+02</strong>, BR-07 giữ P2. Hạn BR-03 lùi sang 02/11, BR-04 sang
+04/11</td>
+</tr>
+<tr>
+<td>6</td>
+<td>Nếu ctx 32k không vừa thì hạ ctx hay đẩy vision sang tiến trình
+riêng</td>
+<td><strong>Hạ ctx</strong>, vì dự án cần dựng được môi trường giả lập
+production để thử Brain</td>
+<td>BR-04 yêu cầu 7 bỏ phương án tách tiến trình. Thêm yêu cầu 8 (ctx
+phải đủ cho kế hoạch 3 tool kèm RAG) và yêu cầu 10 (runbook dựng lại
+được)</td>
+</tr>
+<tr>
+<td>7</td>
+<td>Nhánh <code>feat/brain-integration</code> của Body có gộp về
+<code>Dgsonn/ANSER-v2</code> không</td>
+<td><strong>Có, gộp sớm nếu cần</strong></td>
+<td>Xem <a href="PHAN_VIEC_CHU_KY_01.md">PHAN_VIEC_CHU_KY_01.md</a>
+BD-01</td>
+</tr>
+<tr>
+<td>8</td>
+<td>Đội Body tuần này gồm ai</td>
+<td><strong>Sĩ, Sơn, Nam</strong></td>
+<td>Xem <a href="PHAN_VIEC_CHU_KY_01.md">PHAN_VIEC_CHU_KY_01.md</a>
+§5</td>
+</tr>
+</tbody>
+</table>
+<h3 id="85-còn-để-ngỏ">8.5. Còn để ngỏ</h3>
 <table>
 <thead>
 <tr>
@@ -1410,20 +1497,19 @@ nạp</strong> ở mọi cấu hình. Đánh đổi chuyển sang ctx so với s
 <tbody>
 <tr>
 <td>1</td>
-<td><strong>Ai nhận luồng A, ai nhận luồng B</strong></td>
-<td>Sáng Thứ Hai 26/10, điền vào bảng §6.1. Chưa có người cho luồng B
-thì chạy phương án một người</td>
+<td><strong>Ctx chốt ở mức nào</strong>, và
+<code>ANSER_TEXT_MAX_CONCURRENT</code> theo đó là bao nhiêu</td>
+<td>Khi BR-04 có số đo, dự kiến Thứ Tư 04/11. Hỏi trước lúc có số là
+đoán</td>
 </tr>
 <tr>
 <td>2</td>
-<td><strong>Nếu BR-04 cho thấy 32k không vừa, chấp nhận ctx thấp hơn hay
-đẩy vision sang tiến trình riêng?</strong></td>
-<td>Khi có số đo, dự kiến Thứ Sáu 30/10. Hỏi trước lúc có số là
-đoán</td>
+<td><strong>Môi trường giả lập production đặt ở đâu</strong> khi rời
+Colab</td>
+<td>Chu kỳ 02. Colab không phục vụ traffic thật được (<a href="ARCHITECTURE.md">ARCHITECTURE.md §4.4</a>)</td>
 </tr>
 </tbody>
 </table>
-<hr />
 <h2 id="9-ngoài-phạm-vi-chu-kỳ-01">9. Ngoài phạm vi chu kỳ 01</h2>
 <p>Nêu ra để không ai làm, và để biết chúng chưa chết.</p>
 <table>
@@ -1443,7 +1529,9 @@ khi chạy nhiều tiến trình</td>
 </tr>
 <tr>
 <td><strong>Nối <code>vllm-vision</code> qua HTTP</strong></td>
-<td>TIEN_TRINH §7 thứ 5. Phụ thuộc kết quả đo ở BR-04</td>
+<td>TIEN_TRINH §7 thứ 5. Chủ dự án chốt 24/10: nếu thiếu chỗ thì
+<strong>hạ ctx</strong> chứ không tách tiến trình, vì cần dựng lại được
+môi trường giả lập production</td>
 <td>TIEN_TRINH §3 treo 3</td>
 </tr>
 <tr>
@@ -1463,10 +1551,16 @@ vì nó khó</td>
 <td>ROADMAP GĐ B</td>
 </tr>
 <tr>
-<td><strong><code>SCHEMA MAP</code> khớp ERD Body +
+<td><strong>Bộ đo RAG (BR-06)</strong></td>
+<td>Cần khoảng 3 ngày, không nằm trên đường găng, và chu kỳ này chỉ có
+một người. Đặc tả giữ nguyên tại chỗ để chu kỳ 02 dùng lại</td>
+<td>§BR-06 của chính tài liệu này</td>
+</tr>
+<tr>
+<td><strong><code>SCHEMA MAP</code> khớp lược đồ Body +
 <code>get_report_lines</code></strong></td>
-<td>ERD đã chốt nên nó sẵn sàng, nhưng nó không nằm trên đường găng của
-S2. Lấy làm việc đệm nếu BR-05 hoặc BR-06 xong sớm</td>
+<td>Chờ Body chốt một bản lược đồ duy nhất, xem PHAN_VIEC BD-02. Lấy làm
+việc đệm nếu BR-05 xong sớm</td>
 <td>GIAO_VIEC V3</td>
 </tr>
 <tr>

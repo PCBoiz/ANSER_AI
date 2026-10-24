@@ -100,21 +100,26 @@ Lược đồ 13 bảng mà [SRS §BR-03](SRS_CHU_KY_01.md) dựa vào là bản
 | Mã | Việc | Ưu tiên | Hạn | Phụ thuộc |
 |---|---|---|---|---|
 | BR-01 | `/tools/vat` từ chối trường lạ thay vì tính bằng 0 | P0 | T3 27/10 | không |
-| BR-02 | Thêm đường chat cho `VLLMServerClient` | P0 | T4 28/10 | không |
-| BR-03 | `engine.py` rẽ nhánh theo backend, kèm phép thử chứng minh thi hành | P0 | T5 29/10 | BR-02 |
-| BR-04 | Dựng vLLM server trên Colab L4, đo ngân sách ngữ cảnh | P0 | T6 30/10 | BR-03 |
-| BR-05 | Đo bản fine-tune, dựng bảng phân loại lỗi | P1 | T4 04/11 | BR-04 |
-| BR-06 | Bộ đo RAG | P1 | T5 05/11 | không |
+| BR-02 | Thêm đường chat cho `VLLMServerClient` | P0 | T5 29/10 | không |
+| BR-03 | `engine.py` rẽ nhánh theo backend, kèm phép thử chứng minh thi hành | P0 | T2 02/11 | BR-02 |
+| BR-04 | Dựng vLLM server trên Colab L4, đo ngân sách ngữ cảnh | P0 | T4 04/11 | BR-03 |
+| BR-05 | Đo bản fine-tune, dựng bảng phân loại lỗi | P1 | T5 05/11 | BR-04 |
 | BR-07 | Mở rộng cổng lint của CI | P2 | T6 06/11 | không |
+
+**Tất cả do Thành làm**, một người. Nên `BR-02 → BR-03 → BR-04 → BR-05` là một chuỗi **nối tiếp**, không có ai chạy song song để bù khi một mắt xích trượt. Ước lượng công là 7 đến 9 ngày trên 10 ngày làm việc, tức biên dự phòng chỉ 1 đến 3 ngày.
+
+**BR-06, bộ đo RAG, đã chuyển sang chu kỳ 02.** Nó cần khoảng 3 ngày và không nằm trên đường găng. Thà chở năm việc tới nơi còn hơn bảy việc dở dang.
 
 ### Body: đề nghị
 
-| Mã | Việc | Ưu tiên | Hạn đề nghị |
-|---|---|---|---|
-| **BD-01** | **Gộp `feat/brain-integration` về `Dgsonn/ANSER-v2`** | **P0** | T6 30/10 |
-| **BD-02** | **Chốt một bản `schema.ts` duy nhất** và báo cho Brain | **P0** | T3 27/10 |
-| BD-03 | Giữ phép thử hợp đồng đường dẫn chạy được, xem §6.4 | P1 | T2 02/11 |
-| BD-04 | Đưa Body lên chỗ khách truy cập được | P1 | T6 06/11 |
+| Mã | Việc | Ưu tiên | Người đề nghị | Hạn đề nghị |
+|---|---|---|---|---|
+| **BD-01** | **Gộp `feat/brain-integration` về `Dgsonn/ANSER-v2`** | **P0** | Sĩ chủ trì, Sơn cùng xử xung đột lược đồ | T6 30/10 |
+| **BD-02** | **Chốt một bản `schema.ts` duy nhất** và báo cho Brain | **P0** | Sơn | T3 27/10 |
+| BD-03 | Giữ phép thử hợp đồng đường dẫn chạy được, xem §6.4 | P1 | Nam | T2 02/11 |
+| BD-04 | Đưa Body lên chỗ khách truy cập được | P1 | Nam | T6 06/11 |
+
+> **Cột người là đề nghị theo hình dạng việc, không theo hiểu biết về năng lực từng người.** Đội Body đổi thoải mái, miễn mỗi việc có **đúng một người chịu trách nhiệm**. Lý do xếp như trên: BD-01 là việc nặng nhất và dính lược đồ nên ghép hai người; BD-02 nằm ở tầng DB nên để cùng người xử xung đột lược đồ; BD-03 và BD-04 độc lập nên một người chạy song song được.
 
 #### BD-01. Gộp nhánh tích hợp về bản chính
 
@@ -206,23 +211,25 @@ Xem BD-03. Brain giữ phép thử, Body báo khi `brain.ts` đổi.
 
 ### Tuần 1: Thứ Hai 26/10 đến Thứ Sáu 30/10
 
-| Ngày | Brain | Body |
+| Ngày | Brain · Thành | Body · Sĩ, Sơn, Nam |
 |---|---|---|
-| **T2 26/10** | Chốt ai nhận luồng nào (SRS §6.1). Đọc `serving.py`, `engine.py` | Lấy 6 commit của `master` về `feat/brain-integration`, xử xung đột `schema.ts` |
-| **T3 27/10** | BR-01 · BR-02 | **BD-02 hạn 17h**, trả lời bốn câu về lược đồ |
-| **T4 28/10** | **BR-02 hạn.** Bắt đầu BR-03 | Gộp tiếp, chạy `pnpm lint` và `npx tsc --noEmit` |
-| **T5 29/10** | **BR-03 hạn**, phép thử chứng minh server nhận request | Mở PR ngược lên `Dgsonn/ANSER-v2` |
-| **T6 30/10** | **BR-04 hạn**, dựng server trên L4, đo ngân sách ngữ cảnh | **BD-01 hạn**, PR gộp xong |
+| **T2 26/10** | Dựng môi trường, ra 1003 passed. **BR-01** | **Sơn** lấy 6 commit của `master` về nhánh, xử xung đột `schema.ts`. **Nam** rà chỗ đặt cho BD-04 |
+| **T3 27/10** | **BR-01 hạn.** Đọc `serving.py`, `engine.py`, chốt thiết kế rẽ nhánh backend | **BD-02 hạn 17h**, Sơn trả lời bốn câu về lược đồ |
+| **T4 28/10** | **BR-02** | **Sĩ** gộp tiếp, chạy `pnpm lint` và `npx tsc --noEmit` |
+| **T5 29/10** | **BR-02 hạn.** Bắt đầu **BR-03** | **Sĩ** mở PR ngược lên `Dgsonn/ANSER-v2` |
+| **T6 30/10** | **BR-03** | **BD-01 hạn**, PR gộp xong |
 
 ### Tuần 2: Thứ Hai 02/11 đến Thứ Sáu 06/11
 
-| Ngày | Brain | Body |
+| Ngày | Brain · Thành | Body · Sĩ, Sơn, Nam |
 |---|---|---|
-| **T2 02/11** | Chạy lại BR-04 một mình, xác nhận làm được không cần hỏi ai | **BD-03**, thống nhất cách báo khi `brain.ts` đổi |
-| **T3 03/11** | BR-06 dựng bộ câu hỏi và nhãn | Chỉ báo AI ba trạng thái (§6.2) · xử 503 (§6.3) |
-| **T4 04/11** | **BR-05 hạn**, phiên đo và bảng phân loại lỗi | BD-04 chuẩn bị chỗ đặt |
-| **T5 05/11** | **BR-06 hạn**, báo cáo chỉ số RAG | BD-04 |
-| **T6 06/11** | BR-07 · viết biên bản chu kỳ | **BD-04 hạn** · cùng viết biên bản |
+| **T2 02/11** | **BR-03 hạn**, kèm phép thử chứng minh server nhận request | **BD-03 hạn**, Nam thống nhất cách báo khi `brain.ts` đổi |
+| **T3 03/11** | **BR-04**, dựng vLLM server trên Colab L4 | Chỉ báo AI ba trạng thái (§6.2) · xử 503 (§6.3) |
+| **T4 04/11** | **BR-04 hạn**, đo ba mức `max_model_len` với vision đang nạp | **Nam** chuẩn bị chỗ đặt cho BD-04 |
+| **T5 05/11** | **BR-05 hạn**, phiên đo và bảng phân loại lỗi | BD-04 |
+| **T6 06/11** | **BR-07** nếu còn ngày · viết biên bản | **BD-04 hạn** · cùng viết biên bản |
+
+> **Hạn phía Brain lùi so với bản trước**, vì bản trước giả định hai người chạy song song. Một người thì `BR-02 → BR-03 → BR-04` phải nối tiếp, và dồn cả ba vào tuần 1 là đặt một hạn không ai giữ được.
 
 ---
 
@@ -234,7 +241,7 @@ Hai đội ngồi với nhau đúng hai lần. Ngoài hai buổi này thì làm 
 
 | Bên | Câu hỏi |
 |---|---|
-| Brain | Một câu hỏi thật có đi trọn vòng từ `/chat` qua `VLLM_BASE_URL` tới vLLM server trên L4 và quay về không, và log server có ghi nhận request đó không? |
+| Brain | `VLLMServerClient` đã có đường chat chưa, và ba phép thử payload đã xanh chưa? Tức `chat_template_kwargs`, `guided_json`, và `repetition_penalty == 1.0` khi bật grammar. Đây là mốc giữa đường: một người thì BR-03 chưa thể xong trong tuần 1 |
 | Body | Cài Body sạch từ `Dgsonn/ANSER-v2` có thấy chỉ báo AI và trang Hướng dẫn dùng không? |
 
 Bên nào không đạt thì **dừng việc P1 và P2 của bên đó**, dồn vào đường găng.
@@ -256,18 +263,29 @@ Bên nào không đạt thì **dừng việc P1 và P2 của bên đó**, dồn 
 
 ---
 
-## 10. Chủ dự án cần quyết
+## 10. Bốn quyết định của chủ dự án, chốt ngày 24/10/2026
 
-| # | Câu hỏi | Chặn gì | Hạn |
+| # | Câu hỏi | Quyết định | Đổi gì trong tài liệu này |
 |---|---|---|---|
-| 1 | **`feat/brain-integration` có gộp về `Dgsonn/ANSER-v2` không, hay Body đi tiếp trên bản chính và bỏ nhánh đó?** | BD-01, tức bốn tính năng ROADMAP đang đánh ✅ | T2 26/10 |
-| 2 | Ai nhận luồng A và luồng B bên Brain | Lịch tuần 1 của Brain | T2 26/10 |
-| 3 | Đội Body có người làm trong hai tuần này không, và là ai | Toàn bộ cột Body | T2 26/10 |
-| 4 | Nếu BR-04 cho thấy ctx 32k không vừa: hạ ctx, hay đẩy vision sang tiến trình riêng | Quyết định kiến trúc cuối tuần 1 | khi có số đo, T6 30/10 |
+| 1 | `feat/brain-integration` có gộp về `Dgsonn/ANSER-v2` không | **Có, gộp sớm nếu cần** | BD-01 giữ P0, hạn T6 30/10. Bốn tính năng ROADMAP đánh dấu đã xong sẽ về đúng sản phẩm |
+| 2 | Ai nhận phần Brain | **Thành**, một người, cả hai luồng | Chuỗi BR-02 → BR-03 → BR-04 → BR-05 thành nối tiếp. **BR-06 sang chu kỳ 02.** Hạn Brain lùi, xem §7 |
+| 3 | Đội Body tuần này gồm ai | **Sĩ, Sơn, Nam** | §5 có cột người đề nghị theo hình dạng việc |
+| 4 | Nếu ctx 32k không vừa thì hạ ctx hay đẩy vision sang tiến trình riêng | **Hạ ctx**, vì cần dựng được môi trường giả lập production để thử Brain | Phương án tách tiến trình `vllm-vision` rời khỏi bàn trong chu kỳ này. Xem [SRS §BR-04](SRS_CHU_KY_01.md) yêu cầu 7 đến 10 |
 
-Câu 1 là câu đáng quyết nhất. Nếu bỏ nhánh tích hợp thì bốn tính năng kia phải làm lại, và ROADMAP phải sửa dấu ✅ thành ❌ để không ai tin nhầm lần nữa.
+### 10.1. Hai thứ còn để ngỏ
 
----
+| # | Câu hỏi | Khi nào cần trả lời |
+|---|---|---|
+| 1 | **Ctx chốt ở mức nào**, và `ANSER_TEXT_MAX_CONCURRENT` theo đó là bao nhiêu | Khi BR-04 có số đo, dự kiến T4 04/11 |
+| 2 | **Môi trường giả lập production đặt ở đâu** khi rời Colab | Chu kỳ 02. Colab không phục vụ traffic thật được |
+
+### 10.2. Một hệ quả của quyết định 2 cần nói thẳng
+
+Brain có **một người** và đường găng là một chuỗi bốn việc nối tiếp, biên dự phòng 1 đến 3 ngày. Body có **ba người** cho bốn việc phần lớn chạy song song được.
+
+Nghĩa là rủi ro trượt tập trung gần hết ở phía Brain, và nó không giảm được bằng cách thêm người vào giữa chu kỳ: `BR-02 → BR-03` là tri thức nối tiếp, người thứ hai vào lúc này sẽ làm chậm người thứ nhất trước khi giúp được.
+
+Cách giảm rủi ro thật sự nằm ở chỗ khác: **cắt phạm vi sớm**. BR-06 đã cắt. Nếu M1 ngày 30/10 không đạt thì cắt tiếp BR-07, và nếu BR-04 trượt sang tuần sau thì BR-05 lùi sang chu kỳ 02 thay vì ép cả hai vào hai ngày cuối.
 
 ## 11. Tham chiếu
 
