@@ -77,6 +77,18 @@ R1 có một hệ quả dễ bỏ qua: **"chưa biết" khác "bằng 0"**. `Non
 
 ## 2. Cài đặt và chạy trên máy bạn
 
+> ### Trước khi đọc mục này: hệ thống chạy thật ở đâu
+>
+> **Tính đến 24/10/2026, chưa ở đâu cả.** Không có môi trường nào khách truy cập được. [ROADMAP.md](ROADMAP.md) ghi ô *"Đưa lên chỗ khách truy cập được"* là ❌ chưa, và đó là ô đỏ duy nhất còn lại của Giai đoạn B.
+>
+> Nghĩa là toàn bộ mục 2 này hướng dẫn dựng **môi trường phát triển**, và hiện nó cũng là môi trường duy nhất tồn tại. Đừng đọc nó như mô tả cách sản phẩm vận hành.
+>
+> Đây không phải chi tiết nhỏ. Sáu phép kiểm sổ sách đã tìm ra 5.596.500đ giá vốn không ghi và 157/160 mã sai diện thuế trên dữ liệu thật của khách, mà khách **chưa có đường nào tự chạy chúng**.
+>
+> Đòn bẩy làm việc này khả thi: lớp sinh ra giá trị **không cần GPU và không cần model**. Chạy `RUNTIME_PROFILE=minimal` thì Brain phục vụ toàn bộ `/tools/*` trên một máy CPU rẻ tiền, còn nhánh `/chat` tắt theo thiết kế. Đã kiểm ngày 24/10, xem [SRS_CHU_KY_01.md §2.3](SRS_CHU_KY_01.md).
+>
+> Kế hoạch đóng ô đỏ đó, kèm người và hạn: [SRS_CHU_KY_01.md](SRS_CHU_KY_01.md).
+
 ### 2.1. Cần gì
 
 | Thứ | Phiên bản | Ghi chú |
@@ -802,7 +814,8 @@ Mỗi dòng kèm lý do. Phần lớn lý do là một sự cố đã xảy ra.
 | Hình vẽ C4, phụ thuộc giữa module, ngân sách VRAM | [ARCHITECTURE_DIAGRAMS.md](ARCHITECTURE_DIAGRAMS.md) |
 | Đang ở đâu, cái gì đã chắc, cái gì đang dở | [TIEN_TRINH_BRAIN.md](TIEN_TRINH_BRAIN.md) |
 | Lộ trình sản phẩm, cổng ra từng giai đoạn | [ROADMAP.md](ROADMAP.md) |
-| Việc tiếp theo, đã xếp thứ tự | [GIAO_VIEC_BRAIN.md](GIAO_VIEC_BRAIN.md) |
+| **Việc của chu kỳ này, có người và hạn** | [SRS_CHU_KY_01.md](SRS_CHU_KY_01.md) |
+| Bảy việc dài hạn, đã xếp thứ tự | [GIAO_VIEC_BRAIN.md](GIAO_VIEC_BRAIN.md) |
 | Chạy thử nội bộ, kịch bản từng bước | [CHAY_THU_NOI_BO.md](CHAY_THU_NOI_BO.md) |
 | Mảng vận tải, và ba mảng nghiên cứu sâu | [BAN_GIAO_VAN_TAI.md](BAN_GIAO_VAN_TAI.md) |
 | Kế hoạch RAG và VLM | [RAG_VLM_KE_HOACH.md](RAG_VLM_KE_HOACH.md) |

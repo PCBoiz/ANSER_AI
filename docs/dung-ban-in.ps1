@@ -23,6 +23,7 @@ $ErrorActionPreference = "Continue"
 $TaiLieu = @{
     "SO_TAY_NGUOI_MOI" = "ANSER Brain - So tay cho nguoi moi"
     "GIAO_VIEC_BRAIN"  = "ANSER Brain - Ho so ban giao"
+    "SRS_CHU_KY_01"    = "ANSER - SRS chu ky 01"
 }
 
 function Tim-Lenh([string[]]$duongDan, [string]$ten) {

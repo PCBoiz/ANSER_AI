@@ -527,6 +527,27 @@ chứ không điền 0.</p>
 <hr />
 <h2 id="2-cài-đặt-và-chạy-trên-máy-bạn">2. Cài đặt và chạy trên máy
 bạn</h2>
+<blockquote>
+<h3 id="trước-khi-đọc-mục-này-hệ-thống-chạy-thật-ở-đâu">Trước khi đọc
+mục này: hệ thống chạy thật ở đâu</h3>
+<p><strong>Tính đến 24/10/2026, chưa ở đâu cả.</strong> Không có môi
+trường nào khách truy cập được. <a href="ROADMAP.md">ROADMAP.md</a> ghi
+ô <em>&quot;Đưa lên chỗ khách truy cập được&quot;</em> là ❌ chưa, và đó là ô đỏ
+duy nhất còn lại của Giai đoạn B.</p>
+<p>Nghĩa là toàn bộ mục 2 này hướng dẫn dựng <strong>môi trường phát
+triển</strong>, và hiện nó cũng là môi trường duy nhất tồn tại. Đừng đọc
+nó như mô tả cách sản phẩm vận hành.</p>
+<p>Đây không phải chi tiết nhỏ. Sáu phép kiểm sổ sách đã tìm ra
+5.596.500đ giá vốn không ghi và 157/160 mã sai diện thuế trên dữ liệu
+thật của khách, mà khách <strong>chưa có đường nào tự chạy
+chúng</strong>.</p>
+<p>Đòn bẩy làm việc này khả thi: lớp sinh ra giá trị <strong>không cần
+GPU và không cần model</strong>. Chạy
+<code>RUNTIME_PROFILE=minimal</code> thì Brain phục vụ toàn bộ
+<code>/tools/*</code> trên một máy CPU rẻ tiền, còn nhánh
+<code>/chat</code> tắt theo thiết kế. Đã kiểm ngày 24/10, xem <a href="SRS_CHU_KY_01.md">SRS_CHU_KY_01.md §2.3</a>.</p>
+<p>Kế hoạch đóng ô đỏ đó, kèm người và hạn: <a href="SRS_CHU_KY_01.md">SRS_CHU_KY_01.md</a>.</p>
+</blockquote>
 <h3 id="21-cần-gì">2.1. Cần gì</h3>
 <table>
 <thead>
@@ -1973,7 +1994,11 @@ dưới</td>
 <td><a href="ROADMAP.md">ROADMAP.md</a></td>
 </tr>
 <tr>
-<td>Việc tiếp theo, đã xếp thứ tự</td>
+<td><strong>Việc của chu kỳ này, có người và hạn</strong></td>
+<td><a href="SRS_CHU_KY_01.md">SRS_CHU_KY_01.md</a></td>
+</tr>
+<tr>
+<td>Bảy việc dài hạn, đã xếp thứ tự</td>
 <td><a href="GIAO_VIEC_BRAIN.md">GIAO_VIEC_BRAIN.md</a></td>
 </tr>
 <tr>
