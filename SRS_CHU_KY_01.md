@@ -1,9 +1,13 @@
-# SRS — Đặc tả yêu cầu phần mềm, chu kỳ 01
+# SRS — Đặc tả yêu cầu, Brain, chu kỳ 01
 
 **Chu kỳ:** Thứ Hai 26/10/2026 → Thứ Sáu 06/11/2026 (10 ngày làm việc)
-**Lập ngày:** 24/10/2026 · **Mốc mã nguồn:** `feat/workflow-format-and-deterministic-core` @ `3a96ea8`
-**Phạm vi:** repo Brain (`PCBoiz/ANSER_AI`) và repo Body (`Dgsonn/ANSER-v2`)
+**Lập ngày:** 24/10/2026 · **Mốc mã nguồn:** `feat/workflow-format-and-deterministic-core` @ `645f4a1`
+**Phạm vi:** chỉ repo Brain (`PCBoiz/ANSER_AI`). Body có bản bàn giao riêng
 **Trạng thái:** bản thảo, chờ chủ dự án chốt §8.3
+
+> **Đính chính bản trước.** Bản SRS đầu (24/10, sáng) đặt trọng tâm vào việc triển khai lớp kế toán trên máy CPU, và đẩy **S2** cùng **phiên đo Colab** vào mục ngoài phạm vi. Đó là sai: [AGENTS.md §8](AGENTS.md) đặt S2 là việc **🔵 kế tiếp**, và [TIEN_TRINH_BRAIN.md §7](TIEN_TRINH_BRAIN.md) đặt phiên đo Colab là việc **số 1**. Bản này dựng lại quanh đúng hai thứ đó.
+>
+> Phần còn đúng của bản trước được giữ: khuyết tật `/tools/vat` (BR-01) và khoảng trống triển khai. Khoảng trống triển khai nay nằm ở §9 kèm lý do, thay vì chiếm chỗ của S2.
 
 ---
 
@@ -11,11 +15,13 @@
 
 ### 1.1. Nó là gì, và không là gì
 
-Đây là **đặc tả cho người viết mã**, không phải bản mô tả nghiệp vụ gửi khách. Mỗi yêu cầu trong §4 và §5 có một tiêu chí nghiệm thu **chạy được bằng một lệnh**. Yêu cầu nào không kiểm được bằng lệnh thì nó chưa phải yêu cầu, nó là một mong muốn, và nó không được nằm trong tài liệu này.
+Đây là **đặc tả cho người viết mã**. Mỗi yêu cầu ở §4 và §5 có một tiêu chí nghiệm thu **chạy được bằng một lệnh**. Yêu cầu nào không kiểm được bằng lệnh thì nó chưa phải yêu cầu, nó là một mong muốn, và nó không được nằm trong tài liệu này.
 
-Nó cũng không thay [SO_TAY_NGUOI_MOI.md](SO_TAY_NGUOI_MOI.md) (dựng môi trường, hiểu mã) hay [GIAO_VIEC_BRAIN.md](GIAO_VIEC_BRAIN.md) (bảy việc dài hạn kèm bối cảnh). Tài liệu này cắt ra **đúng phần làm trong hai tuần tới**, gán người và hạn.
+Nó **chỉ nói về Brain**. Công việc của Body nằm ở bản bàn giao riêng của Body. Chỗ nào Brain phụ thuộc Body, tài liệu này nêu đúng thứ cần và để nguyên ở đó.
 
-### 1.2. Mẫu một yêu cầu, dùng lại cho chu kỳ sau
+Nó không thay [SO_TAY_NGUOI_MOI.md](SO_TAY_NGUOI_MOI.md) (dựng môi trường, hiểu mã) hay [GIAO_VIEC_BRAIN.md](GIAO_VIEC_BRAIN.md) (bảy việc dài hạn kèm bối cảnh). Tài liệu này cắt ra đúng phần làm trong hai tuần tới, gán người và hạn.
+
+### 1.2. Khuôn một yêu cầu, dùng lại cho chu kỳ sau
 
 Chu kỳ 02 viết theo đúng khuôn này. Sáu mục, không thêm không bớt:
 
@@ -31,80 +37,85 @@ Chu kỳ 02 viết theo đúng khuôn này. Sáu mục, không thêm không bớ
 **Nghiệm thu**    lệnh chạy được, kèm đầu ra mong đợi. Người khác chạy phải ra
                   cùng kết quả mà không cần hỏi gì thêm.
 
-**Ngoài yêu cầu**  nói rõ cái gì KHÔNG thuộc phạm vi, để tránh phình việc.
+**Ngoài yêu cầu** nói rõ cái gì KHÔNG thuộc phạm vi, để tránh phình việc.
 ```
 
-Mục **Ngoài yêu cầu** là mục hay bị bỏ nhất và cũng là mục cứu nhiều thời gian nhất.
+Mục **Ngoài yêu cầu** hay bị bỏ nhất và cứu nhiều thời gian nhất.
 
 ### 1.3. Quy ước mã và mức ưu tiên
 
 | Tiền tố | Nghĩa |
 |---|---|
 | `BR-` | Yêu cầu thuộc repo Brain |
-| `BD-` | Yêu cầu thuộc repo Body. **Đây là đề xuất đặc tả**, xem §2.1 |
-| `CH-` | Yêu cầu cần cả hai bên cùng làm mới nghiệm thu được |
 | `NFR-` | Yêu cầu phi chức năng, áp cho mọi yêu cầu chức năng |
 
 | Mức | Nghĩa |
 |---|---|
-| **P0** | Không xong thì cổng ra chu kỳ (§7) không mở. Trượt P0 là trượt cả chu kỳ |
-| **P1** | Cần cho chu kỳ, nhưng trượt thì vẫn mở được cổng với ghi chú |
+| **P0** | Không xong thì cổng ra chu kỳ (§7) không mở |
+| **P1** | Cần cho chu kỳ, trượt thì vẫn mở được cổng kèm ghi chú |
 | **P2** | Làm nếu còn thời gian. Trượt thì đẩy sang chu kỳ 02, không cần giải trình |
 
 ### 1.4. Từ khoá mức bắt buộc
 
-**PHẢI** là điều kiện nghiệm thu, thiếu nó thì yêu cầu chưa xong. **NÊN** là khuyến nghị mạnh, bỏ qua thì phải ghi lý do vào PR. **CÓ THỂ** là tuỳ chọn, không ai phải giải trình.
+**PHẢI** là điều kiện nghiệm thu. **NÊN** là khuyến nghị mạnh, bỏ qua thì ghi lý do vào PR. **CÓ THỂ** là tuỳ chọn.
 
 ---
 
 ## 2. Bối cảnh
 
-### 2.1. Hai thành phần và ranh giới sửa đổi
+### 2.1. Brain làm gì, và ranh giới
 
-| | **Brain** | **Body** |
+Brain là dịch vụ FastAPI cung cấp năng lực AI qua HTTP: lõi tính toán tất định (`/tools/*`), hỏi đáp có vòng agentic (`/chat`), đọc tài liệu (`/knowledge`), đọc ảnh hoá đơn (`/ocr`). Body gọi vào, n8n gọi vào.
+
+Theo [AGENTS.md §1](AGENTS.md), người làm Brain **không sửa repo Body**. Chu kỳ này không có yêu cầu nào cần Body đổi.
+
+### 2.2. Lộ trình nói việc kế tiếp là gì
+
+Hai tài liệu kiểm soát, cùng chỉ một hướng:
+
+**[AGENTS.md §8](AGENTS.md)** liệt kê tám hạng mục đã xong và một hạng mục kế tiếp:
+
+> **S2** · Hạ tầng: **vLLM server riêng, Qwen3-8B, ctx 32k, Redis, Cloudflare Tunnel** · 🔵 **Kế tiếp**
+
+**[TIEN_TRINH_BRAIN.md §7](TIEN_TRINH_BRAIN.md)** đề nghị thứ tự:
+
+| # | Việc | Chặn bởi |
 |---|---|---|
-| Repo | `PCBoiz/ANSER_AI` | `Dgsonn/ANSER-v2` |
-| Công nghệ | Python, FastAPI | Next.js, Neon Postgres, Drizzle |
-| Vai trò | Năng lực AI và lõi tính toán tất định, phục vụ qua HTTP | Giao diện, đăng nhập, dữ liệu nghiệp vụ |
+| 1 | **Phiên đo Colab** | một buổi GPU L4 |
+| 2 | **Bộ đo RAG** | không |
+| 3 | Kế toán thật rà kết quả | tìm được người |
+| 4 | Nối `redis` cho TASK_REGISTRY | không, chưa gấp |
+| 5 | Nối `vllm-vision` qua HTTP | không |
 
-Theo [AGENTS.md §1](AGENTS.md), người làm Brain **không được sửa repo Body**. Vì vậy mọi yêu cầu `BD-` trong tài liệu này là **bản đặc tả đề xuất**: đội Body đọc, phản hồi, rồi tự quyết cách làm. Chúng nằm chung một tài liệu vì chúng chặn nhau, và tách ra hai tài liệu là cách chắc chắn để hai bên hiểu khác nhau về cùng một hợp đồng.
+Việc 1 và 2 làm song song được, vì một cần GPU và một không.
 
-### 2.2. Vì sao chu kỳ này tồn tại
+**Chu kỳ 01 nhận nửa đầu của S2 cộng việc 1 và 2.** S2 lớn hơn một chu kỳ: Redis, vision qua HTTP và Cloudflare Tunnel sang chu kỳ 02, lý do ở §9.
 
-[ROADMAP.md](ROADMAP.md) đặt cổng ra Giai đoạn B như sau:
+### 2.3. Ràng buộc phần cứng, và vì sao L4 là sàn
 
-> *Kế toán của Hoàng Phát tự tải file lên, tự đọc kết quả, **không cần ai ngồi cạnh**.*
+Model text là **`Qwen/Qwen3-8B`** ở định dạng AWQ 4-bit. Không có Qwen3.5 ở đâu trong repo; rà toàn bộ mã, tài liệu và notebook cho ra 22 lần nhắc `Qwen3-8B` và không lần nào nhắc 3.5.
 
-Bảng trạng thái của chính ROADMAP cho thấy mọi ô khác đã xanh, trừ một ô:
+Ngân sách VRAM theo [ARCHITECTURE.md §5.1](ARCHITECTURE.md):
 
-| Việc | Trạng thái |
+| Thành phần | VRAM |
 |---|---|
-| Hai màn hình Dòng tiền + Cảnh báo sổ sách | ✅ 20/20 ca |
-| Nạp file qua giao diện | ✅ 4 loại file MISA |
-| Chạy trên máy mình | ✅ Brain 8000 + Body 3100 |
-| Xác thực chặn đúng | ✅ quét 24 endpoint |
-| Hướng dẫn cho người không phải kỹ thuật | ✅ |
-| **Đưa lên chỗ khách truy cập được** | ❌ **chưa** |
+| Qwen3-8B AWQ, weights | ~5,5 GB |
+| KV-cache ở ctx 32k, batch vừa | ~5,0 GB |
+| Qwen2.5-VL-3B AWQ, vision | ~3,0 GB |
+| Embedding + reranker | ~0,8 GB |
+| Đệm | ~0,7 GB |
+| **Tổng** | **~15,0 GB** |
 
-Toàn bộ tài liệu kỹ thuật hiện có, kể cả sổ tay người mới viết tuần trước, hướng dẫn **chạy trên máy mình**. Đó là mô tả đúng hiện trạng, và hiện trạng đó là vấn đề: sáu phép kiểm sổ sách đã tìm ra 5.596.500đ giá vốn không ghi và 157/160 mã sai diện thuế trên dữ liệu thật của khách, nhưng khách **không có đường nào để tự chạy chúng**.
+Con số đó là **kế hoạch**, chưa phải đo thật. Hiện trạng trong mã khác kế hoạch ở hai chỗ, và cả hai đều ăn thêm VRAM:
 
-**Mục tiêu chu kỳ 01: đóng đúng ô đỏ đó.**
+1. Vision nạp qua `transformers` ở **bf16**, không phải AWQ. Chú thích [`engine.py`](src/core/engine.py) ghi: *"VRAM bf16: Qwen2-VL-2B ~4,5GB, Qwen2.5-VL-3B ~7,5GB"*.
+2. `gpu_memory_utilization = 0.55` là **phần giữ chỗ** của vLLM, không phải phần dùng thật. Trên L4 22,5GB thì 0,55 ≈ 12,4GB.
 
-### 2.3. Đòn bẩy kỹ thuật làm mục tiêu này khả thi trong hai tuần
+Cộng lại: 12,4 + 7,5 ≈ **19,9GB trên một card 22,5GB**. Chú thích trong mã gọi đúng tên tình trạng này là *"rất sát trần"*, và đó là lý do embedder với reranker của RAG chạy CPU.
 
-Lớp sinh ra giá trị **không cần GPU và không cần model**. Kiểm ngày 24/10/2026 bằng `RUNTIME_PROFILE=minimal`:
+Hệ quả cho chu kỳ này: **L4 22,5GB là sàn, T4 16GB không đủ** ([PHIEN_DO_COLAB.md](PHIEN_DO_COLAB.md) nêu thẳng). Và yêu cầu `ctx 32k` của S2 **chưa ai đo** trên cấu hình thật, nên BR-04 tồn tại để đo chứ không để khẳng định.
 
-```
-GET  /health              -> {"status":"ok","runtime_profile":"minimal",
-                              "auth_enabled":true,"engine_ready":false}
-GET  /tools   (no token)  -> 401
-GET  /tools   (token)     -> 200
-POST /tools/inventory-audit -> 2 phát hiện, money_impact 1.218.356đ
-```
-
-Nghĩa là Brain triển khai được lên **một máy CPU rẻ tiền**, phục vụ toàn bộ `/tools/*`, trong khi nhánh `/chat` cần model thì tạm tắt theo thiết kế. Không phải chờ thuê GPU, không phải chờ nối vLLM server.
-
-### 2.4. Hiện trạng đo được, mốc `3a96ea8`
+### 2.4. Hiện trạng đo được, mốc `645f4a1`
 
 | Hạng mục | Lệnh | Kết quả |
 |---|---|---|
@@ -112,47 +123,50 @@ Nghĩa là Brain triển khai được lên **một máy CPU rẻ tiền**, ph�
 | Lint | `ruff check src tests offline_training` | sạch |
 | Kiểu tĩnh | `mypy` theo danh sách CI | sạch |
 | Secret toàn lịch sử git | `git log --all -S` 5 mẫu | sạch, mọi khớp là fixture |
+| Nhánh chưa gộp | `git log origin/feat/lop-provider-cho-benchmark ^HEAD` | rỗng, đã gộp hết |
 
 ### 2.5. Ràng buộc bất biến
 
-Năm ràng buộc R1–R5 ở [AGENTS.md](AGENTS.md) áp cho mọi yêu cầu dưới đây, không có ngoại lệ. Bản rút gọn: LLM không tính toán; dữ liệu khách không tới LLM bên thứ ba; hạ tầng ≤ 5.000.000đ/tháng; một khái niệm một nguồn; không hardcode phần cứng.
+R1–R5 ở [AGENTS.md](AGENTS.md) áp cho mọi yêu cầu, không ngoại lệ. Bản rút gọn: LLM không tính toán; dữ liệu khách không tới LLM bên thứ ba; hạ tầng ≤ 5.000.000đ/tháng; một khái niệm một nguồn; không hardcode phần cứng.
 
 ---
 
-## 3. Giao diện ngoài
+## 3. Kiến trúc đích của chu kỳ
 
-### 3.1. Actor
+### 3.1. Hiện trạng đường sinh text
 
-| Actor | Làm gì trong chu kỳ này |
-|---|---|
-| **Kế toán Hoàng Phát** | Đăng nhập, tải file MISA, đọc phát hiện. Đây là người mà cổng ra §7 đo |
-| **Chủ doanh nghiệp** | Xem dòng tiền và cảnh báo sổ sách |
-| **Đội Brain / Body** | Vận hành, đọc log, sửa |
-| **n8n** | Gọi `/tools/*` theo lịch. Ngoài phạm vi chu kỳ này |
+```
+chat.py ─► manager ─► ModelEngine.generate_chat
+                           │
+                           ├─ tokenizer = self.llm.get_tokenizer()
+                           ├─ apply_chat_template(enable_thinking=False)
+                           └─ run_in_executor ─► vllm.LLM.generate   ◄── TRONG TIẾN TRÌNH
+```
 
-### 3.2. Hợp đồng HTTP Body ↔ Brain
+`vllm.LLM` là **API chạy lô ngoại tuyến**. Mỗi lệnh `.generate()` chạy trọn một vòng lập lịch cho đúng lô đưa vào. Đưa vào một prompt nghĩa là lô kích thước một, nên **continuous batching bị vô hiệu hoá hoàn toàn**. Thêm vào đó, `run_in_executor` cho nhiều luồng cùng gọi một đối tượng không thread-safe. Đó là nguyên nhân hiện tượng "quá tải, treo" mà [ARCHITECTURE.md §5.4](ARCHITECTURE.md) mô tả.
 
-Đang có và **không được đổi** trong chu kỳ này, trừ phần §4 nêu rõ:
+### 3.2. Đích
 
-| Đường | Dùng cho | Xác thực |
-|---|---|---|
-| `GET /health` | Body hiển thị chỉ báo AI | **Không** cần token, cố ý |
-| `GET /tools` | manifest | `X-API-Token` |
-| `POST /tools/*` | lớp tất định | `X-API-Token` |
-| `POST /chat` | hỏi đáp AI | `X-API-Token` + `X-User-Id` + `X-Store-Id` |
-| `GET /api/v1/task/{id}` | lấy kết quả | `X-API-Token` + `X-User-Id` (kiểm chủ sở hữu) |
+```
+chat.py ─► manager ─► ModelEngine.generate_chat
+                           │
+                           └─ VLLMServerClient ──HTTP──► vllm serve Qwen3-8B
+                                                          (tiến trình riêng, cổng 8001)
+```
 
-`tests/test_body_contract.py` đọc thẳng `brain.ts` của Body để khoá hợp đồng này.
+`src/core/serving.py` đã có sẵn `VLLMServerClient`, `ConcurrencyGuard`, `CompletionRequest` mang được `guided_json`, và 395 dòng test. **Chưa caller nào gọi nó.** `engine.py` import từ `serving` đúng một thứ: `guard_from_env`.
 
-### 3.3. Ba hồ sơ chạy của Brain
+### 3.3. Ba cái bẫy đã xác định trong đường server
 
-Biến `RUNTIME_PROFILE`, đọc ở [`dependencies.py:20`](src/api/dependencies.py#L20):
+Đọc mã ngày 24/10. Cả ba đều thuộc loại hỏng im lặng, nên mỗi cái có một yêu cầu riêng kèm phép thử riêng.
 
-| Giá trị | Nạp gì | Dùng ở đâu trong chu kỳ này |
-|---|---|---|
-| `full` (mặc định) | text + vision + RAG | máy dev, Colab |
-| `text-only` | text + RAG, tắt vision | chưa dùng |
-| **`minimal`** | **không nạp model nào** | **môi trường khách truy cập** |
+| # | Bẫy | Đường trong tiến trình xử ra sao | Đường server |
+|---|---|---|---|
+| 1 | **Chat template** | `self.llm.get_tokenizer().apply_chat_template(...)` tại [`engine.py:354`](src/core/engine.py#L354) | Client chỉ có `complete()` gọi `/v1/completions` với **prompt thô**. Không có hàm chat |
+| 2 | **`enable_thinking=False`** | đặt tại [`engine.py:358`](src/core/engine.py#L358) | Chưa có. Qwen3 mặc định **bật** thinking, nên model xổ `<think>` trước mọi câu, trong khi grammar ép `{` là token đầu và dataset v3 train **không** think |
+| 3 | **`repetition_penalty` khi bật grammar** | hạ 1,25 → 1,0 tại [`engine.py:341`](src/core/engine.py#L341) | `CompletionRequest` mặc định 1,25 và không chỗ nào hạ. JSON **bắt buộc** lặp token (`"typeVersion"`, `"position"`, dấu ngoặc), nên phạt lặp sẽ cấm chính các token grammar đòi |
+
+Bẫy 2 và 3 không làm chương trình đổ. Chúng làm chất lượng sinh tụt, và trong lịch sử dự án đúng loại này đã **đốt trọn một vòng đo**: phiên 15/08 sửa `additionalProperties: False` mà kết quả không đổi một đơn vị nào, vì backend giải mã bỏ qua ràng buộc đó.
 
 ---
 
@@ -170,217 +184,171 @@ Biến `RUNTIME_PROFILE`, đọc ở [`dependencies.py:20`](src/api/dependencies
 | đổi `price` thành `unit_price` | **0** | **lệch 5.400.000đ, không hợp lệ** |
 | tên trường tiếng Việt | **0** | lệch 5.400.000đ, `warnings: None` |
 
-Gõ sai một chữ thì tool phát ra một lời buộc tội sổ sách chính xác tới từng đồng, và sai, không kèm cảnh báo nào. Đây là tool mà **model tự điền tham số** từ câu người dùng (`vat` không nằm trong `SYSTEM_DATA_FIELDS`), nên nguồn sai không phải giả định. Vi phạm trực tiếp AGENTS §4.1 quy tắc 5: *tool tự validate đầu vào, không tin tham số model điền*.
+Gõ sai một chữ thì tool phát ra lời buộc tội sổ sách chính xác tới từng đồng, và sai, không kèm cảnh báo. `vat` lại đúng là tool mà **model tự điền tham số** từ câu người dùng, vì nó không nằm trong `SYSTEM_DATA_FIELDS`. Vi phạm AGENTS §4.1 quy tắc 5.
+
+Việc này nằm ở đây thay vì chờ, vì nó rẻ, biên rõ, có đáp án kiểm được, nên hợp với người mới nhận repo.
 
 **Yêu cầu.**
-1. `items` PHẢI dùng một model pydantic có kiểu, không dùng `dict` trần. Trường: `name: str`, `price: float`, `qty: float`, `is_reduced_vat: Optional[bool]`.
-2. Model đó PHẢI đặt `extra="forbid"`. Trường lạ PHẢI làm request trả **422 kèm tên trường**, không được tính tiếp.
-3. `price` và `qty` PHẢI là bắt buộc. Thiếu PHẢI trả 422, không được mặc định 0.
-4. Lược đồ mới PHẢI hiện ra ở `GET /tools` để `agentic.py::arguments_schema` ràng buộc được model lúc sinh.
-5. NÊN rà các endpoint `/tools/*` khác tìm `list[dict]` hoặc `dict` trần và ghi lại kết quả rà, kể cả khi không sửa trong chu kỳ này.
+1. `items` PHẢI dùng model pydantic có kiểu: `name: str`, `price: float`, `qty: float`, `is_reduced_vat: Optional[bool]`.
+2. Model đó PHẢI đặt `extra="forbid"`. Trường lạ PHẢI trả **422 kèm tên trường**.
+3. `price` và `qty` PHẢI bắt buộc. Thiếu PHẢI trả 422, không mặc định 0.
+4. Lược đồ mới PHẢI hiện ở `GET /tools` để `agentic.py::arguments_schema` ràng buộc được model lúc sinh.
+5. NÊN rà các `/tools/*` khác tìm `list[dict]` hoặc `dict` trần, ghi kết quả rà vào PR kể cả khi không sửa.
 
 **Nghiệm thu.**
 ```bash
-# a) đúng trường -> 200, lệch 0
+# đúng trường -> 200, lệch 0
 curl -s -X POST localhost:8000/tools/vat -H "X-API-Token: $T" -H "Content-Type: application/json" \
   -d '{"items":[{"name":"X","price":500000,"qty":10,"is_reduced_vat":true}],"stated_total":5400000}'
-#    -> "difference": 0, "is_valid": true
-
-# b) sai tên trường -> 422, KHÔNG phải 200 kèm lệch 5.4 triệu
+# sai tên trường -> 422, KHÔNG phải 200 kèm lệch 5,4 triệu
 curl -s -o /dev/null -w "%{http_code}\n" -X POST localhost:8000/tools/vat -H "X-API-Token: $T" \
   -H "Content-Type: application/json" \
   -d '{"items":[{"name":"X","unit_price":500000,"qty":10}],"stated_total":5400000}'
-#    -> 422
 ```
-Kèm test hồi quy trong `tests/test_pricing_and_tools.py` phủ cả ba ca ở bảng trên. `pytest -q` PHẢI vẫn xanh.
+Kèm test hồi quy phủ cả ba ca trong bảng. `pytest -q` PHẢI vẫn xanh.
 
-**Ngoài yêu cầu.** Không đổi công thức tính VAT. Không đụng `vat_catalog_audit`. Không sửa các tool khác trong chu kỳ này, chỉ rà và ghi lại.
+**Ngoài yêu cầu.** Không đổi công thức VAT. Không đụng `vat_catalog_audit`. Không sửa tool khác, chỉ rà và ghi.
 
 ---
 
-### BR-02. Đóng gói Brain hồ sơ `minimal`, chạy được không GPU
+### BR-02. Thêm đường chat cho `VLLMServerClient`
 
-**Ưu tiên** P0 · **Người làm** Brain-2 · **Hạn** Thứ Năm 29/10 · **Phụ thuộc** BD-01 (chốt chỗ đặt)
+**Ưu tiên** P0 · **Người làm** Brain-2 · **Hạn** Thứ Tư 28/10 · **Phụ thuộc** không
 
-**Vì sao.** Đây là đường găng của cả chu kỳ. `deploy/Dockerfile` ghi *"KHÔNG có CUDA, image ~1GB"* rồi `pip install -r requirements.txt`, mà file đó ghim `vllm>=0.10.2,<0.12` và `torch>=2.4.0`. Nên image thật sẽ kéo về vllm và wheel CUDA, phản lại chú thích của chính nó, và không dựng nổi trên một máy CPU rẻ tiền. `deploy/docker-compose.yml` **chưa từng được chạy** (ghi ở đầu file).
+**Vì sao.** Bẫy 1, 2 và 3 ở §3.3. Client hiện chỉ có `complete()` gọi `/v1/completions` với prompt thô, trong khi `generate_chat` cần chat template, và template đó đang lấy từ tokenizer của chính đối tượng `vllm.LLM` trong tiến trình. Không có đường chat thì không nối được gì.
 
 **Yêu cầu.**
-1. PHẢI tách `requirements.txt` thành hai: phần Brain chạy CPU, và phần GPU hoặc huấn luyện. Danh sách CPU lấy từ `.github/workflows/ci.yml`, vốn đã chứng minh là đủ cho 1003 test.
-2. `deploy/Dockerfile` PHẢI chỉ cài phần CPU. Image dựng xong PHẢI **không chứa** `torch` bản CUDA và không chứa `vllm`.
-3. Container chạy `RUNTIME_PROFILE=minimal` PHẢI phục vụ được `GET /health` và toàn bộ `POST /tools/*`.
-4. `POST /chat` ở hồ sơ `minimal` PHẢI trả **503** kèm một câu tiếng Việt nói rõ tính năng hỏi đáp đang tắt, không trả 500 và không trả stack trace.
-5. `GET /health` PHẢI trả `runtime_profile: "minimal"` và `auth_enabled: true`.
-6. Khối `environment:` của service `brain` trong compose PHẢI đặt `RUNTIME_PROFILE`. Giá trị `ENV: SERVER` hiện tại PHẢI được hiểu tường minh hoặc gỡ bỏ, vì mã chỉ rẽ nhánh ở `== "LOCAL"` ([`engine.py:181`](src/core/engine.py#L181)).
-7. `tests/test_deploy_config.py` PHẢI cập nhật theo: biến nào nối rồi thì ra khỏi `CHUA_NOI`, biến nào còn treo thì ở lại kèm lý do.
+1. `VLLMServerClient` PHẢI có một phương thức nhận `messages` (danh sách `{role, content}`) và gọi **`/v1/chat/completions`**, để server áp chat template.
+2. Phương thức đó PHẢI truyền `chat_template_kwargs: {"enable_thinking": false}`. Thiếu nó thì Qwen3 xổ `<think>`.
+3. Khi có `guided_json`, `repetition_penalty` PHẢI là **1.0**, không phải mặc định 1,25.
+4. PHẢI giữ nguyên hành vi lỗi hiện có: `BackendUnavailable`, `BackendTimeout`, `BackendError` ánh xạ sang mã HTTP đúng nghĩa ở tầng trên.
+5. PHẢI ghim phiên bản vLLM của server khớp với tên trường client gửi. `requirements.txt` đang ghim `vllm>=0.10.2,<0.12` vì **0.12 gỡ `GuidedDecodingParams`**. Server dựng ở BR-04 PHẢI nằm trong cùng khoảng đó.
+6. Test PHẢI dùng server giả và **đòi server giả nhận được đúng payload**: có `chat_template_kwargs`, có `guided_json`, và `repetition_penalty == 1.0`.
 
-**Nghiệm thu.** Trên máy đích, không GPU:
+**Nghiệm thu.** `pytest tests/test_serving.py -q` xanh, và trong đó có ít nhất ba ca mới ứng với yêu cầu 2, 3, 6. Một ca PHẢI đỏ nếu cố tình bỏ `chat_template_kwargs` ra khỏi payload.
+
+**Ngoài yêu cầu.** Không đụng `engine.py` ở yêu cầu này, đó là BR-03. Không làm đường vision.
+
+---
+
+### BR-03. Cho `engine.py` rẽ nhánh theo backend, và chứng minh đường HTTP thi hành
+
+**Ưu tiên** P0 · **Người làm** Brain-2 cặp với Brain-1 · **Hạn** Thứ Năm 29/10 · **Phụ thuộc** BR-02
+
+**Vì sao.** Đây là việc trung tâm của S2. `VLLMServerClient` đã dựng xong, có test, được khai trong `docker-compose.yml`, và **không caller nào gọi nó**. Đây là lần thứ tư dự án dính hình dạng lỗi "một lớp phòng thủ trông như đã có mà chưa nối"; ba lần trước là `API_TOKEN` so với `API_AUTH_TOKEN`, `arguments_schema()` không đóng object, và trần token benchmark rộng hơn production.
+
+`tests/test_deploy_config.py` **không bắt được** lỗ này: nó quét regex, thấy `os.getenv("VLLM_BASE_URL")` nằm trong chính `serving.py`, rồi kết luận biến đã được mã đọc. Đọc khác dùng.
+
+**Yêu cầu.**
+1. `ModelEngine` PHẢI rẽ nhánh theo **backend**, không theo tên môi trường: có `VLLM_BASE_URL` thì dùng `VLLMServerClient`; không có thì nạp trong tiến trình, giữ nguyên đường cũ cho Colab; `ENV=LOCAL` thì mock.
+2. Ba đường PHẢI quyết định ở **một chỗ**, không rải điều kiện khắp các phương thức.
+3. `generate_chat` và `generate_text` qua đường server PHẢI cho kết quả cùng hình dạng với đường trong tiến trình. Tầng gọi không được biết mình đang đi đường nào.
+4. `GET /health` PHẢI khai backend đang dùng và trạng thái sống của vLLM server.
+5. PHẢI có phép thử dựng **server giả**, gọi `generate_chat`, và **đòi server giả nhận được request**. Phép thử chỉ kiểm biến môi trường được đọc là không đủ.
+6. `tests/test_deploy_config.py` PHẢI cập nhật: `VLLM_BASE_URL` và `VLLM_MODEL` ra khỏi diện nghi vấn; `REDIS_URL` và `VLLM_VISION_*` ở lại `CHUA_NOI` kèm lý do.
+7. Giá trị `ENV: SERVER` trong compose PHẢI được hiểu tường minh hoặc gỡ bỏ. Mã hiện chỉ rẽ ở `== "LOCAL"` ([`engine.py:181`](src/core/engine.py#L181)), nên mọi giá trị khác đều rơi vào nhánh nạp model lên CUDA.
+
+**Nghiệm thu.**
 ```bash
-docker compose up -d brain
-curl -s localhost:8000/health | grep -q '"runtime_profile": *"minimal"'
-curl -s -o /dev/null -w "%{http_code}\n" localhost:8000/tools              # 401
-curl -s -o /dev/null -w "%{http_code}\n" -H "X-API-Token: $T" localhost:8000/tools  # 200
-curl -s -X POST localhost:8000/tools/inventory-import -H "X-API-Token: $T" \
-     -F "file=@sample_data/ton_kho_mau.xlsx"                               # 8 phát hiện / 7 mã
-docker image inspect anser-brain --format '{{.Size}}'                      # ghi lại con số
+ENV=LOCAL pytest tests/test_serving.py tests/test_runtime_loading.py tests/test_deploy_config.py -q
+ENV=LOCAL pytest -q          # 1003 passed trở lên
 ```
-Ghi lại vào PR: kích thước image, thời gian khởi động nguội, và RAM lúc nghỉ.
+Và trên Colab ở BR-04: một câu hỏi thật đi trọn vòng qua `VLLM_BASE_URL`, log của vLLM server PHẢI ghi nhận request đó.
 
-**Ngoài yêu cầu.** Không nối `VLLMServerClient`. Không nối Redis. Không dựng `vllm-text` hay `vllm-vision`. Ba việc đó ở §9.
+**Ngoài yêu cầu.** Không nối Redis. Không nối vision qua HTTP. Không dựng Cloudflare Tunnel.
 
 ---
 
-### BR-03. `SCHEMA MAP` khớp lược đồ Body, và mở đường lấy dòng bán hàng
+### BR-04. Dựng vLLM server Qwen3-8B trên Colab L4 và đo ngân sách ngữ cảnh
 
-**Ưu tiên** P1 · **Người làm** Brain-2 cặp với Brain-1 · **Hạn** Thứ Sáu 30/10 · **Phụ thuộc** BD-03
+**Ưu tiên** P0 · **Người làm** Brain-2 và Brain-1 cùng ngồi · **Hạn** Thứ Sáu 30/10 · **Phụ thuộc** BR-03
 
-**Vì sao.** 4 trên 8 định danh trong `SCHEMA MAP` ([`saas_api.py:22-33`](src/core/saas_api.py#L22-L33)) không khớp Body. Triệu chứng với người dùng: hỏi *"còn bao nhiêu dầu AW46"* nhận về *"Lỗi hệ thống khi tìm sản phẩm"*, trông y hệt sự cố database. Lược đồ thật 13 bảng đã chép vào [GIAO_VIEC_BRAIN.md](GIAO_VIEC_BRAIN.md) V3.
+**Vì sao.** S2 đòi **ctx 32k**, và [ARCHITECTURE.md §9.3](ARCHITECTURE.md) giải thích vì sao đó là điều kiện cần: vòng agentic nạp lại kết quả tool ở mỗi bước, nên ở `max_model_len` nhỏ thì context tràn sau khoảng ba lần gọi tool có kèm đoạn RAG. Nhưng **chưa ai đo** 32k trên phần cứng thật. §2.3 cho thấy cấu hình hiện tại đã ở mức ~19,9GB trên card 22,5GB, nên 32k có thể không vừa khi vision cùng bật.
 
-Quan trọng hơn: `sales_invoice_items` có `unit_cost`, `quantity`, `line_total`. Nghĩa là `SaasAPI.get_report_lines`, hàm mà `chat.py` kiểm `getattr` rồi trả *"Tôi chưa nối được với dữ liệu bán hàng"*, nay **viết được**, kèm giá vốn từng dòng. Đó chính là thứ `reporting.py` phải tự thú là chỉ phủ 62% doanh thu.
+Đo rồi quyết. Chọn con số vì "nghe hợp lý" là cách đi lùi mà không biết.
 
 **Yêu cầu.**
-1. Bốn định danh PHẢI sửa: `stock_quantity`→`stock`, `workspace_id`→`warehouse_id`, `sales`→`sales_invoices`, `amount`→`total`. Mọi định danh PHẢI ở trong đúng khối `SCHEMA MAP`, không rải vào SQL.
-2. PHẢI quyết cách xử `sales_invoices.warehouse_id IS NULL` và ghi lý do ngay tại chỗ. Cột này nullable, nên `WHERE warehouse_id = :ws` sẽ **âm thầm bỏ** mọi hoá đơn chưa gán kho.
-3. `products.stock` là `numeric(14,3)`. Ép kiểu PHẢI giữ phần lẻ.
-4. PHẢI viết `SaasAPI.get_report_lines`, trả đúng hình dạng `rp.SaleLine` và `rp.ExpenseLine` mà `_build_report_context` đang chờ.
-5. PHẢI cập nhật cả ba nơi theo R4: `prompts.py::DB_SCHEMA`, `offline_training/db_schema.txt`, SQL trong `saas_api.py`.
-6. PHẢI thêm phép thử hợp đồng đối chiếu `SCHEMA MAP` với một bản chụp lược đồ Body đã commit. Chủ dự án cho biết ERD *"đã chốt nhưng chưa hoàn thiện, còn giai đoạn thử nghiệm"*, nên thứ cần là một phép thử **kêu to lúc nó đổi**, không phải một lần sửa đúng.
+1. PHẢI dựng `vllm serve` cho `Qwen3-8B` AWQ trên Colab L4, cổng nội bộ, phiên bản nằm trong khoảng ghim ở BR-02 yêu cầu 5.
+2. Brain PHẢI gọi được qua `VLLM_BASE_URL` và trả lời đúng một câu hỏi thật đi hết vòng agentic.
+3. PHẢI đo và ghi lại **ba cấu hình**: `max_model_len` 8192 không vision, 32768 không vision, 32768 có vision. Mỗi cấu hình ghi VRAM đỉnh và việc nó có dựng nổi hay không.
+4. PHẢI ghi `inference_latency_p95` ở 4 request đồng thời cho cấu hình được chọn. Ngưỡng tham chiếu ở ARCHITECTURE §13 là 5.000ms.
+5. Kết quả PHẢI thành một quyết định ghi vào [ARCHITECTURE.md](ARCHITECTURE.md) trong cùng PR: ctx bao nhiêu, vision bật hay tắt, và vì sao.
+6. Nếu 32k không vừa cùng vision, PHẢI nêu rõ đánh đổi thay vì im lặng hạ xuống. Vision phục vụ OCR hoá đơn, là tính năng cốt lõi.
 
-**Nghiệm thu.** Trỏ vào một nhánh dev của Neon có dữ liệu mẫu:
-```
-"doanh thu hôm nay"      -> số thật, nhãn ghi HÔM NAY
-"tháng này bán bao nhiêu"-> số của tháng này
-"tháng trước"            -> nói thẳng chưa lấy được, mời hỏi lại 3 kỳ đang hỗ trợ
-"quý này lãi hay lỗ"     -> ra số thật, KHÔNG còn câu "chưa nối được dữ liệu bán hàng"
-```
-Vế thứ ba quan trọng ngang hai vế đầu: trả một con số cho câu hỏi sai kỳ là lỗi không có triệu chứng.
+**Nghiệm thu.** Một bảng ba dòng trong PR, mỗi dòng có: `max_model_len`, vision bật/tắt, VRAM đỉnh đo bằng `nvidia-smi`, dựng được hay không, p95. Kèm một đoạn log vLLM server cho thấy request của Brain.
 
-**Ngoài yêu cầu.** Không sửa repo Body. Không làm tuổi nợ 30/60/90 trong chu kỳ này.
+**Ngoài yêu cầu.** Không phục vụ traffic thật từ Colab. [ARCHITECTURE.md §4.4](ARCHITECTURE.md): điều khoản Colab Paid cấm web service, nên Colab chỉ dùng để đo và thử nghiệm rời rạc.
 
 ---
 
-### BR-04. Mở rộng cổng lint của CI
+### BR-05. Chạy lại phiên đo trên đường server, đóng việc treo số 1 và số 2
 
-**Ưu tiên** P2 · **Người làm** Brain-1 · **Hạn** Thứ Ba 03/11 · **Phụ thuộc** không
+**Ưu tiên** P1 · **Người làm** Brain-1 · **Hạn** Thứ Tư 04/11 · **Phụ thuộc** BR-04
 
-**Vì sao.** CI chỉ chạy `ruff` trên chín file viết tay, nên nó không nhìn thấy tám lỗi đã sửa ngày 22/10. Trong tám lỗi đó có một lỗi `F821` làm ô 4.2 của notebook Colab ném `NameError` giữa phiên đo, sau khi đã nạp xong model.
+**Vì sao.** [TIEN_TRINH_BRAIN.md §3](TIEN_TRINH_BRAIN.md) treo hai việc. Việc treo 1: `render_tools()` từng quảng cáo `sales`, `expenses`, `lines*` cho model trong khi lược đồ đã gạch chúng, đã sửa ở `0c82c4d` nhưng **chưa có số chứng minh nó kéo agentic lên**. Việc treo 2: `providers.py` ghi lại chế độ ràng buộc **dự định**, và `smoke_test_guided()` kiểm chế độ đó có **thi hành** không; hai thứ khác nhau.
+
+Runbook đầy đủ ở [PHIEN_DO_COLAB.md](PHIEN_DO_COLAB.md). Khoảng một giờ khi đo lại, vì dữ liệu sinh phiên 15/08 còn trên Drive tại `ANSER_AI_Logistics/generated`.
+
+**Yêu cầu.**
+1. PHẢI chạy `benchmark_v3.py` qua **đường server** của BR-03, không qua đường trong tiến trình. Đo đường không dùng nữa là đo một khâu không phục vụ ai.
+2. PHẢI so **theo cặp** bằng `compare_runs.py`. Hai điểm trung bình không trả lời được câu "bản mới làm hỏng câu nào mà bản cũ vốn đúng".
+3. PHẢI đọc ba dòng cảnh báo khung đo **trước** điểm số: `⚠ đầu ra KHÔNG đọc được thành JSON`, `⚠ CẮT CỤT`, `[chốt chặn]`. Tỷ lệ JSON hỏng từ 30% trở lên gần như luôn là mã chứ không phải model.
+4. PHẢI xác nhận `smoke_test_guided()` báo ràng buộc **đang thi hành** trên đường server. Đây là chỗ bẫy 2 và 3 ở §3.3 lộ ra nếu BR-02 làm sót.
+5. PHẢI dùng chung các hằng số trần token (`MAX_DECISION_TOKENS`, `MAX_REPORT_TOKENS`, `MAX_WORKFLOW_TOKENS`). Benchmark từng đo ở 1024 trong khi production cấp 700, nên mọi tỷ lệ cắt cụt đo được đều đẹp hơn thứ khách nhận.
+6. Kết quả PHẢI cập nhật vào TIEN_TRINH_BRAIN.md: việc treo 1 và 2 đóng hay vẫn mở.
+
+**Nghiệm thu.** Hai file JSON kết quả cộng đầu ra của `compare_runs.py`, đính vào PR. Dòng `[chốt chặn] ràng buộc JSON: ✓ CHẠY` PHẢI có mặt.
+
+**Ngoài yêu cầu.** Không huấn luyện lại model. Kết luận "dùng model gốc cho nhánh kế toán" đã có từ 15/08 và chu kỳ này không xét lại.
+
+---
+
+### BR-06. Bộ đo RAG
+
+**Ưu tiên** P1 · **Người làm** Brain-1 · **Hạn** Thứ Năm 05/11 · **Phụ thuộc** không
+
+**Vì sao.** `src/core/knowledge.py` có 571 dòng và 70 test đơn vị, và **không một chỉ số recall, MRR hay faithfulness nào**. TIEN_TRINH §7 xếp việc này thứ hai và ghi rõ nó không cần GPU, nên nó chạy song song với mọi thứ trên.
+
+Bốn lỗ hổng chức năng mà [ARCHITECTURE.md §13b.3](ARCHITECTURE.md) liệt kê thì **đã vá hết**: `workspace_id` bắt buộc ở mọi lối vào, `Passage` có `source` và ngày hiệu lực, tài liệu hết hiệu lực bị loại hẳn, `ingest_folder` đã ra khỏi `__init__`. Việc còn lại thuần là đo.
+
+**Yêu cầu.**
+1. PHẢI báo cáo ít nhất một chỉ số tầng truy hồi và một chỉ số tầng sinh. Ngưỡng khởi điểm: **Recall@20 ≥ 0,8**, MRR càng gần 1 càng tốt.
+2. Bộ câu hỏi sinh từ tài liệu PHẢI có người rà lại **20% mẫu**. Câu hỏi sinh máy mà tự trả lời được không cần truy hồi thì phải loại.
+3. **PHẢI KHÔNG gửi tài liệu của khách tới DeepSeek.** [BAN_GIAO_VAN_TAI.md §E.3](BAN_GIAO_VAN_TAI.md) đề nghị dùng DeepSeek sinh câu hỏi từ "hợp đồng, bảng giá cước, chính sách công nợ", và đó là **dữ liệu khách**, vi phạm R2. DeepSeek chỉ dùng cho corpus công khai là nghị định và văn bản pháp luật. Tài liệu khách thì gõ tay hoặc sinh bằng model local.
+4. `grounding.py` đã là một dạng faithfulness thu hẹp về **con số**. Yêu cầu là **mở rộng nó thành chỉ số báo cáo được**, không thay bằng thứ khác.
+5. NÊN thử ba cải tiến theo thứ tự của E.3: chỉnh cách chia đoạn trước (bge-m3 nhận tới 8192 token, chia theo 128 token của model cũ là phí), rồi bật tắt ViRanker để so, rồi tìm lai từ khoá cộng vector.
+
+**Nghiệm thu.** Một lệnh chạy ra bảng chỉ số, số liệu đính vào PR, kèm ghi chú nguồn câu hỏi và tỷ lệ người đã rà.
+
+**Ngoài yêu cầu.** Không đổi embedder hay reranker. Không nạp thêm nguồn tài liệu mới.
+
+---
+
+### BR-07. Mở rộng cổng lint của CI
+
+**Ưu tiên** P2 · **Người làm** Brain-1 · **Hạn** Thứ Sáu 06/11 · **Phụ thuộc** không
+
+**Vì sao.** CI chỉ chạy `ruff` trên chín file viết tay, nên nó không nhìn thấy tám lỗi đã sửa ngày 22/10. Trong đó có một lỗi `F821` làm ô 4.2 của notebook Colab ném `NameError` giữa phiên đo, sau khi đã nạp xong model. Chu kỳ này có tới hai việc chạy trên Colab, nên lỗi loại đó đắt gấp đôi.
 
 **Yêu cầu.** `.github/workflows/ci.yml` PHẢI chạy `ruff check src tests offline_training`. Lỗi mới PHẢI làm CI đỏ.
 
-**Nghiệm thu.** Thêm tạm một biến tên `l` vào một file bất kỳ trong `src/`, đẩy lên nhánh phụ, CI PHẢI đỏ. Gỡ ra, CI PHẢI xanh.
+**Nghiệm thu.** Thêm tạm một biến tên `l` vào một file trong `src/`, đẩy lên nhánh phụ, CI PHẢI đỏ. Gỡ ra, CI PHẢI xanh.
 
-**Ngoài yêu cầu.** Không mở rộng `mypy` trong chu kỳ này, vì diện lỗi của nó rộng hơn nhiều và sẽ chiếm trọn thời gian.
-
----
-
-### BD-01. Body có địa chỉ mà kế toán Hoàng Phát truy cập được
-
-**Ưu tiên** P0 · **Người làm** Đội Body · **Hạn** Thứ Tư 28/10 · **Phụ thuộc** quyết định §8.3 câu 1
-
-**Vì sao.** Đây là ô đỏ duy nhất còn lại của Giai đoạn B. Mọi thứ khác trong chu kỳ này phục vụ nó.
-
-**Yêu cầu.**
-1. Body PHẢI chạy ở một địa chỉ ổn định mà khách mở bằng trình duyệt, có HTTPS.
-2. PHẢI trỏ vào một nhánh Neon **không phải production** cho tới khi qua CH-02.
-3. Biến `BRAIN_URL` PHẢI trỏ vào Brain của BR-02, không trỏ vào `localhost` của máy ai.
-4. `BRAIN_API_TOKEN` của Body PHẢI khớp `API_AUTH_TOKEN` của Brain. Lệch hai biến này là sự cố 13/08/2026 lặp lại.
-5. `BRAIN_KB_WORKSPACE` PHẢI khớp `KB_WORKSPACE_ID` của Brain. Để trống cả hai là an toàn nhất, vì cùng mặc định `default`.
-6. Đăng nhập PHẢI bật. Không mở ẩn danh ra Internet.
-
-**Nghiệm thu.** Từ một máy không phải máy dựng, không dùng VPN: mở địa chỉ, đăng nhập, vào màn hình Tồn kho, tải `ton_kho_mau.xlsx`, thấy 8 phát hiện trên 7 mã.
-
-**Ngoài yêu cầu.** Chưa cần tên miền riêng của khách. Chưa cần sao lưu tự động.
-
----
-
-### BD-02. Hiển thị đúng **ba** trạng thái AI, không phải hai
-
-**Ưu tiên** P1 · **Người làm** Đội Body · **Hạn** Thứ Hai 02/11 · **Phụ thuộc** BR-02
-
-**Vì sao.** Sau BR-02, Brain chạy hồ sơ `minimal` sẽ có `engine_ready: false` một cách **cố ý**. Nếu giao diện chỉ phân biệt "AI bật" và "AI hỏng" thì khách sẽ thấy một dải đỏ báo hỏng trong khi hệ thống đang chạy đúng thiết kế, và lần sau có hỏng thật thì không ai tin dải đỏ đó nữa.
-
-`GET /health` đã trả sẵn `runtime_profile`. Đội Body cần xác nhận `brain.ts` có đọc trường này chưa.
-
-**Yêu cầu.** Giao diện PHẢI phân biệt ba trạng thái:
-
-| `/health` trả | Hiển thị |
-|---|---|
-| `runtime_profile: "minimal"` | "Hỏi đáp AI đang tắt. Các phép kiểm sổ sách vẫn chạy." Màu trung tính |
-| `degraded: true` hoặc `engine_error` khác null ở hồ sơ `full` | cảnh báo đỏ, đây là hỏng thật |
-| `auth_enabled: false` | **đỏ, mức cao nhất.** Brain đang không kiểm token |
-
-**Nghiệm thu.** Dựng ba tình huống bằng cách đổi biến môi trường của Brain rồi tải lại trang, chụp màn hình cả ba, đính vào PR.
-
-**Ngoài yêu cầu.** Không đổi gì ở luồng chat.
-
----
-
-### BD-03. Xác nhận lược đồ và cung cấp bản chụp để Brain khoá hợp đồng
-
-**Ưu tiên** P1 · **Người làm** Đội Body · **Hạn** Thứ Ba 27/10 · **Phụ thuộc** không
-
-**Vì sao.** BR-03 chặn ở đây. Brain đọc được `schema.ts` trên nhánh `docs/onboarding-playbook`, nhưng chủ dự án cho biết ERD còn một giai đoạn thử nghiệm, nên Brain cần biết nhánh nào là nguồn và khi nào nó đổi.
-
-**Yêu cầu.**
-1. Đội Body PHẢI xác nhận nhánh nào là nguồn lược đồ cho chu kỳ này.
-2. PHẢI xác nhận bốn ánh xạ: `products.stock`, `products.warehouse_id`, `sales_invoices.total`, `sales_invoices.warehouse_id`.
-3. PHẢI trả lời: hoá đơn có `warehouse_id = NULL` là hợp lệ hay là dữ liệu lỗi. Câu trả lời quyết định yêu cầu số 2 của BR-03.
-4. NÊN báo trước cho Brain khi lược đồ đổi, trước khi migration chạy lên nhánh dùng chung.
-
-**Nghiệm thu.** Một tin nhắn hoặc một PR mô tả, có bốn câu trả lời trên, trước 17h Thứ Ba 27/10.
-
-**Ngoài yêu cầu.** Chưa cần đổi lược đồ. Chu kỳ này Brain thích nghi theo Body, không ngược lại.
-
----
-
-### CH-01. Quét xác thực trên môi trường đã triển khai, qua HTTPS thật
-
-**Ưu tiên** P0 · **Người làm** Brain-1 cùng Đội Body · **Hạn** Thứ Ba 03/11 · **Phụ thuộc** BR-02, BD-01
-
-**Vì sao.** Ba lỗ bảo mật ngày 15/08/2026 chỉ lộ ra khi quét **từng endpoint qua HTTP thật**, không phải TestClient. Một trong ba là `GET /api/v1/task/{id}` trả nguyên câu trả lời của AI gồm tên khách, mã số thuế, số công nợ, không kiểm gì cả. Lần này hệ thống mở ra Internet thật, nên phải quét lại trên đúng môi trường đó.
-
-**Yêu cầu.**
-1. PHẢI chạy `pytest tests/test_auth_bao_phu.py` trỏ vào địa chỉ đã triển khai, không phải `localhost`.
-2. Mọi endpoint trừ `/health` PHẢI trả **401** khi không có token và khi token sai. Không được trả 422.
-3. `GET /health` PHẢI trả `auth_enabled: true`.
-4. `GET /api/v1/task/{id}` với `X-User-Id` của người khác PHẢI trả **404**, không phải 403.
-5. PHẢI chạy `pytest tests/test_body_contract.py -k duong_dan`.
-
-**Nghiệm thu.** Dán toàn bộ đầu ra của hai lệnh vào PR, kèm địa chỉ đã quét và thời điểm.
-
-**Ngoài yêu cầu.** Không làm kiểm thử xâm nhập. Không thêm giới hạn tần suất trong chu kỳ này.
-
----
-
-### CH-02. Buổi chạy thử với kế toán thật, trên môi trường thật
-
-**Ưu tiên** P0 · **Người làm** Chủ dự án chủ trì, Brain-1 và Đội Body quan sát · **Hạn** Thứ Năm 05/11 · **Phụ thuộc** mọi P0 ở trên
-
-**Vì sao.** Đây là cổng ra của chu kỳ, và là thứ duy nhất trả lời được câu *"khách có tự dùng được không"*. ROADMAP viết: *"đưa hướng dẫn + đường truy cập cho họ, rồi **ngồi im xem chỗ nào họ khựng lại**"*.
-
-**Yêu cầu.**
-1. Kế toán PHẢI tự đăng nhập, tự tải file MISA thật của họ, tự đọc kết quả. Không ai được thao tác hộ.
-2. Người quan sát PHẢI ghi lại **mọi chỗ người dùng dừng quá 10 giây**, kèm câu hỏi họ nói ra.
-3. PHẢI ghi ba loại riêng biệt: *chưa có dữ liệu*, *sai cấu hình*, *sản phẩm khó dùng*. Nhầm loại hai thành loại ba là đi sửa giao diện cho một lỗi biến môi trường.
-4. Kết quả PHẢI viết thành một mục trong [ROADMAP.md](ROADMAP.md) trong cùng tuần.
-
-**Nghiệm thu.** Kế toán hoàn thành trọn vòng tải file và đọc kết quả, không cần ai can thiệp. Nếu không đạt, biên bản PHẢI nêu đích danh chỗ hỏng, và đó là đầu vào của chu kỳ 02.
-
-**Ngoài yêu cầu.** Không nhắm tính năng hỏi đáp AI. Chu kỳ này đo lớp sổ sách.
+**Ngoài yêu cầu.** Không mở rộng `mypy` trong chu kỳ này, diện lỗi của nó rộng hơn nhiều.
 
 ---
 
 ## 5. Yêu cầu phi chức năng
 
-Áp cho mọi yêu cầu ở §4.
-
 | Mã | Yêu cầu | Nghiệm thu |
 |---|---|---|
-| **NFR-01** | **Bảo mật.** `API_AUTH_TOKEN` PHẢI khác rỗng ở mọi môi trường ngoài máy dev. Không secret nào trong repo. Không commit `.env` | `/health` trả `auth_enabled: true`; quét secret 5 mẫu trên lịch sử trước mỗi lần push |
-| **NFR-02** | **Chi phí.** Hạ tầng chu kỳ này PHẢI ≤ 500.000đ/tháng, tức 10% trần R3. PR nào tăng chi phí PHẢI ghi con số VNĐ/tháng | Ghi chi phí thật vào biên bản cuối chu kỳ |
-| **NFR-03** | **Hiệu năng.** `POST /tools/inventory-import` với file 150 dòng NÊN xong dưới 5 giây. `GET /health` PHẢI dưới 500ms | Đo trên môi trường đã triển khai, ghi vào PR của BR-02 |
-| **NFR-04** | **Quan sát được.** Mọi log PHẢI có `request_id`. `ai_metrics_log.jsonl` PHẢI ghi được. `/health` PHẢI đủ các trường ở §3.3 | Gọi một request, tìm lại được nó trong log bằng `request_id` |
-| **NFR-05** | **Dữ liệu khách.** File tải lên PHẢI xử lý trong bộ nhớ, không ghi ra đĩa. Dữ liệu thật của khách PHẢI không vào repo | Rà PR; `sample_data/an_danh.py` cho bản ẩn danh |
-| **NFR-06** | **Chưa biết khác bằng không.** Mọi trường thiếu dữ liệu PHẢI là `None`, không phải `0` | Có trong test của từng yêu cầu |
+| **NFR-01** | **Bảo mật.** Không secret trong repo, không commit `.env`. `VLLM_API_KEY` đọc từ env, không nhận qua tham số từ tầng trên | Quét secret 5 mẫu trên toàn lịch sử trước mỗi lần push |
+| **NFR-02** | **Chi phí.** Chu kỳ này dùng Colab Pro đã có, **không thuê GPU**. PR nào tăng chi phí PHẢI ghi con số VNĐ/tháng | Ghi chi phí thật vào biên bản cuối chu kỳ |
+| **NFR-03** | **Hiệu năng.** `inference_latency_p95` ở 4 request đồng thời PHẢI đo và ghi lại. Ngưỡng tham chiếu 5.000ms | BR-04 yêu cầu 4 |
+| **NFR-04** | **Quan sát được.** Mọi log PHẢI có `request_id`. `/health` PHẢI khai backend đang dùng | BR-03 yêu cầu 4 |
+| **NFR-05** | **R1.** Không con số tài chính nào ra từ model. Đổi đường sinh text không được nới ranh giới này | `pytest -q` xanh, gồm các ca `bat_buoc_tool` |
+| **NFR-06** | **R5.** Không hardcode tên GPU, số VRAM, đường dẫn máy ai. Mọi tham số phần cứng đọc từ env | `grep -rn "content/drive" src/` rỗng |
+| **NFR-07** | **Chưa biết khác bằng không.** Trường thiếu dữ liệu PHẢI là `None`, không phải `0` | Có trong test của từng yêu cầu |
 
 ---
 
@@ -388,50 +356,49 @@ Vế thứ ba quan trọng ngang hai vế đầu: trả một con số cho câu 
 
 ### 6.1. Vai
 
-| Vai | Là ai | Ghi chú |
+| Vai | Là ai | Nhận gì |
 |---|---|---|
-| **Brain-1** | người mới vào | Nhận việc nhỏ, biên rõ, có đáp án kiểm được: BR-01, BR-04, CH-01 |
-| **Brain-2** | người sắp nghỉ một thời gian | Nhận việc cần ngữ cảnh sẵn có: BR-02, BR-03. **Dồn vào tuần 1** |
-| **Đội Body** | cả đội | BD-01, BD-02, BD-03 |
-| **Chủ dự án** | bạn | Quyết §8.3, chủ trì CH-02, tìm kế toán rà sổ |
+| **Brain-1** | người mới vào | BR-01, BR-05, BR-06, BR-07. Việc biên rõ, có đáp án kiểm được |
+| **Brain-2** | người sắp nghỉ một thời gian | BR-02, BR-03, BR-04. Việc cần ngữ cảnh sẵn có. **Dồn vào tuần 1** |
+| **Chủ dự án** | bạn | Chốt §8.3, cấp Colab Pro và Drive, tìm kế toán rà sổ |
 
-> **Ràng buộc lịch quan trọng nhất của chu kỳ này.** Brain-2 sắp nghỉ. Giá trị lớn nhất họ để lại là thứ chưa nằm trong tài liệu. Vì vậy BR-03 làm **theo cặp** với Brain-1, và mọi thứ Brain-2 giải thích miệng PHẢI được Brain-1 viết vào tài liệu trong cùng ngày. Sau Thứ Sáu 30/10, kế hoạch giả định Brain-2 không còn trả lời được.
+> **Ràng buộc lịch quan trọng nhất.** Brain-2 sắp nghỉ. Giá trị lớn nhất họ để lại là thứ chưa nằm trong tài liệu. Vì vậy BR-03 và BR-04 làm **theo cặp** với Brain-1, và mọi thứ Brain-2 giải thích miệng PHẢI được Brain-1 viết vào tài liệu trong cùng ngày. Sau Thứ Sáu 30/10, kế hoạch giả định Brain-2 không còn trả lời được.
 
 ### 6.2. Đường găng
 
 ```
-BD-03 (xác nhận lược đồ)  ─┐
-                           ├─► BR-03
-BD-01 (chỗ đặt) ─► BR-02 ──┴─► CH-01 ─► CH-02  ◄── cổng ra chu kỳ
+BR-02 (đường chat cho client) ─► BR-03 (nối engine) ─► BR-04 (dựng + đo trên L4) ─► BR-05 (phiên đo)
+                                                                                        │
+BR-06 (bộ đo RAG) ─────── chạy song song, không cần GPU ────────────────────────────────┘
 ```
 
-**BD-01 trượt là cả chu kỳ trượt.** Nó là việc duy nhất không ai bên Brain làm thay được, và nó phải xong trong tuần 1.
+Cả bốn việc đầu nằm trên một đường. **BR-02 trượt là cả chu kỳ trượt**, nên nó hạn sớm nhất và giao cho người có ngữ cảnh.
 
 ### 6.3. Tuần 1: Thứ Hai 26/10 đến Thứ Sáu 30/10
 
-| Ngày | Brain-1 | Brain-2 | Đội Body | Chủ dự án |
-|---|---|---|---|---|
-| **T2 26/10** | Dựng môi trường theo [sổ tay §2](SO_TAY_NGUOI_MOI.md), chạy ra 1003 passed. Làm bài tập 1 và 2 | Rà `requirements.txt`, tách danh sách CPU | Chốt chỗ đặt, mở môi trường | **Chốt §8.3 trong ngày.** Trễ là cả chu kỳ trễ |
-| **T3 27/10** | **BR-01** | **BR-02** Dockerfile | **BD-03 hạn 17h** | Liên hệ kế toán rà sổ |
-| **T4 28/10** | **BR-01** xong, có test hồi quy | **BR-02** tiếp | **BD-01 hạn** | |
-| **T5 29/10** | Cặp với Brain-2 trên **BR-03**, và là người **viết tài liệu** | **BR-02 hạn.** Rồi **BR-03** | Hỗ trợ Brain nối vào Body đã triển khai | |
-| **T6 30/10** | Viết nốt những gì Brain-2 giải thích miệng | **BR-03 hạn.** Bàn giao nốt | | **Mốc M1**, xem 6.5 |
+| Ngày | Brain-1 | Brain-2 |
+|---|---|---|
+| **T2 26/10** | Dựng môi trường theo [sổ tay §2](SO_TAY_NGUOI_MOI.md), ra 1003 passed. Làm bài tập 1 và 2 | Đọc `serving.py` và `engine.py`, chốt thiết kế rẽ nhánh backend |
+| **T3 27/10** | **BR-01** | **BR-02** |
+| **T4 28/10** | **BR-01** xong, có test hồi quy | **BR-02 hạn.** Bắt đầu **BR-03** |
+| **T5 29/10** | Cặp với Brain-2 trên **BR-03**, và là người **viết tài liệu** | **BR-03 hạn** |
+| **T6 30/10** | Cùng ngồi **BR-04** trên Colab, tự tay chạy một lượt | **BR-04 hạn.** Bàn giao nốt |
 
 ### 6.4. Tuần 2: Thứ Hai 02/11 đến Thứ Sáu 06/11
 
-| Ngày | Brain-1 | Đội Body | Chủ dự án |
-|---|---|---|---|
-| **T2 02/11** | Nhận bàn giao, đọc lại tài liệu đã viết | **BD-02 hạn** | |
-| **T3 03/11** | **CH-01 hạn.** Rồi **BR-04** | Cùng CH-01 | |
-| **T4 04/11** | Nạp dữ liệu thật của Hoàng Phát lên môi trường đã triển khai, chạy thử trọn vòng một lượt | Sửa chỗ hỏng lộ ra | Chuẩn bị buổi chạy thử |
-| **T5 05/11** | Quan sát, ghi chép | Quan sát, ghi chép | **CH-02: buổi chạy thử với kế toán** |
-| **T6 06/11** | Sửa chỗ khựng ở mức sửa được trong ngày | Sửa chỗ khựng | **Mốc M2.** Viết kết quả vào ROADMAP |
+| Ngày | Brain-1 |
+|---|---|
+| **T2 02/11** | Đọc lại tài liệu đã viết tuần 1, chạy lại BR-04 một mình để chắc là làm được |
+| **T3 03/11** | **BR-06** dựng bộ câu hỏi và nhãn |
+| **T4 04/11** | **BR-05 hạn.** Phiên đo trên Colab, đọc cảnh báo khung đo trước điểm số |
+| **T5 05/11** | **BR-06 hạn.** Báo cáo chỉ số RAG |
+| **T6 06/11** | **BR-07.** Viết biên bản chu kỳ, cập nhật TIEN_TRINH_BRAIN và ARCHITECTURE |
 
 ### 6.5. Hai mốc kiểm
 
-**M1, Thứ Sáu 30/10 cuối ngày.** Trả lời đúng một câu: *từ một máy bất kỳ không phải máy dựng, mở địa chỉ Body, đăng nhập, tải `ton_kho_mau.xlsx`, có thấy 8 phát hiện trên 7 mã không?*
+**M1, Thứ Sáu 30/10 cuối ngày.** Trả lời đúng một câu: *một câu hỏi thật có đi trọn vòng từ `/chat` qua `VLLM_BASE_URL` tới vLLM server trên L4 và quay về không, và log của server có ghi nhận request đó không?*
 
-Không đạt thì **dừng mọi việc P1 và P2**, dồn toàn bộ tuần 2 vào đường găng. Đừng làm BR-04 trong khi cổng chính chưa mở.
+Không đạt thì **dừng BR-06 và BR-07**, dồn toàn bộ tuần 2 vào đường găng.
 
 **M2, Thứ Sáu 06/11.** Cổng ra chu kỳ, xem §7.
 
@@ -439,63 +406,63 @@ Không đạt thì **dừng mọi việc P1 và P2**, dồn toàn bộ tuần 2 
 
 ## 7. Cổng ra chu kỳ
 
-Chu kỳ 01 coi là đạt khi đủ cả năm:
+Chu kỳ 01 đạt khi đủ cả sáu:
 
-- [ ] Kế toán Hoàng Phát tự tải file MISA thật lên và tự đọc được kết quả, **không ai ngồi cạnh** (CH-02)
-- [ ] Quét xác thực trên môi trường đã triển khai, qua HTTPS thật, mọi endpoint trừ `/health` trả 401 khi không có token (CH-01)
+- [ ] `/chat` chạy qua **vLLM server** chứ không phải `vllm.LLM` trong tiến trình, và có một phép thử **chứng minh server nhận được request**, không phải chỉ chứng minh biến môi trường được đọc (BR-03)
+- [ ] Ba bẫy ở §3.3 đều có phép thử riêng và đều xanh: chat template, `enable_thinking=False`, `repetition_penalty=1.0` khi bật grammar (BR-02)
+- [ ] Ngân sách ngữ cảnh đã **đo** trên L4 ở ba cấu hình, và quyết định ctx cùng vision đã ghi vào ARCHITECTURE kèm lý do (BR-04)
 - [ ] `/tools/vat` trả 422 cho trường lạ, không còn tính bằng 0 rồi buộc tội sổ sách (BR-01)
-- [ ] `pytest -q` xanh, `ruff` sạch, và các con số đó đo trên **đúng mã đã triển khai**
-- [ ] Biên bản chu kỳ ghi rõ ba thứ: chi phí thật VNĐ/tháng, những chỗ khách khựng lại, và danh sách đẩy sang chu kỳ 02
+- [ ] `pytest -q` xanh và `ruff` sạch, đo trên đúng mã đã chạy phiên đo
+- [ ] Biên bản chu kỳ ghi: việc treo 1 và 2 đóng hay mở, chỉ số RAG nếu có, chi phí thật, và danh sách đẩy sang chu kỳ 02
 
 Mỗi mục chưa đạt PHẢI có một dòng nêu lý do và người chịu trách nhiệm đẩy tiếp.
 
 ---
 
-## 8. Rủi ro, giả định, và việc cần chốt
+## 8. Rủi ro, giả định, việc cần chốt
 
 ### 8.1. Rủi ro
 
 | Rủi ro | Dấu hiệu sớm | Xử lý |
 |---|---|---|
-| BD-01 trượt vì chưa chốt chỗ đặt | Hết Thứ Hai 26/10 mà chưa có quyết định | Chủ dự án quyết trong ngày. Mọi phương án đều hơn không quyết |
-| Brain-2 nghỉ sớm hơn dự kiến | không có dấu hiệu báo trước | Dồn BR-03 lên sớm, và Brain-1 viết tài liệu **trong lúc** nghe, không để sau |
-| `docker compose` chưa ai chạy bao giờ, nổ lúc dựng | BR-02 trượt Thứ Tư | Lùi về chạy uvicorn thẳng trên máy đích. Cổng ra không đòi Docker |
-| Dữ liệu thật của khách chưa về kịp buổi 05/11 | Hết Thứ Hai 02/11 chưa có file | Chạy buổi đó bằng bản xuất MISA khách đã gửi tháng 8 |
-| Lược đồ Body đổi giữa chu kỳ | migration mới trên nhánh dùng chung | Phép thử hợp đồng ở BR-03 yêu cầu 6 sẽ đỏ, đó là mục đích của nó |
+| Colab cấp T4 thay vì L4 | Ô kiểm GPU ở đầu notebook | Đổi phiên, hoặc đợi. T4 16GB không đủ cho Qwen3-8B AWQ |
+| ctx 32k không vừa cùng vision trên L4 | BR-04 cấu hình thứ ba không dựng nổi | Đây là **kết quả đo**, không phải thất bại. Ghi đánh đổi vào ARCHITECTURE rồi chọn |
+| Phiên bản vLLM trên Colab trôi khỏi khoảng ghim | `guided_json` bị bỏ qua im lặng | BR-05 yêu cầu 4 bắt được. Ghim phiên bản ngay lúc `pip install` |
+| Brain-2 nghỉ sớm hơn dự kiến | không có dấu hiệu báo trước | Dồn BR-02 và BR-03 lên sớm. Brain-1 viết tài liệu **trong lúc** nghe, không để sau |
+| Phiên Colab hết giờ giữa chừng | Runtime ngắt | `bat_lai_brain.py` đã có để dựng lại. Chạy bằng `%run -i`, không phải `!python` |
 
 ### 8.2. Giả định
 
-1. Hoàng Phát vẫn là khách duy nhất, nên chưa cần cô lập dữ liệu đa khách.
-2. Không thuê GPU trong chu kỳ này. Nhánh `/chat` tắt theo thiết kế ở môi trường khách.
-3. Bốn file MISA đã nhận tháng 8 còn dùng được làm dữ liệu thử.
-4. Đội Body có quyền triển khai mà không cần phê duyệt bên ngoài.
+1. Colab Pro cấp được L4 trong các buổi đã lên lịch.
+2. Bản AWQ `ANSER_AI_Logistics/anser-v3-awq` và thư mục `generated` của phiên 15/08 còn trên Drive.
+3. Không thuê GPU trong chu kỳ này.
+4. Hoàng Phát vẫn là khách duy nhất, nên chưa cần cô lập dữ liệu đa khách.
 
 ### 8.3. Chủ dự án cần chốt trước 17h Thứ Hai 26/10
 
 | # | Câu hỏi | Vì sao không hoãn được |
 |---|---|---|
-| 1 | **Body và Brain đặt ở đâu?** Nêu nhà cung cấp và ai trả tiền | Chặn BD-01, tức chặn đường găng |
-| 2 | **Tắt `/chat` ở môi trường khách trong chu kỳ này có được không?** | Đây là đề xuất của tài liệu, không phải quyết định đã có. Nếu phải bật thì chu kỳ cần thêm một tuần cho việc nối vLLM |
-| 3 | **Ai là Brain-1 và Brain-2?** Brain-2 nghỉ từ ngày nào | Quyết toàn bộ lịch tuần 1 |
-| 4 | **Buổi 05/11 kế toán nào ngồi?** Người của Hoàng Phát, hay kế toán rà sổ, hay cả hai | Hai người này phục vụ hai mục đích khác nhau |
+| 1 | **Ai là Brain-1 và Brain-2, và Brain-2 nghỉ từ ngày nào?** | Quyết toàn bộ lịch tuần 1. Nếu Brain-2 nghỉ trước 30/10 thì phải rút BR-04 lên |
+| 2 | **Đo trên bản gốc `Qwen3-8B` hay bản fine-tune `anser-v3-awq`, hay cả hai?** | Quyết thời lượng BR-04 và BR-05. So cặp cần cả hai, mất gấp đôi thời gian GPU |
+| 3 | **Có chấp nhận tắt vision để lấy ctx 32k không, nếu BR-04 cho thấy không vừa cả hai?** | Vision phục vụ OCR hoá đơn nhà xe. Đây là đánh đổi nghiệp vụ, không phải quyết định kỹ thuật |
+| 4 | **Khi nào bắt đầu tìm kế toán rà sổ?** | Nằm ngoài chu kỳ này nhưng phụ thuộc lịch người ngoài, nên càng hỏi sớm càng tốt |
 
 ---
 
 ## 9. Ngoài phạm vi chu kỳ 01
 
-Nêu ra để không ai làm, và để biết chúng chưa chết:
+Nêu ra để không ai làm, và để biết chúng chưa chết.
 
 | Việc | Vì sao hoãn | Ở đâu |
 |---|---|---|
-| Nối `VLLMServerClient` vào `engine.py` | Không phục vụ cổng ra. Lớp sổ sách không cần model | [GIAO_VIEC_BRAIN.md](GIAO_VIEC_BRAIN.md) V2 |
-| Nối Redis cho `TASK_REGISTRY`, client HTTP cho vision | Chưa chặn gì khi chạy một worker | V2 bước 5 |
-| Bộ đo RAG: recall@20, MRR, faithfulness | Cần tài liệu thật của khách mới đo có nghĩa | V4 |
-| Phiên đo lại trên Colab | Cần GPU và một buổi trọn vẹn | V5 |
-| Mảng vận tải | Chặn bởi khách. Hoàng Phát chưa làm vận tải | V7 |
-| Tuổi nợ 30/60/90 | Chặn bởi sổ chi tiết công nợ của khách | V6 |
-| Huấn luyện lại model | Đã đo: narration hỏng 11 sửa 0 | ROADMAP GĐ D |
-
-Việc duy nhất ngoài phạm vi mà vẫn **nên khởi động trong chu kỳ này** là tìm kế toán có nghề rà [HOANG_PHAT_SOAT_SO_1108.md](HOANG_PHAT_SOAT_SO_1108.md). Nó phụ thuộc lịch người ngoài nên càng hỏi sớm càng tốt, và nó rẻ hơn mọi việc trong tài liệu này.
+| **Nối Redis cho `TASK_REGISTRY`** | Thuộc S2 nhưng TIEN_TRINH §7 xếp thứ 4 và ghi "chưa gấp". Chỉ cần khi chạy nhiều tiến trình | GIAO_VIEC V2 bước 5 |
+| **Nối `vllm-vision` qua HTTP** | TIEN_TRINH §7 thứ 5. Phụ thuộc kết quả đo ở BR-04 | TIEN_TRINH §3 treo 3 |
+| **Cloudflare Tunnel** | Thuộc S2, nhưng phụ thuộc quyết định chỗ đặt mà chu kỳ này chưa có | ROADMAP điểm chặn 4 |
+| **Đưa lên chỗ khách truy cập được** | Ô đỏ duy nhất còn lại của Giai đoạn B, và nó **chưa chết**. Lớp kế toán chạy được không cần GPU: đã kiểm `RUNTIME_PROFILE=minimal` ngày 24/10, `/tools/inventory-audit` trả 2 phát hiện với `engine_ready: false`. Hoãn vì chu kỳ này dồn vào S2, không vì nó khó | ROADMAP GĐ B |
+| **`SCHEMA MAP` khớp ERD Body + `get_report_lines`** | ERD đã chốt nên nó sẵn sàng, nhưng nó không nằm trên đường găng của S2. Lấy làm việc đệm nếu BR-05 hoặc BR-06 xong sớm | GIAO_VIEC V3 |
+| **Mảng vận tải** | Chặn bởi khách. Hoàng Phát chưa làm vận tải | GIAO_VIEC V7 |
+| **Huấn luyện lại model** | Đã đo 15/08: narration hỏng 11 sửa 0 | ROADMAP GĐ D |
+| **Kế toán thật rà sổ** | Không phải việc của Brain, nhưng là việc rẻ nhất đang chặn nhiều thứ nhất. **Nên khởi động trong chu kỳ này** | GIAO_VIEC V6 |
 
 ---
 
@@ -505,12 +472,12 @@ Việc duy nhất ngoài phạm vi mà vẫn **nên khởi động trong chu k�
 |---|---|
 | Dựng môi trường, hiểu mã, từ điển thuật ngữ | [SO_TAY_NGUOI_MOI.md](SO_TAY_NGUOI_MOI.md) |
 | Bảy việc dài hạn kèm bối cảnh đầy đủ | [GIAO_VIEC_BRAIN.md](GIAO_VIEC_BRAIN.md) |
-| Năm ràng buộc R1–R5, quy trình phản biện | [AGENTS.md](AGENTS.md) |
-| Quyết định kiến trúc, sổ lỗi | [ARCHITECTURE.md](ARCHITECTURE.md) |
+| Đang ở đâu, cái gì đã chắc, cái gì đang dở | [TIEN_TRINH_BRAIN.md](TIEN_TRINH_BRAIN.md) |
+| Năm ràng buộc R1–R5, thứ tự ưu tiên S0–S8 | [AGENTS.md](AGENTS.md) |
+| Quyết định kiến trúc, ngân sách VRAM, sổ lỗi | [ARCHITECTURE.md](ARCHITECTURE.md) |
+| Chạy phiên đo Colab từng ô | [PHIEN_DO_COLAB.md](PHIEN_DO_COLAB.md) |
 | Cổng ra từng giai đoạn | [ROADMAP.md](ROADMAP.md) |
-| Kịch bản chạy thử từng bước | [CHAY_THU_NOI_BO.md](CHAY_THU_NOI_BO.md) |
-| Kết quả soát sổ gửi khách | [HOANG_PHAT_SOAT_SO_1108.md](HOANG_PHAT_SOAT_SO_1108.md) |
-| Hợp đồng API với Body | `tests/test_body_contract.py` |
+| Ba mảng nghiên cứu sâu, gồm phương án bộ đo RAG | [BAN_GIAO_VAN_TAI.md](BAN_GIAO_VAN_TAI.md) §E |
 
 ---
 

@@ -85,9 +85,9 @@ R1 có một hệ quả dễ bỏ qua: **"chưa biết" khác "bằng 0"**. `Non
 >
 > Đây không phải chi tiết nhỏ. Sáu phép kiểm sổ sách đã tìm ra 5.596.500đ giá vốn không ghi và 157/160 mã sai diện thuế trên dữ liệu thật của khách, mà khách **chưa có đường nào tự chạy chúng**.
 >
-> Đòn bẩy làm việc này khả thi: lớp sinh ra giá trị **không cần GPU và không cần model**. Chạy `RUNTIME_PROFILE=minimal` thì Brain phục vụ toàn bộ `/tools/*` trên một máy CPU rẻ tiền, còn nhánh `/chat` tắt theo thiết kế. Đã kiểm ngày 24/10, xem [SRS_CHU_KY_01.md §2.3](SRS_CHU_KY_01.md).
+> Một điều đáng biết khi tới lúc làm: lớp sinh ra giá trị **không cần GPU và không cần model**. Chạy `RUNTIME_PROFILE=minimal` thì Brain phục vụ toàn bộ `/tools/*` trên một máy CPU rẻ tiền, còn nhánh `/chat` tắt theo thiết kế. Kiểm ngày 24/10: `/health` trả `engine_ready: false` mà `/tools/inventory-audit` vẫn ra 2 phát hiện kèm `money_impact`.
 >
-> Kế hoạch đóng ô đỏ đó, kèm người và hạn: [SRS_CHU_KY_01.md](SRS_CHU_KY_01.md).
+> Ô đỏ này **chưa nằm trong chu kỳ đang chạy**. Chu kỳ 01 dồn vào S2, tức đưa `/chat` qua vLLM server chạy Qwen3-8B trên GPU L4. Lý do hoãn và trạng thái: [SRS_CHU_KY_01.md §9](SRS_CHU_KY_01.md).
 
 ### 2.1. Cần gì
 

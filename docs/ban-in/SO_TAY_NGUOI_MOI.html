@@ -541,12 +541,17 @@ nó như mô tả cách sản phẩm vận hành.</p>
 5.596.500đ giá vốn không ghi và 157/160 mã sai diện thuế trên dữ liệu
 thật của khách, mà khách <strong>chưa có đường nào tự chạy
 chúng</strong>.</p>
-<p>Đòn bẩy làm việc này khả thi: lớp sinh ra giá trị <strong>không cần
-GPU và không cần model</strong>. Chạy
+<p>Một điều đáng biết khi tới lúc làm: lớp sinh ra giá trị <strong>không
+cần GPU và không cần model</strong>. Chạy
 <code>RUNTIME_PROFILE=minimal</code> thì Brain phục vụ toàn bộ
 <code>/tools/*</code> trên một máy CPU rẻ tiền, còn nhánh
-<code>/chat</code> tắt theo thiết kế. Đã kiểm ngày 24/10, xem <a href="SRS_CHU_KY_01.md">SRS_CHU_KY_01.md §2.3</a>.</p>
-<p>Kế hoạch đóng ô đỏ đó, kèm người và hạn: <a href="SRS_CHU_KY_01.md">SRS_CHU_KY_01.md</a>.</p>
+<code>/chat</code> tắt theo thiết kế. Kiểm ngày 24/10:
+<code>/health</code> trả <code>engine_ready: false</code> mà
+<code>/tools/inventory-audit</code> vẫn ra 2 phát hiện kèm
+<code>money_impact</code>.</p>
+<p>Ô đỏ này <strong>chưa nằm trong chu kỳ đang chạy</strong>. Chu kỳ 01
+dồn vào S2, tức đưa <code>/chat</code> qua vLLM server chạy Qwen3-8B
+trên GPU L4. Lý do hoãn và trạng thái: <a href="SRS_CHU_KY_01.md">SRS_CHU_KY_01.md §9</a>.</p>
 </blockquote>
 <h3 id="21-cần-gì">2.1. Cần gì</h3>
 <table>
