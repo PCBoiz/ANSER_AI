@@ -95,25 +95,25 @@ Việc 1 và 2 làm song song được, vì một cần GPU và một không.
 
 Model text là **`Qwen/Qwen3-8B`** ở định dạng AWQ 4-bit. Không có Qwen3.5 ở đâu trong repo; rà toàn bộ mã, tài liệu và notebook cho ra 22 lần nhắc `Qwen3-8B` và không lần nào nhắc 3.5.
 
-Ngân sách VRAM theo [ARCHITECTURE.md §5.1](ARCHITECTURE.md):
+> ⚠️ **Bảng VRAM ở [ARCHITECTURE.md §5.1](ARCHITECTURE.md) đã lỗi thời.** Nó ghi vision `Qwen2.5-VL-3B AWQ ~3,0 GB` và tổng `~15,0 GB`. Mã không làm thế: [`engine.py`](src/core/engine.py) nạp vision bằng `torch_dtype=torch.bfloat16`, **không lượng tử hoá gì cả**. [RAG_VLM_KE_HOACH.md §B.2.4](RAG_VLM_KE_HOACH.md) đã tính lại ngày 03/08/2026 và bảng đó mới là bảng đúng. Dùng bảng dưới, đừng dùng §5.1.
 
-| Thành phần | VRAM |
-|---|---|
-| Qwen3-8B AWQ, weights | ~5,5 GB |
-| KV-cache ở ctx 32k, batch vừa | ~5,0 GB |
-| Qwen2.5-VL-3B AWQ, vision | ~3,0 GB |
-| Embedding + reranker | ~0,8 GB |
-| Đệm | ~0,7 GB |
-| **Tổng** | **~15,0 GB** |
+Ngân sách VRAM thật trên L4 22,5GB, theo [RAG_VLM_KE_HOACH.md §B.2.4](RAG_VLM_KE_HOACH.md):
 
-Con số đó là **kế hoạch**, chưa phải đo thật. Hiện trạng trong mã khác kế hoạch ở hai chỗ, và cả hai đều ăn thêm VRAM:
+| Thành phần | VRAM | Ghi chú |
+|---|---|---|
+| vLLM, `gpu_memory_utilization = 0.55` | **12,4 GB** | **giữ chỗ cứng**, gồm cả KV cache. Không phải phần vLLM thực dùng |
+| Qwen2.5-VL-3B **bf16** | **~7,5 GB** | 3,75B × 2 byte. Bản 2B cũ là ~4,5 GB |
+| `bge-m3` embedder | ~1,2 GB | **đã chuyển sang CPU** |
+| `ViRanker` reranker | ~1,2 GB | **đã chuyển sang CPU** |
+| **Còn trên GPU** | **~19,9 GB / 22,5 GB** | dư ~2,6 GB cho activation và phân mảnh |
 
-1. Vision nạp qua `transformers` ở **bf16**, không phải AWQ. Chú thích [`engine.py`](src/core/engine.py) ghi: *"VRAM bf16: Qwen2-VL-2B ~4,5GB, Qwen2.5-VL-3B ~7,5GB"*.
-2. `gpu_memory_utilization = 0.55` là **phần giữ chỗ** của vLLM, không phải phần dùng thật. Trên L4 22,5GB thì 0,55 ≈ 12,4GB.
+Chuyển embedder với reranker sang CPU là cách đã dùng để lấy lại 2,4 GB. Truy vấn RAG thưa, vài lượt mỗi phút chứ không phải mỗi token, nên đổi ~200ms độ trễ lấy 2,4 GB là hời.
 
-Cộng lại: 12,4 + 7,5 ≈ **19,9GB trên một card 22,5GB**. Chú thích trong mã gọi đúng tên tình trạng này là *"rất sát trần"*, và đó là lý do embedder với reranker của RAG chạy CPU.
+**Hệ quả cho chu kỳ này.** `L4 22,5GB là sàn, T4 16GB không đủ` ([PHIEN_DO_COLAB.md](PHIEN_DO_COLAB.md) nêu thẳng). Và yêu cầu `ctx 32k` của S2 **chưa ai đo** trên cấu hình thật.
 
-Hệ quả cho chu kỳ này: **L4 22,5GB là sàn, T4 16GB không đủ** ([PHIEN_DO_COLAB.md](PHIEN_DO_COLAB.md) nêu thẳng). Và yêu cầu `ctx 32k` của S2 **chưa ai đo** trên cấu hình thật, nên BR-04 tồn tại để đo chứ không để khẳng định.
+Tính thử để biết nên trông đợi gì, **con số dưới là ước lượng cần BR-04 xác nhận**. KV cache của Qwen3-8B tốn khoảng `2 × số_lớp × số_đầu_KV × head_dim × 2 byte` mỗi token. Với 36 lớp, 8 đầu KV, head_dim 128 thì ra ~0,147 MB mỗi token, tức **~4,6 GB cho một chuỗi dài trọn 32k**. Cộng ~6 GB weights AWQ thì một chuỗi 32k chiếm ~10,6 GB trong bể 12,4 GB.
+
+Đánh đổi thật của chu kỳ này là **ctx so với số request chạy đồng thời**. Ở 32k, bể KV gần như chỉ đủ cho một chuỗi dài trọn vẹn, và continuous batching của vLLM chỉ phát huy khi còn chỗ cho nhiều chuỗi. BR-04 tồn tại để đo chuyện đó chứ không để khẳng định.
 
 ### 2.4. Hiện trạng đo được, mốc `645f4a1`
 
@@ -263,21 +263,31 @@ Và trên Colab ở BR-04: một câu hỏi thật đi trọn vòng qua `VLLM_BA
 
 **Ưu tiên** P0 · **Người làm** Brain-2 và Brain-1 cùng ngồi · **Hạn** Thứ Sáu 30/10 · **Phụ thuộc** BR-03
 
-**Vì sao.** S2 đòi **ctx 32k**, và [ARCHITECTURE.md §9.3](ARCHITECTURE.md) giải thích vì sao đó là điều kiện cần: vòng agentic nạp lại kết quả tool ở mỗi bước, nên ở `max_model_len` nhỏ thì context tràn sau khoảng ba lần gọi tool có kèm đoạn RAG. Nhưng **chưa ai đo** 32k trên phần cứng thật. §2.3 cho thấy cấu hình hiện tại đã ở mức ~19,9GB trên card 22,5GB, nên 32k có thể không vừa khi vision cùng bật.
+**Vì sao.** S2 đòi **ctx 32k**, và [ARCHITECTURE.md §9.3](ARCHITECTURE.md) giải thích vì sao đó là điều kiện cần: vòng agentic nạp lại kết quả tool ở mỗi bước, nên ở `max_model_len` nhỏ thì context tràn sau khoảng ba lần gọi tool có kèm đoạn RAG. Chưa ai đo 32k trên phần cứng thật.
 
-Đo rồi quyết. Chọn con số vì "nghe hợp lý" là cách đi lùi mà không biết.
+**Hai ràng buộc đã chốt, không đưa ra thương lượng lại trong chu kỳ này:**
+
+1. **Vision ở lại.** Quyết định của chủ dự án ngày 24/10. ANSER cần vision cho một số tác vụ, nên mọi phương án lấy chỗ bằng cách tắt vision đều bị loại.
+2. **Không lượng tử hoá vision xuống 4-bit.** [RAG_VLM_KE_HOACH.md §B.2.4](RAG_VLM_KE_HOACH.md) đã bác phương án này với lý do đứng vững: việc của vision là đọc đúng con số tiền trên tờ giấy nhàu, đó là loại tác vụ mất mát lượng tử hoá gây hại nhất, và dự án **chưa có bộ ảnh thật nào** để đo xem mất bao nhiêu.
+
+Nên đánh đổi cần đo là **ctx so với số request đồng thời**, xem phép tính ở §2.3.
 
 **Yêu cầu.**
 1. PHẢI dựng `vllm serve` cho `Qwen3-8B` AWQ trên Colab L4, cổng nội bộ, phiên bản nằm trong khoảng ghim ở BR-02 yêu cầu 5.
 2. Brain PHẢI gọi được qua `VLLM_BASE_URL` và trả lời đúng một câu hỏi thật đi hết vòng agentic.
-3. PHẢI đo và ghi lại **ba cấu hình**: `max_model_len` 8192 không vision, 32768 không vision, 32768 có vision. Mỗi cấu hình ghi VRAM đỉnh và việc nó có dựng nổi hay không.
-4. PHẢI ghi `inference_latency_p95` ở 4 request đồng thời cho cấu hình được chọn. Ngưỡng tham chiếu ở ARCHITECTURE §13 là 5.000ms.
-5. Kết quả PHẢI thành một quyết định ghi vào [ARCHITECTURE.md](ARCHITECTURE.md) trong cùng PR: ctx bao nhiêu, vision bật hay tắt, và vì sao.
-6. Nếu 32k không vừa cùng vision, PHẢI nêu rõ đánh đổi thay vì im lặng hạ xuống. Vision phục vụ OCR hoá đơn, là tính năng cốt lõi.
+3. PHẢI đo **với vision đang nạp** ở mọi cấu hình. Đo lúc vision tắt rồi suy ra là tự cho mình một ngân sách không tồn tại.
+4. PHẢI đo và ghi lại ít nhất **ba mức `max_model_len`**: 8192, 16384, 32768. Mỗi mức ghi: server có dựng nổi không, VRAM đỉnh theo `nvidia-smi`, và **số token KV cache vLLM báo lúc khởi động** (dòng `GPU KV cache size`).
+5. PHẢI quy số token KV cache đó ra **số request 32k chạy song song được**, vì đó là con số quyết định `ANSER_TEXT_MAX_CONCURRENT`.
+6. PHẢI đo `inference_latency_p95` ở mức đồng thời mà yêu cầu 5 cho ra, không phải ở một con số đặt sẵn. Ngưỡng tham chiếu ARCHITECTURE §13 là 5.000ms.
+7. Nếu 32k không vừa, PHẢI nêu phương án theo thứ tự rẻ trước, và chọn có lý do ghi lại:
+   - hạ `gpu_memory_utilization` rồi đo lại, vì weights AWQ chỉ ~6 GB nên phần giữ chỗ 12,4 GB có thể rộng hơn mức cần;
+   - hạ `max_model_len` xuống mức vừa, kèm con số bao nhiêu lần gọi tool thì tràn;
+   - đẩy vision sang tiến trình riêng qua `vllm-vision`, vốn đã khai trong compose mà chưa nối.
+8. Kết quả PHẢI thành một quyết định ghi vào [ARCHITECTURE.md](ARCHITECTURE.md) trong cùng PR, **kèm sửa bảng §5.1 đang lỗi thời** như §2.3 nêu.
 
-**Nghiệm thu.** Một bảng ba dòng trong PR, mỗi dòng có: `max_model_len`, vision bật/tắt, VRAM đỉnh đo bằng `nvidia-smi`, dựng được hay không, p95. Kèm một đoạn log vLLM server cho thấy request của Brain.
+**Nghiệm thu.** Một bảng trong PR, mỗi dòng một mức `max_model_len`, các cột: dựng được hay không, VRAM đỉnh, `GPU KV cache size`, số request 32k song song suy ra, p95. Kèm một đoạn log vLLM server cho thấy request của Brain đi tới nơi.
 
-**Ngoài yêu cầu.** Không phục vụ traffic thật từ Colab. [ARCHITECTURE.md §4.4](ARCHITECTURE.md): điều khoản Colab Paid cấm web service, nên Colab chỉ dùng để đo và thử nghiệm rời rạc.
+**Ngoài yêu cầu.** Không phục vụ traffic thật từ Colab. [ARCHITECTURE.md §4.4](ARCHITECTURE.md): điều khoản Colab Paid cấm web service, nên Colab chỉ dùng để đo và thử nghiệm rời rạc. Không đổi model vision trong chu kỳ này.
 
 ---
 
@@ -285,21 +295,37 @@ Và trên Colab ở BR-04: một câu hỏi thật đi trọn vòng qua `VLLM_BA
 
 **Ưu tiên** P1 · **Người làm** Brain-1 · **Hạn** Thứ Tư 04/11 · **Phụ thuộc** BR-04
 
-**Vì sao.** [TIEN_TRINH_BRAIN.md §3](TIEN_TRINH_BRAIN.md) treo hai việc. Việc treo 1: `render_tools()` từng quảng cáo `sales`, `expenses`, `lines*` cho model trong khi lược đồ đã gạch chúng, đã sửa ở `0c82c4d` nhưng **chưa có số chứng minh nó kéo agentic lên**. Việc treo 2: `providers.py` ghi lại chế độ ràng buộc **dự định**, và `smoke_test_guided()` kiểm chế độ đó có **thi hành** không; hai thứ khác nhau.
+**Vì sao.** Chủ dự án chốt ngày 24/10: đo **bản fine-tune `anser-v3-awq`**, và mục đích là *"xem hổng chỗ nào để còn biết mà cải tiến"*. Nên việc này là **chẩn đoán**, không phải chấm điểm. Đầu ra có giá trị của nó là một **danh sách lỗ hổng theo loại**, đủ cụ thể để quyết vòng cải tiến sau sửa cái gì.
 
-Runbook đầy đủ ở [PHIEN_DO_COLAB.md](PHIEN_DO_COLAB.md). Khoảng một giờ khi đo lại, vì dữ liệu sinh phiên 15/08 còn trên Drive tại `ANSER_AI_Logistics/generated`.
+Nó đồng thời đóng hai việc treo ở [TIEN_TRINH_BRAIN.md §3](TIEN_TRINH_BRAIN.md). Treo 1: `render_tools()` từng quảng cáo `sales`, `expenses`, `lines*` cho model trong khi lược đồ đã gạch chúng; sửa ở `0c82c4d` nhưng **chưa có số chứng minh nó kéo agentic lên**. Treo 2: `providers.py` ghi lại chế độ ràng buộc **dự định**, còn `smoke_test_guided()` kiểm chế độ đó có **thi hành** không.
+
+Số phiên 15/08 để biết nên soi vào đâu trước:
+
+| Nhánh | Bản fine-tune | Đọc ra gì |
+|---|---|---|
+| extraction | **65,3%** | mạnh nhất. Nhưng đo trên dữ liệu **sinh ra**, chưa phải tin nhắn thật |
+| n8n | 67,6% | |
+| **narration** | **44,4%** | chỗ hổng nặng nhất. Hỏng 11 sửa 0 so với bản gốc, **trong đó 8 ca bịa số** |
+| **agentic** | **15,8%** | phần lớn thất bại đến từ **lỗi lược đồ**, nay đã sửa. Con số này nhiều khả năng đổi |
+
+Tám ca bịa số ở narration là lỗi **R1**, và với sản phẩm kế toán thì đó là loại không được phép có.
+
+Runbook đầy đủ ở [PHIEN_DO_COLAB.md](PHIEN_DO_COLAB.md). Khoảng một giờ, vì dữ liệu sinh phiên 15/08 còn trên Drive tại `ANSER_AI_Logistics/generated`.
 
 **Yêu cầu.**
-1. PHẢI chạy `benchmark_v3.py` qua **đường server** của BR-03, không qua đường trong tiến trình. Đo đường không dùng nữa là đo một khâu không phục vụ ai.
-2. PHẢI so **theo cặp** bằng `compare_runs.py`. Hai điểm trung bình không trả lời được câu "bản mới làm hỏng câu nào mà bản cũ vốn đúng".
-3. PHẢI đọc ba dòng cảnh báo khung đo **trước** điểm số: `⚠ đầu ra KHÔNG đọc được thành JSON`, `⚠ CẮT CỤT`, `[chốt chặn]`. Tỷ lệ JSON hỏng từ 30% trở lên gần như luôn là mã chứ không phải model.
-4. PHẢI xác nhận `smoke_test_guided()` báo ràng buộc **đang thi hành** trên đường server. Đây là chỗ bẫy 2 và 3 ở §3.3 lộ ra nếu BR-02 làm sót.
-5. PHẢI dùng chung các hằng số trần token (`MAX_DECISION_TOKENS`, `MAX_REPORT_TOKENS`, `MAX_WORKFLOW_TOKENS`). Benchmark từng đo ở 1024 trong khi production cấp 700, nên mọi tỷ lệ cắt cụt đo được đều đẹp hơn thứ khách nhận.
-6. Kết quả PHẢI cập nhật vào TIEN_TRINH_BRAIN.md: việc treo 1 và 2 đóng hay vẫn mở.
+1. PHẢI chạy `benchmark_v3.py` trên `anser-v3-awq`, qua **đường server** của BR-03. Đo đường không dùng nữa là đo một khâu không phục vụ ai.
+2. PHẢI đọc ba dòng cảnh báo khung đo **trước** điểm số: `⚠ đầu ra KHÔNG đọc được thành JSON`, `⚠ CẮT CỤT`, `[chốt chặn]`. Tỷ lệ JSON hỏng từ 30% trở lên gần như luôn là mã chứ không phải model.
+3. PHẢI xác nhận `smoke_test_guided()` báo ràng buộc **đang thi hành** trên đường server. Đây là chỗ bẫy 2 và 3 ở §3.3 lộ ra nếu BR-02 làm sót.
+4. PHẢI dùng chung các hằng số trần token (`MAX_DECISION_TOKENS`, `MAX_REPORT_TOKENS`, `MAX_WORKFLOW_TOKENS`). Benchmark từng đo ở 1024 trong khi production cấp 700, nên mọi tỷ lệ cắt cụt đo được đều đẹp hơn thứ khách nhận.
+5. **Đầu ra chính PHẢI là bảng phân loại lỗi**, không phải một con số phần trăm. Mỗi nhánh liệt kê các loại hỏng kèm **số ca** và **một ví dụ nguyên văn**. Tối thiểu phân biệt: bịa số, sai lược đồ, cắt cụt, thiếu trường bắt buộc, hiểu sai ý câu hỏi.
+6. Loại **bịa số** PHẢI soi riêng, vì nó là lỗi R1. Với mỗi ca, ghi con số model bịa và con số đúng lẽ ra phải có.
+7. Mỗi loại lỗi PHẢI quy về một trong ba nguyên nhân, vì cách sửa khác hẳn nhau: **dữ liệu huấn luyện**, **lược đồ hoặc prompt**, **mã khung đo**. Lịch sử dự án cho thấy ba lần liên tiếp con số xấu đến từ mã chứ không từ model.
+8. Kết quả PHẢI cập nhật vào TIEN_TRINH_BRAIN.md: treo 1 và 2 đóng hay vẫn mở.
+9. NÊN chạy thêm bản gốc `Qwen3-8B` rồi so theo cặp bằng `compare_runs.py`, nếu còn thời gian GPU. Việc này trả lời câu "bản fine-tune làm hỏng câu nào mà bản gốc vốn đúng", thứ mà một lần chạy đơn lẻ không nói được. Để ở mức NÊN vì nó tốn gấp đôi thời gian GPU.
 
-**Nghiệm thu.** Hai file JSON kết quả cộng đầu ra của `compare_runs.py`, đính vào PR. Dòng `[chốt chặn] ràng buộc JSON: ✓ CHẠY` PHẢI có mặt.
+**Nghiệm thu.** File JSON kết quả, cộng **bảng phân loại lỗi** theo yêu cầu 5 đến 7, đính vào PR. Dòng `[chốt chặn] ràng buộc JSON: ✓ CHẠY` PHẢI có mặt.
 
-**Ngoài yêu cầu.** Không huấn luyện lại model. Kết luận "dùng model gốc cho nhánh kế toán" đã có từ 15/08 và chu kỳ này không xét lại.
+**Ngoài yêu cầu.** Không huấn luyện lại model trong chu kỳ này. Bảng phân loại lỗi là **đầu vào** cho quyết định huấn luyện lại, không phải quyết định đó.
 
 ---
 
@@ -354,15 +380,20 @@ Bốn lỗ hổng chức năng mà [ARCHITECTURE.md §13b.3](ARCHITECTURE.md) li
 
 ## 6. Phân công và lịch
 
-### 6.1. Vai
+### 6.1. Hai luồng việc, chia theo năng lực chứ không theo tên
 
-| Vai | Là ai | Nhận gì |
+Nhân sự chu kỳ này chưa chốt, nên lịch chia theo **loại việc**. Ai nhận luồng nào thì điền vào bảng lúc bắt đầu, và lịch không đổi theo.
+
+| Luồng | Tính chất | Việc |
 |---|---|---|
-| **Brain-1** | người mới vào | BR-01, BR-05, BR-06, BR-07. Việc biên rõ, có đáp án kiểm được |
-| **Brain-2** | người sắp nghỉ một thời gian | BR-02, BR-03, BR-04. Việc cần ngữ cảnh sẵn có. **Dồn vào tuần 1** |
-| **Chủ dự án** | bạn | Chốt §8.3, cấp Colab Pro và Drive, tìm kế toán rà sổ |
+| **A, đường găng** | Cần ngữ cảnh sẵn có về `serving.py`, `engine.py` và vòng agentic. Sai ở đây làm hỏng cả chu kỳ | BR-02 → BR-03 → BR-04 → BR-05 |
+| **B, biên rõ** | Phạm vi hẹp, đáp án kiểm được bằng lệnh, hỏng cũng không lan. An toàn cho người mới nhận repo | BR-01, BR-06, BR-07 |
 
-> **Ràng buộc lịch quan trọng nhất.** Brain-2 sắp nghỉ. Giá trị lớn nhất họ để lại là thứ chưa nằm trong tài liệu. Vì vậy BR-03 và BR-04 làm **theo cặp** với Brain-1, và mọi thứ Brain-2 giải thích miệng PHẢI được Brain-1 viết vào tài liệu trong cùng ngày. Sau Thứ Sáu 30/10, kế hoạch giả định Brain-2 không còn trả lời được.
+**Nếu chỉ có một người làm cả hai luồng:** chạy luồng A theo đúng thứ tự, chèn BR-01 vào ngày đầu vì nó mất khoảng một ngày và cho người làm chạm vào lớp tất định trước khi đụng tầng model. BR-06 và BR-07 đẩy sang chu kỳ 02, không cần giải trình, vì chúng là P1 và P2.
+
+**Nếu có hai người và một người sắp nghỉ:** người sắp nghỉ nhận luồng A và **dồn hết vào tuần 1**. Giá trị lớn nhất họ để lại là thứ chưa nằm trong tài liệu, nên BR-03 và BR-04 làm **theo cặp**, và người ở lại là người **viết tài liệu ngay trong lúc nghe**, không để sau. Từ ngày họ nghỉ, kế hoạch giả định không hỏi được ai nữa.
+
+Chủ dự án: chốt §8.3, cấp Colab Pro và quyền đọc Drive `ANSER_AI_Logistics/`.
 
 ### 6.2. Đường găng
 
@@ -376,21 +407,23 @@ Cả bốn việc đầu nằm trên một đường. **BR-02 trượt là cả 
 
 ### 6.3. Tuần 1: Thứ Hai 26/10 đến Thứ Sáu 30/10
 
-| Ngày | Brain-1 | Brain-2 |
+| Ngày | Luồng A, đường găng | Luồng B, biên rõ |
 |---|---|---|
-| **T2 26/10** | Dựng môi trường theo [sổ tay §2](SO_TAY_NGUOI_MOI.md), ra 1003 passed. Làm bài tập 1 và 2 | Đọc `serving.py` và `engine.py`, chốt thiết kế rẽ nhánh backend |
-| **T3 27/10** | **BR-01** | **BR-02** |
-| **T4 28/10** | **BR-01** xong, có test hồi quy | **BR-02 hạn.** Bắt đầu **BR-03** |
-| **T5 29/10** | Cặp với Brain-2 trên **BR-03**, và là người **viết tài liệu** | **BR-03 hạn** |
-| **T6 30/10** | Cùng ngồi **BR-04** trên Colab, tự tay chạy một lượt | **BR-04 hạn.** Bàn giao nốt |
+| **T2 26/10** | Đọc `serving.py` và `engine.py`, chốt thiết kế rẽ nhánh backend | Dựng môi trường theo [sổ tay §2](SO_TAY_NGUOI_MOI.md), ra 1003 passed. Làm bài tập 1 và 2 |
+| **T3 27/10** | **BR-02** | **BR-01** |
+| **T4 28/10** | **BR-02 hạn.** Bắt đầu **BR-03** | **BR-01** xong, có test hồi quy |
+| **T5 29/10** | **BR-03 hạn** | Cặp trên **BR-03**, và là người **viết tài liệu** |
+| **T6 30/10** | **BR-04 hạn** | Cùng ngồi **BR-04** trên Colab, tự tay chạy một lượt |
 
 ### 6.4. Tuần 2: Thứ Hai 02/11 đến Thứ Sáu 06/11
 
-| Ngày | Brain-1 |
+Tuần 2 giả định người của luồng A có thể đã nghỉ, nên mọi việc dồn về người ở lại.
+
+| Ngày | Việc |
 |---|---|
-| **T2 02/11** | Đọc lại tài liệu đã viết tuần 1, chạy lại BR-04 một mình để chắc là làm được |
+| **T2 02/11** | Đọc lại tài liệu đã viết tuần 1. Chạy lại BR-04 **một mình** để chắc là làm được mà không cần hỏi ai |
 | **T3 03/11** | **BR-06** dựng bộ câu hỏi và nhãn |
-| **T4 04/11** | **BR-05 hạn.** Phiên đo trên Colab, đọc cảnh báo khung đo trước điểm số |
+| **T4 04/11** | **BR-05 hạn.** Phiên đo trên Colab. Đọc cảnh báo khung đo trước điểm số, rồi dựng bảng phân loại lỗi |
 | **T5 05/11** | **BR-06 hạn.** Báo cáo chỉ số RAG |
 | **T6 06/11** | **BR-07.** Viết biên bản chu kỳ, cập nhật TIEN_TRINH_BRAIN và ARCHITECTURE |
 
@@ -410,7 +443,9 @@ Chu kỳ 01 đạt khi đủ cả sáu:
 
 - [ ] `/chat` chạy qua **vLLM server** chứ không phải `vllm.LLM` trong tiến trình, và có một phép thử **chứng minh server nhận được request**, không phải chỉ chứng minh biến môi trường được đọc (BR-03)
 - [ ] Ba bẫy ở §3.3 đều có phép thử riêng và đều xanh: chat template, `enable_thinking=False`, `repetition_penalty=1.0` khi bật grammar (BR-02)
-- [ ] Ngân sách ngữ cảnh đã **đo** trên L4 ở ba cấu hình, và quyết định ctx cùng vision đã ghi vào ARCHITECTURE kèm lý do (BR-04)
+- [ ] Ngân sách ngữ cảnh đã **đo** trên L4 ở ít nhất ba mức `max_model_len`, **với vision đang nạp**, và quyết định ctx cùng `ANSER_TEXT_MAX_CONCURRENT` đã ghi vào ARCHITECTURE kèm lý do (BR-04)
+- [ ] Bảng §5.1 của ARCHITECTURE đã sửa, không còn ghi vision AWQ 3,0 GB trong khi mã nạp bf16 7,5 GB (BR-04)
+- [ ] Có **bảng phân loại lỗi** của bản fine-tune theo nhánh, mỗi loại kèm số ca và một ví dụ nguyên văn, và mỗi loại đã quy về một trong ba nguyên nhân: dữ liệu, lược đồ, hay mã khung đo (BR-05)
 - [ ] `/tools/vat` trả 422 cho trường lạ, không còn tính bằng 0 rồi buộc tội sổ sách (BR-01)
 - [ ] `pytest -q` xanh và `ruff` sạch, đo trên đúng mã đã chạy phiên đo
 - [ ] Biên bản chu kỳ ghi: việc treo 1 và 2 đóng hay mở, chỉ số RAG nếu có, chi phí thật, và danh sách đẩy sang chu kỳ 02
@@ -438,14 +473,21 @@ Mỗi mục chưa đạt PHẢI có một dòng nêu lý do và người chịu 
 3. Không thuê GPU trong chu kỳ này.
 4. Hoàng Phát vẫn là khách duy nhất, nên chưa cần cô lập dữ liệu đa khách.
 
-### 8.3. Chủ dự án cần chốt trước 17h Thứ Hai 26/10
+### 8.3. Bốn quyết định của chủ dự án, chốt ngày 24/10/2026
 
-| # | Câu hỏi | Vì sao không hoãn được |
+| # | Câu hỏi | Quyết định | Đổi gì trong tài liệu này |
+|---|---|---|---|
+| 1 | Ai nhận luồng nào, và người sắp nghỉ đi từ ngày nào | **Chưa chốt** | §6.1 chia việc theo **loại**, không theo tên, kèm phương án khi chỉ có một người. Lịch không đổi theo nhân sự |
+| 2 | Đo bản gốc hay bản fine-tune | **Bản fine-tune `anser-v3-awq`**, để xem hổng chỗ nào mà cải tiến | BR-05 đổi từ chấm điểm sang **chẩn đoán**. Đầu ra chính là bảng phân loại lỗi, không phải một con số. So cặp với bản gốc hạ xuống mức NÊN |
+| 3 | Có tắt vision để lấy ctx 32k không | **Không.** ANSER cần vision cho một số tác vụ | BR-04 bỏ hẳn phương án tắt vision, đo với vision **đang nạp** ở mọi cấu hình. Đánh đổi chuyển sang ctx so với số request đồng thời |
+| 4 | Khi nào tìm kế toán rà sổ | **Tính sau**, tập trung vào việc làm được ngay | Gỡ khỏi §9. Nó vẫn nằm ở [GIAO_VIEC_BRAIN.md](GIAO_VIEC_BRAIN.md) V6 |
+
+### 8.4. Còn để ngỏ
+
+| # | Câu hỏi | Khi nào cần trả lời |
 |---|---|---|
-| 1 | **Ai là Brain-1 và Brain-2, và Brain-2 nghỉ từ ngày nào?** | Quyết toàn bộ lịch tuần 1. Nếu Brain-2 nghỉ trước 30/10 thì phải rút BR-04 lên |
-| 2 | **Đo trên bản gốc `Qwen3-8B` hay bản fine-tune `anser-v3-awq`, hay cả hai?** | Quyết thời lượng BR-04 và BR-05. So cặp cần cả hai, mất gấp đôi thời gian GPU |
-| 3 | **Có chấp nhận tắt vision để lấy ctx 32k không, nếu BR-04 cho thấy không vừa cả hai?** | Vision phục vụ OCR hoá đơn nhà xe. Đây là đánh đổi nghiệp vụ, không phải quyết định kỹ thuật |
-| 4 | **Khi nào bắt đầu tìm kế toán rà sổ?** | Nằm ngoài chu kỳ này nhưng phụ thuộc lịch người ngoài, nên càng hỏi sớm càng tốt |
+| 1 | **Ai nhận luồng A, ai nhận luồng B** | Sáng Thứ Hai 26/10, điền vào bảng §6.1. Chưa có người cho luồng B thì chạy phương án một người |
+| 2 | **Nếu BR-04 cho thấy 32k không vừa, chấp nhận ctx thấp hơn hay đẩy vision sang tiến trình riêng?** | Khi có số đo, dự kiến Thứ Sáu 30/10. Hỏi trước lúc có số là đoán |
 
 ---
 
@@ -461,8 +503,8 @@ Nêu ra để không ai làm, và để biết chúng chưa chết.
 | **Đưa lên chỗ khách truy cập được** | Ô đỏ duy nhất còn lại của Giai đoạn B, và nó **chưa chết**. Lớp kế toán chạy được không cần GPU: đã kiểm `RUNTIME_PROFILE=minimal` ngày 24/10, `/tools/inventory-audit` trả 2 phát hiện với `engine_ready: false`. Hoãn vì chu kỳ này dồn vào S2, không vì nó khó | ROADMAP GĐ B |
 | **`SCHEMA MAP` khớp ERD Body + `get_report_lines`** | ERD đã chốt nên nó sẵn sàng, nhưng nó không nằm trên đường găng của S2. Lấy làm việc đệm nếu BR-05 hoặc BR-06 xong sớm | GIAO_VIEC V3 |
 | **Mảng vận tải** | Chặn bởi khách. Hoàng Phát chưa làm vận tải | GIAO_VIEC V7 |
-| **Huấn luyện lại model** | Đã đo 15/08: narration hỏng 11 sửa 0 | ROADMAP GĐ D |
-| **Kế toán thật rà sổ** | Không phải việc của Brain, nhưng là việc rẻ nhất đang chặn nhiều thứ nhất. **Nên khởi động trong chu kỳ này** | GIAO_VIEC V6 |
+| **Huấn luyện lại model** | Bảng phân loại lỗi của BR-05 là **đầu vào** cho quyết định này, nên phải có nó trước | ROADMAP GĐ D |
+| **Kế toán thật rà sổ** | Chủ dự án chốt 24/10: tính sau, tập trung vào việc làm được ngay | GIAO_VIEC V6 |
 
 ---
 

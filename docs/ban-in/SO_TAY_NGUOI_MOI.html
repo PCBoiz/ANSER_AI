@@ -2091,6 +2091,14 @@ L4&quot;; log &quot;Booting COLAB engine&quot;</td>
 bẫy</td>
 </tr>
 <tr>
+<td>ARCHITECTURE.md §5.1 ghi vision
+<code>Qwen2.5-VL-3B AWQ ~3,0 GB</code>, tổng <code>~15,0 GB</code></td>
+<td>Mã nạp vision bằng <code>torch_dtype=torch.bfloat16</code>,
+<strong>không lượng tử hoá gì cả</strong>, nên nó tốn ~7,5 GB. <a href="RAG_VLM_KE_HOACH.md">RAG_VLM_KE_HOACH.md §B.2.4</a> đã tính lại
+ngày 03/08/2026: thật ra ~19,9 GB trên card 22,5 GB sau khi đã đẩy
+embedder và reranker sang CPU. Dùng bảng ở §B.2.4, đừng dùng §5.1</td>
+</tr>
+<tr>
 <td>ARCHITECTURE.md §13b.3 liệt kê bốn lỗ hổng RAG &quot;phải vá trước khi
 nạp dữ liệu thật&quot;</td>
 <td><strong>Cả bốn đã vá.</strong> <code>workspace_id</code> bắt buộc ở
