@@ -216,21 +216,51 @@ def _hoi_brain(msg: str, gio: float) -> tuple[str, float]:
     """Đúng đường Body: POST /chat -> task_id -> poll. Câu đầu chờ cả lúc nạp vision."""
     goc = f"http://127.0.0.1:{CONG_BRAIN}"
     t0 = time.time()
-    with httpx.Client(timeout=gio) as c:
-        r = c.post(f"{goc}/chat", json={"user_id": "br04", "store_id": "1", "message": msg})
-        if r.status_code != 200:
-            return f"[POST /chat {r.status_code}] {r.text[:200]}", time.time() - t0
-        tid = r.json().get("task_id")
-        han = time.time() + gio
-        while time.time() < han:
-            time.sleep(2)
-            tt = c.get(f"{goc}/api/v1/task/{tid}").json()
-            if tt.get("status") == "completed":
-                kq = tt.get("result") or {}
-                return str(kq.get("answer") if isinstance(kq, dict) else kq), time.time() - t0
-            if tt.get("status") == "failed":
-                return f"[THẤT BẠI] {tt.get('error')}", time.time() - t0
+    # `POST /chat` chờ trọn lúc nạp runtime TRƯỚC khi trả task_id (chat.py), nên
+    # `gio` áp cho cả POST. Hết giờ thì trả chuỗi lỗi, không ném: ném ra ngoài là
+    # mất luôn đuôi log Brain — thứ duy nhất nói vì sao nó chậm.
+    try:
+        with httpx.Client(timeout=gio) as c:
+            r = c.post(f"{goc}/chat", json={"user_id": "br04", "store_id": "1", "message": msg})
+            if r.status_code != 200:
+                return f"[POST /chat {r.status_code}] {r.text[:200]}", time.time() - t0
+            tid = r.json().get("task_id")
+            han = time.time() + gio
+            while time.time() < han:
+                time.sleep(2)
+                tt = c.get(f"{goc}/api/v1/task/{tid}").json()
+                if tt.get("status") == "completed":
+                    kq = tt.get("result") or {}
+                    return str(kq.get("answer") if isinstance(kq, dict) else kq), time.time() - t0
+                if tt.get("status") == "failed":
+                    return f"[THẤT BẠI] {tt.get('error')}", time.time() - t0
+    except httpx.HTTPError as exc:
+        return f"[LỖI {type(exc).__name__} sau {time.time() - t0:.0f}s] {exc}", time.time() - t0
     return f"[HẾT GIỜ sau {gio:.0f}s]", time.time() - t0
+
+
+def _tai_truoc_model() -> None:
+    """Kéo về cache HF các model Brain nạp lúc /chat đầu: vision, embedder, reranker.
+
+    Không tải trước thì phút tải 10GB trên runtime mới bị tính vào phiên đo, và
+    câu /chat đầu vượt mọi trần thời gian (26/10/2026: quá 15 phút ở mức 8192).
+    Đọc tên model từ chính `Config` (R4), không chép lại ở đây.
+    """
+    from huggingface_hub import snapshot_download
+
+    sys.path.insert(0, REPO)
+    from src.core.config import Config
+
+    cfg = Config()
+    ten = [cfg.vision_model_id, cfg.embedding_model_id, cfg.reranker_model_id]
+    for t in dict.fromkeys(t for t in ten if t and not os.path.isdir(t)):
+        t0 = time.time()
+        print(f"  > tải trước {t} ...", flush=True)
+        try:
+            snapshot_download(t)
+            print(f"    v xong sau {time.time() - t0:.0f}s", flush=True)
+        except Exception as exc:  # tải hỏng thì Brain tự tải lại, chỉ chậm hơn
+            print(f"    ! không tải trước được: {type(exc).__name__}: {exc}", flush=True)
 
 
 def _p95(url: str, dong_thoi: int, so_request: int) -> dict:
@@ -261,7 +291,7 @@ def _p95(url: str, dong_thoi: int, so_request: int) -> dict:
 # Một mức max_model_len
 # ---------------------------------------------------------------------------
 
-def do_mot_muc(muc: int, gmu: float, awq: str) -> dict:
+def do_mot_muc(muc: int, gmu: float, awq: str, gio_cau_dau: float) -> dict:
     kq: dict = {"max_model_len": muc, "gpu_memory_utilization": gmu, "dung_duoc": False}
     print(f"\n{'=' * 74}\n  max_model_len={muc}  gpu_memory_utilization={gmu}\n{'=' * 74}")
 
@@ -306,11 +336,14 @@ def do_mot_muc(muc: int, gmu: float, awq: str) -> dict:
 
             moc_log = len(_doc(log_vllm))
             vram_truoc_brain = _vram_mb()
-            print("  > câu hoá đơn qua POST /chat (lần đầu nạp vision, tới 15 phút)...")
-            tra_loi, giay = _hoi_brain(HOA_DON, 900)
+            print(f"  > câu hoá đơn qua POST /chat (lần đầu nạp vision, tới {gio_cau_dau:.0f}s)...",
+                  flush=True)
+            tra_loi, giay = _hoi_brain(HOA_DON, gio_cau_dau)
             kq["brain_giay"] = round(giay, 1)
             kq["brain_tra_loi"] = tra_loi[:300]
             print(f"  {giay:.0f}s · {tra_loi[:200]}")
+            if tra_loi.startswith("["):
+                print(f"  --- đuôi {log_brain} ---\n{_doc(log_brain)[-3000:]}")
 
             dong = [d for d in _doc(log_vllm, moc_log).splitlines()
                     if "/v1/chat/completions" in d or "/v1/completions" in d]
@@ -379,6 +412,10 @@ def main() -> int:
     ap.add_argument("--muc", default="8192,16384,32768", help="các max_model_len, phẩy ngăn")
     ap.add_argument("--gmu", type=float, default=0.55, help="gpu_memory_utilization")
     ap.add_argument("--awq", default=os.environ.get("AWQ", AWQ_MAC_DINH))
+    ap.add_argument("--gio-cau-dau", type=float, default=1800,
+                    help="giây chờ câu /chat đầu, gồm cả lúc Brain nạp vision + kho tri thức")
+    ap.add_argument("--khong-tai-truoc", action="store_true",
+                    help="bỏ bước tải trước model vào cache HF")
     a = ap.parse_args()
 
     ok, v = _vllm_trong_khoang_ghim()
@@ -391,11 +428,13 @@ def main() -> int:
         print(f"x Không thấy model ở {a.awq} — mount Drive hoặc đặt --awq.")
         return 1
     os.makedirs(THU_MUC_LOG, exist_ok=True)
+    if not a.khong_tai_truoc:
+        _tai_truoc_model()
 
     ket_qua = []
     try:
         for muc in (int(x) for x in a.muc.split(",")):
-            ket_qua.append(do_mot_muc(muc, a.gmu, a.awq))
+            ket_qua.append(do_mot_muc(muc, a.gmu, a.awq, a.gio_cau_dau))
             with open(DUONG_KQ, "w", encoding="utf-8") as f:   # ghi dần: phiên ngắt vẫn còn số
                 json.dump(ket_qua, f, ensure_ascii=False, indent=2)
     finally:
