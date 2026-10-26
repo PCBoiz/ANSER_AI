@@ -205,7 +205,10 @@ def _chay():
 
     env = {
         **os.environ,
-        "ENV": "SERVER",
+        # GPU = nạp text + vision TRONG tiến trình. Từ BR-03, SERVER nghĩa là
+        # "Brain không nạp model nào" và đòi VLLM_BASE_URL — đặt SERVER ở đây
+        # thì engine ném CauHinhSai ngay lúc dựng.
+        "ENV": "GPU",
         "TEXT_MODEL_ID": awq,
         "PYTHONPATH": REPO,
         "VLLM_WORKER_MULTIPROC_METHOD": "spawn",
