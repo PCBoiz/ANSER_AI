@@ -408,3 +408,32 @@ def test_env_server_health_khong_bao_vision_ready(monkeypatch, vllm_gia):
     assert rs.vision is None
     assert "ENV=SERVER" in (rs.vision_error or "")
     monkeypatch.setattr(ModelEngine, "_instance", None)
+
+
+def test_env_server_vision_tat_theo_thiet_ke_khong_lam_degraded(monkeypatch, vllm_gia):
+    """
+    Cấu hình compose (production dự kiến). Sau lời gọi vision đầu tiên, bản
+    trước báo `degraded: true` vĩnh viễn dù vLLM khoẻ (QA 26/10, vòng 2).
+    """
+    import asyncio
+
+    from fastapi.testclient import TestClient
+
+    import src.api.main as main_mod
+    from src.api.dependencies import RuntimeState
+
+    monkeypatch.setattr(ModelEngine, "_instance", None)
+    monkeypatch.setenv("ENV", "SERVER")
+    monkeypatch.setenv("VLLM_BASE_URL", vllm_gia.url)
+    rs = RuntimeState()
+    asyncio.run(rs.ensure_text_runtime())
+    asyncio.run(rs.ensure_vision_runtime())
+    monkeypatch.setattr(main_mod, "runtime", rs)
+
+    body = TestClient(main_mod.app).get("/health").json()
+    assert body["vision_backend"] == "none"
+    assert body["vision_ready"] is False
+    assert body["vision_error"], "lý do vẫn phải nhìn thấy được"
+    assert body["vllm_server"]["ok"] is True
+    assert body["degraded"] is False, body
+    monkeypatch.setattr(ModelEngine, "_instance", None)

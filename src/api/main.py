@@ -141,9 +141,15 @@ async def health():
         {
             "status": "ok",
             "runtime_profile": RUNTIME_PROFILE,
+            # Vision TẮT THEO THIẾT KẾ (ENV=SERVER, vision_backend "none") không
+            # phải hỏng: không tính vào `degraded`. Nếu tính, cấu hình compose —
+            # đúng cấu hình production dự kiến — sẽ báo hỏng vĩnh viễn ngay sau
+            # lời gọi vision đầu tiên (QA 26/10). `vision_error` vẫn trả về để
+            # người gọi biết lý do; `vision_backend` cho biết đây là chủ ý.
+            # PHAN_VIEC §6.2 tách "tắt theo thiết kế" khỏi "hỏng".
             "degraded": bool(
-                runtime.engine_error or runtime.kb_error or runtime.vision_error
-                or server_down
+                runtime.engine_error or runtime.kb_error or server_down
+                or (runtime.vision_error and backend["vision_backend"] != "none")
             ),
             **backend,
             "engine_ready": runtime.engine is not None,
