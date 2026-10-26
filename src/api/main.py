@@ -5,10 +5,13 @@ This replaces the monolithic src/server.py.
 """
 
 import logging
+import math
 import os
 from contextlib import asynccontextmanager
 
 from fastapi import Depends, FastAPI, Request
+from fastapi.encoders import jsonable_encoder
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
@@ -69,6 +72,29 @@ async def attach_request_id(request: Request, call_next):
     response = await call_next(request)
     response.headers["X-Request-ID"] = request_id
     return response
+
+
+def _so_huu_han_hoac_chuoi(x):
+    """NaN/Infinity -> chuỗi. JSON chuẩn không chứa được chúng."""
+    if isinstance(x, float) and not math.isfinite(x):
+        return str(x)
+    if isinstance(x, dict):
+        return {k: _so_huu_han_hoac_chuoi(v) for k, v in x.items()}
+    if isinstance(x, (list, tuple)):
+        return [_so_huu_han_hoac_chuoi(v) for v in x]
+    return x
+
+
+# Handler 422 mặc định của FastAPI chép `input` của trường lỗi vào thân phản
+# hồi. Trường lỗi là NaN/Infinity thì chính phản hồi 422 không render được ra
+# JSON, và người gọi nhận 500 (QA 26/10, `/tools/vat` với `"price": NaN`).
+# Giữ nguyên hình dạng `{"detail": [...]}`, chỉ đổi số không hữu hạn thành chuỗi.
+@app.exception_handler(RequestValidationError)
+async def handle_validation(request: Request, exc: RequestValidationError):
+    return JSONResponse(
+        status_code=422,
+        content=_so_huu_han_hoac_chuoi(jsonable_encoder({"detail": exc.errors()})),
+    )
 
 
 # Quá tải KHÔNG phải lỗi máy chủ — nó là câu trả lời hợp lệ "đang bận, quay

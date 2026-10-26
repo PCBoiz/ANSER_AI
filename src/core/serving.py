@@ -232,23 +232,15 @@ class CompletionRequest:
         }
         if self.stop:
             payload["stop"] = self.stop
-        payload.update(self.extra)
         if self.guided_json:
             payload["guided_json"] = self.guided_json
-            # Cùng bất biến với ChatRequest (SRS §3.3 bẫy 3): bật grammar thì
-            # không phạt lặp. Đặt SAU `extra` để không gì đè được.
-            if payload["repetition_penalty"] != REPETITION_PENALTY_GRAMMAR:
-                logger.warning(
-                    "repetition_penalty=%s bị hạ về %s vì đang bật guided_json",
-                    payload["repetition_penalty"], REPETITION_PENALTY_GRAMMAR,
-                )
-            payload["repetition_penalty"] = REPETITION_PENALTY_GRAMMAR
-        return payload
+        return _ap_bat_bien(payload, self.extra, {"model": model, "prompt": self.prompt})
 
 
 # Phạt lặp mặc định khi sinh tự do. Trùng con số đường trong tiến trình đang
 # dùng ở engine.py ("Ngày 7: 1.15 chưa đủ, model vẫn lặp nguyên câu").
 REPETITION_PENALTY_TU_DO = 1.25
+HEALTH_TIMEOUT_S = 2.0
 # Khi bật grammar PHẢI là 1.0. JSON bắt buộc lặp token ("typeVersion",
 # "position", dấu ngoặc giữa các node); phạt lặp sẽ cấm đúng các token grammar
 # đòi, model bị dồn vào nhánh grammar kém hơn — hỏng im lặng (SRS §3.3 bẫy 3).
@@ -294,13 +286,7 @@ class ChatRequest:
                 raise ValueError(f"message sai hình dạng {{role, content}}: {m!r}")
 
     def repetition_penalty_hieu_luc(self) -> float:
-        if self.guided_json:
-            if self.repetition_penalty not in (None, REPETITION_PENALTY_GRAMMAR):
-                logger.warning(
-                    "repetition_penalty=%s bị hạ về %s vì đang bật guided_json",
-                    self.repetition_penalty, REPETITION_PENALTY_GRAMMAR,
-                )
-            return REPETITION_PENALTY_GRAMMAR
+        # Có grammar thì `_ap_bat_bien` hạ về 1.0 (và cảnh báo nếu bị hạ).
         if self.repetition_penalty is None:
             return REPETITION_PENALTY_TU_DO
         return self.repetition_penalty
@@ -314,16 +300,53 @@ class ChatRequest:
         }
         if self.stop:
             payload["stop"] = self.stop
-        payload.update(self.extra)
-
-        # Bất biến đặt SAU `extra`: một khoá `extra` vô tình không được đè chúng.
         payload["repetition_penalty"] = self.repetition_penalty_hieu_luc()
-        kwargs = dict(payload.get("chat_template_kwargs") or {})
-        kwargs["enable_thinking"] = False
-        payload["chat_template_kwargs"] = kwargs
         if self.guided_json:
             payload["guided_json"] = self.guided_json
+        payload = _ap_bat_bien(
+            payload, self.extra, {"model": model, "messages": payload["messages"]}
+        )
+        # Bẫy 2: không gì tắt được cờ này, kể cả `extra`.
+        kwargs = payload.get("chat_template_kwargs")
+        if not isinstance(kwargs, dict):
+            if kwargs is not None:
+                logger.warning("chat_template_kwargs không phải object (%r) — bỏ", kwargs)
+            kwargs = {}
+        payload["chat_template_kwargs"] = {**kwargs, "enable_thinking": False}
         return payload
+
+
+# Mọi cách vLLM nhận để bật ràng buộc giải mã. Có BẤT KỲ khoá nào trong này
+# là đang có grammar, dù nó đến từ `guided_json` hay lọt qua `extra` (QA 26/10:
+# `extra={"guided_json": ...}` từng gửi grammar kèm phạt lặp 1,25).
+KHOA_GRAMMAR = (
+    "guided_json", "guided_regex", "guided_choice", "guided_grammar",
+    "response_format", "structured_outputs",
+)
+
+
+def _ap_bat_bien(
+    payload: dict[str, Any], extra: dict[str, Any], loi: dict[str, Any]
+) -> dict[str, Any]:
+    """
+    Trộn `extra` rồi áp lại bất biến. MỘT hàm cho cả completions và chat.
+
+    - Khoá lõi (`model`, `prompt`/`messages`) không để `extra` đè: `extra=
+      {"messages": []}` từng thay mất hội thoại thật.
+    - Có grammar ở bất kỳ dạng nào thì `repetition_penalty = 1.0` (bẫy 3).
+    """
+    if extra:
+        payload.update(extra)
+    payload.update(loi)
+    if any(payload.get(k) for k in KHOA_GRAMMAR):
+        rp = payload.get("repetition_penalty")
+        if rp not in (None, REPETITION_PENALTY_GRAMMAR):
+            logger.warning(
+                "repetition_penalty=%s bị hạ về %s vì đang bật ràng buộc giải mã",
+                rp, REPETITION_PENALTY_GRAMMAR,
+            )
+        payload["repetition_penalty"] = REPETITION_PENALTY_GRAMMAR
+    return payload
 
 
 def _chuan_hoa_base_url(url: str) -> str:
@@ -336,9 +359,19 @@ def _chuan_hoa_base_url(url: str) -> str:
     (nằm ở gốc, không dưới `/v1`) cũng trượt theo.
     """
     url = (url or "").strip().rstrip("/")
-    if url.endswith("/v1"):
-        url = url[: -len("/v1")]
+    # Lặp: `/v1/v1` (dán chồng hai lần) cũng phải về gốc. Không phân biệt hoa thường.
+    while url.lower().endswith("/v1"):
+        url = url[: -len("/v1")].rstrip("/")
     return url
+
+
+def _chuoi_tra_ve(x: Any) -> str:
+    """`None` -> "" (model chỉ sinh token đặc biệt). Không phải chuỗi -> TypeError -> BackendError."""
+    if x is None:
+        return ""
+    if not isinstance(x, str):
+        raise TypeError(f"nội dung trả về là {type(x).__name__}, không phải chuỗi")
+    return x.strip()
 
 
 class VLLMServerClient:
@@ -378,6 +411,7 @@ class VLLMServerClient:
         self._api_key = api_key or os.getenv("VLLM_API_KEY", "")
         self._max_connections = max_connections
         self._client: Any = None
+        self._client_loop: Any = None
 
     @property
     def configured(self) -> bool:
@@ -390,9 +424,29 @@ class VLLMServerClient:
         return h
 
     async def _ensure_client(self):
+        """
+        Một AsyncClient cho mỗi event loop.
+
+        Engine là singleton, nhưng loop thì không: TestClient, `asyncio.run` trong
+        script đo, và tác vụ nền đều có thể chạy trên loop khác nhau. Kết nối
+        keep-alive của httpx gắn với loop đã mở nó, dùng lại trên loop khác thì
+        ném `RuntimeError: Event loop is closed` — một lỗi thô, không phải
+        `Backend*` (QA 26/10). Loop đổi thì bỏ client cũ, dựng client mới.
+
+        Client gắn sẵn từ ngoài (test tiêm transport giả) thì giữ nguyên.
+        """
+        loop = asyncio.get_running_loop()
+        if (
+            self._client is not None
+            and self._client_loop is not None
+            and self._client_loop is not loop
+        ):
+            # Không `aclose()` được: loop cũ có thể đã đóng. Bỏ để GC dọn.
+            self._client = None
         if self._client is None:
             import httpx
 
+            self._client_loop = loop
             self._client = httpx.AsyncClient(
                 base_url=self.base_url,
                 timeout=httpx.Timeout(self.timeout_s, connect=5.0),
@@ -406,7 +460,11 @@ class VLLMServerClient:
             return {"ok": False, "reason": "chưa cấu hình VLLM_BASE_URL"}
         try:
             client = await self._ensure_client()
-            resp = await client.get("/health", headers=self._headers(), timeout=5.0)
+            # Ngắn hơn hẳn healthcheck 5s của chính Brain (Dockerfile, compose):
+            # vLLM chậm không được kéo Brain thành "unhealthy" theo (QA 26/10).
+            resp = await client.get(
+                "/health", headers=self._headers(), timeout=HEALTH_TIMEOUT_S
+            )
             return {"ok": resp.status_code == 200, "status_code": resp.status_code}
         except Exception as exc:
             return {"ok": False, "reason": f"{type(exc).__name__}: {exc}"}
@@ -452,7 +510,7 @@ class VLLMServerClient:
         """Sinh text từ prompt THÔ qua `/v1/completions`. Không áp chat template."""
         data = await self._post("/v1/completions", req.to_payload(self.model))
         try:
-            return (data["choices"][0]["text"] or "").strip()
+            return _chuoi_tra_ve(data["choices"][0]["text"])
         except (KeyError, IndexError, TypeError) as exc:
             raise BackendError(
                 f"vLLM trả nội dung không đọc được: {str(data)[:200]}"
@@ -470,7 +528,7 @@ class VLLMServerClient:
         """
         data = await self._post("/v1/chat/completions", req.to_payload(self.model))
         try:
-            return (data["choices"][0]["message"]["content"] or "").strip()
+            return _chuoi_tra_ve(data["choices"][0]["message"]["content"])
         except (KeyError, IndexError, TypeError) as exc:
             raise BackendError(
                 f"vLLM trả nội dung không đọc được: {str(data)[:200]}"
@@ -480,6 +538,7 @@ class VLLMServerClient:
         if self._client is not None:
             await self._client.aclose()
             self._client = None
+            self._client_loop = None
 
 
 def guard_from_env(name: str = "text") -> ConcurrencyGuard:

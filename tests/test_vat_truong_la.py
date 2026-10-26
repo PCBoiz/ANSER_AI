@@ -133,3 +133,36 @@ def test_vong_agentic_va_mcp_cung_bi_chan():
     assert out.get("error") == "tham số không hợp lệ"
     assert "unit_price" in out["detail"]
     assert "calculated_total" not in out
+
+
+# --- Các ca QA tái hiện ngày 26/10 -------------------------------------------
+
+def test_tang_ngoai_go_sai_cung_ra_422_khong_bia_lech():
+    """`default_is_reduce` (thiếu chữ d) từng bị bỏ qua -> tính 10% -> "lệch 100.000đ"."""
+    resp = _post([{"price": 500_000, "qty": 10}], default_is_reduce=True)
+    assert resp.status_code == 422
+    assert "default_is_reduce" in _truong_bi_tu_choi(resp)
+
+
+@pytest.mark.parametrize("item,truong", [
+    ({"price": True, "qty": 10}, "price"),            # từng ra 200, lệch 5.399.989đ
+    ({"price": "500000", "qty": 10}, "price"),
+    ({"price": 500_000, "qty": 10, "is_reduced_vat": "yes"}, "is_reduced_vat"),
+    ({"price": 500_000, "qty": 10, "is_reduced_vat": 0}, "is_reduced_vat"),
+], ids=["bool-lam-gia", "chuoi-lam-gia", "yes-lam-bool", "0-lam-bool"])
+def test_khong_ep_kieu_long(item, truong):
+    resp = _post([item])
+    assert resp.status_code == 422, resp.text[:300]
+    assert truong in _truong_bi_tu_choi(resp)
+
+
+@pytest.mark.parametrize("than", [
+    '{"items":[{"price":NaN,"qty":10}],"stated_total":5400000}',
+    '{"items":[{"price":Infinity,"qty":10}],"stated_total":5400000}',
+    '{"items":[{"price":1e308,"qty":10}],"stated_total":5400000}',
+    '{"items":[{"price":500000,"qty":10}],"stated_total":Infinity}',
+], ids=["nan", "inf", "tran-so", "stated-inf"])
+def test_so_khong_huu_han_ra_422_khong_ra_500(than):
+    resp = client.post("/tools/vat", content=than,
+                       headers={"Content-Type": "application/json"})
+    assert resp.status_code == 422, f"{resp.status_code}: {resp.text[:200]}"

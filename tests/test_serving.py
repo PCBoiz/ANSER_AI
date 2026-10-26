@@ -616,3 +616,63 @@ async def test_ghim_vllm_duoi_0_12_vi_0_12_go_guided_decoding():
         "(GuidedDecodingParams) và ChatRequest/CompletionRequest (guided_json -> "
         "structured_outputs) trước, rồi chạy smoke_test_guided() trên server thật."
     )
+
+
+
+# --- Các ca QA tái hiện ngày 26/10 -------------------------------------------
+
+@pytest.mark.parametrize("khoa", ["guided_json", "guided_regex", "response_format"])
+async def test_grammar_lot_qua_extra_van_ha_phat_lap(khoa):
+    """`extra={"guided_json": ...}` từng gửi grammar kèm phạt lặp 1,25."""
+    seen: dict = {}
+    c = _client(_server_ghi_payload(seen))
+    await c.chat(ChatRequest(messages=_MSGS, extra={khoa: {"type": "object"}}))
+    assert seen["repetition_penalty"] == 1.0
+
+    seen2: dict = {}
+
+    def h(request):
+        import json
+        seen2.update(json.loads(request.content))
+        return httpx.Response(200, json={"choices": [{"text": "ok"}]})
+
+    c2 = _client(h)
+    await c2.complete(CompletionRequest(prompt="p", extra={khoa: {"type": "object"}}))
+    assert seen2["repetition_penalty"] == 1.0
+    await c.aclose()
+    await c2.aclose()
+
+
+async def test_extra_khong_thay_duoc_hoi_thoai_va_model():
+    seen: dict = {}
+    c = _client(_server_ghi_payload(seen))
+    await c.chat(ChatRequest(messages=_MSGS, extra={"messages": [], "model": "khac"}))
+    assert seen["messages"] == _MSGS and seen["model"] == "anser-v3"
+    await c.aclose()
+
+
+async def test_chat_template_kwargs_sai_kieu_trong_extra_khong_lam_sap():
+    seen: dict = {}
+    c = _client(_server_ghi_payload(seen))
+    await c.chat(ChatRequest(messages=_MSGS, extra={"chat_template_kwargs": [1]}))
+    assert seen["chat_template_kwargs"] == {"enable_thinking": False}
+    await c.aclose()
+
+
+async def test_content_khong_phai_chuoi_thanh_BackendError():
+    c = _client(lambda r: httpx.Response(
+        200, json={"choices": [{"message": {"content": [{"type": "text"}]}}]}
+    ))
+    with pytest.raises(BackendError):
+        await c.chat(ChatRequest(messages=_MSGS))
+    await c.aclose()
+
+
+@pytest.mark.parametrize("url,ky_vong", [
+    ("http://h:8001/v1/v1", "http://h:8001"),
+    ("http://h:8001/V1", "http://h:8001"),
+    ("http://h:8001/v10", "http://h:8001/v10"),
+    ("http://h:8001/api/v1", "http://h:8001/api"),
+])
+async def test_base_url_ca_bien(url, ky_vong):
+    assert VLLMServerClient(base_url=url).base_url == ky_vong

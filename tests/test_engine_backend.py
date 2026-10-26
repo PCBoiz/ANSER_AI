@@ -68,6 +68,11 @@ class _VllmGia:
         gia = self
 
         class _H(BaseHTTPRequestHandler):
+            # Keep-alive như vLLM/uvicorn thật. HTTP/1.0 (mặc định) đóng kết nối
+            # sau mỗi request nên che mất lỗi client dùng lại kết nối trên một
+            # event loop đã đóng (QA 26/10).
+            protocol_version = "HTTP/1.1"
+
             def _tra(self, ma_http: int, than: dict | None):
                 raw = json.dumps(than or {}).encode()
                 self.send_response(ma_http)
@@ -335,3 +340,71 @@ def test_nap_trong_tien_trinh_thieu_text_model_id_thi_bao_ro(monkeypatch):
     with pytest.raises(CauHinhSai, match="TEXT_MODEL_ID"):
         ModelEngine()
     assert ModelEngine._instance is None, "không được giữ instance hỏng"
+
+
+# ---------------------------------------------------------------------------
+# Các ca QA tái hiện ngày 26/10
+# ---------------------------------------------------------------------------
+
+def test_engine_dung_qua_nhieu_event_loop_khong_vo(monkeypatch, vllm_gia):
+    """
+    Engine là singleton, loop thì không. Trước bản sửa: asyncio.run lần 2 ném
+    `RuntimeError: Event loop is closed` vì client giữ kết nối keep-alive của loop cũ.
+    """
+    import asyncio
+
+    monkeypatch.setattr(ModelEngine, "_instance", None)
+    monkeypatch.setenv("ENV", "LOCAL")
+    monkeypatch.setenv("VLLM_BASE_URL", vllm_gia.url)
+    eng = ModelEngine()
+    for _ in range(3):
+        assert asyncio.run(eng.generate_chat(system="s", user="u")) == '{"tool": "vat"}'
+    assert vllm_gia.cac_duong().count("/v1/chat/completions") == 3
+    monkeypatch.setattr(ModelEngine, "_instance", None)
+
+
+def test_health_lien_tiep_qua_nhieu_testclient_van_ok(monkeypatch, engine_server):
+    for _ in range(3):
+        body = _health_voi_engine(monkeypatch, engine_server)
+        assert body["vllm_server"]["ok"] is True, body["vllm_server"]
+
+
+def test_vllm_cham_khong_keo_health_cua_brain_qua_5s(monkeypatch):
+    """Healthcheck của chính Brain (Dockerfile, compose) hết giờ ở 5s."""
+    import time
+
+    gia = _VllmGia()
+    goc = gia._srv.RequestHandlerClass.do_GET
+
+    def cham(self):
+        time.sleep(4)
+        goc(self)
+
+    gia._srv.RequestHandlerClass.do_GET = cham
+    try:
+        monkeypatch.setattr(ModelEngine, "_instance", None)
+        monkeypatch.setenv("ENV", "LOCAL")
+        monkeypatch.setenv("VLLM_BASE_URL", gia.url)
+        t0 = time.perf_counter()
+        body = _health_voi_engine(monkeypatch, ModelEngine())
+        assert time.perf_counter() - t0 < 3.0
+        assert body["vllm_server"]["ok"] is False and body["degraded"] is True
+    finally:
+        gia.dong()
+        monkeypatch.setattr(ModelEngine, "_instance", None)
+
+
+def test_env_server_health_khong_bao_vision_ready(monkeypatch, vllm_gia):
+    """`vision_backend: none` mà `vision_ready: true` thì Body tưởng vision chạy được."""
+    import asyncio
+
+    from src.api.dependencies import RuntimeState
+
+    monkeypatch.setattr(ModelEngine, "_instance", None)
+    monkeypatch.setenv("ENV", "SERVER")
+    monkeypatch.setenv("VLLM_BASE_URL", vllm_gia.url)
+    rs = RuntimeState()
+    asyncio.run(rs.ensure_vision_runtime())
+    assert rs.vision is None
+    assert "ENV=SERVER" in (rs.vision_error or "")
+    monkeypatch.setattr(ModelEngine, "_instance", None)

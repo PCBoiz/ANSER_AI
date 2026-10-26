@@ -143,6 +143,11 @@ class ForecastRequest(BaseModel):
     review_periods: float = Field(0.0, ge=0)
 
 
+# Trần chống tràn số cho /tools/vat. Không phải giới hạn nghiệp vụ.
+_TRAN_TIEN = 1e15
+_TRAN_SO_LUONG = 1e9
+
+
 class VatItem(BaseModel):
     """Một dòng hàng của /tools/vat.
 
@@ -159,11 +164,23 @@ class VatItem(BaseModel):
     Model này cũng đi vào `GET /tools` qua `$defs`, nên grammar của vòng
     agentic đóng luôn object dòng hàng: model không sinh nổi `unit_price`.
     """
-    model_config = ConfigDict(extra="forbid")
+    # `strict=True`: chế độ lỏng của pydantic nhận `true` làm số 1 và `"yes"`
+    # làm True. `{"price": true}` từng ra 200 kèm "lệch 5.399.989đ" — đúng loại
+    # lời buộc tội bịa mà BR-01 tồn tại để xoá (QA 26/10). Số nguyên vẫn nhận.
+    model_config = ConfigDict(extra="forbid", strict=True)
 
     name: str = "Unknown"
-    price: float = Field(..., description="Đơn giá TRƯỚC thuế (VND)")
-    qty: float = Field(..., description="Số lượng. Cho phép số lẻ (lít, kg)")
+    # `allow_inf_nan=False` + trần: NaN/Infinity hay 1e308 * qty tràn thành inf
+    # từng làm MCPServer ném ValueError -> 500. Nay là 422. Trần 1e15 VND
+    # (một triệu tỷ) rộng hơn mọi hoá đơn thật mà vẫn không tràn khi nhân qty.
+    price: float = Field(
+        ..., allow_inf_nan=False, ge=-_TRAN_TIEN, le=_TRAN_TIEN,
+        description="Đơn giá TRƯỚC thuế (VND)",
+    )
+    qty: float = Field(
+        ..., allow_inf_nan=False, ge=-_TRAN_SO_LUONG, le=_TRAN_SO_LUONG,
+        description="Số lượng. Cho phép số lẻ (lít, kg)",
+    )
     is_reduced_vat: Optional[bool] = Field(
         None, description="True = diện giảm 8%. Bỏ trống = dùng default_is_reduced"
     )
@@ -174,9 +191,16 @@ class VatRequest(BaseModel):
 
     `is_reduced_vat` là đầu vào của tool này. Muốn biết một mã hàng có thuộc
     diện giảm không thì hỏi `vat_catalog_audit` — nơi giữ bảng tra kèm căn cứ.
+
+    Tầng ngoài CŨNG đóng (QA 26/10): `default_is_reduce` gõ thiếu một chữ từng
+    bị bỏ qua im lặng, tool tính theo 10% rồi báo "lệch 100.000đ" — bịa. Body
+    không gọi /tools/vat (brain.ts gọi 11 đường, không có đường này), nên đóng
+    không làm vỡ caller REST nào đã biết.
     """
+    model_config = ConfigDict(extra="forbid", strict=True)
+
     items: list[VatItem]
-    stated_total: float
+    stated_total: float = Field(..., allow_inf_nan=False, ge=-_TRAN_TIEN, le=_TRAN_TIEN)
     default_is_reduced: bool = False
 
 

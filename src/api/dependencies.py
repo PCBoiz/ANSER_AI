@@ -170,6 +170,16 @@ class RuntimeState:
                 logger.error("Engine init (for vision) failed: %s", exc)
                 return
 
+        # ENV=SERVER: engine không có vision (vllm-vision qua HTTP thuộc chu kỳ
+        # 02). Dựng VisionAgent ở đây thì /health báo `vision_ready: true` trong
+        # khi mọi lời gọi đều ném BackendUnavailable — Body đọc trường đó và
+        # tưởng vision chạy được (QA 26/10).
+        if getattr(self.engine, "vision_backend", None) == "none":
+            self.vision_error = (
+                "Vision tắt ở ENV=SERVER: vllm-vision qua HTTP chưa nối (chu kỳ 02)."
+            )
+            return
+
         try:
             from src.agents.vision import VisionAgent
             self.vision = VisionAgent(self.engine)   # <-- truyền engine vào (trước đây VisionAgent())
