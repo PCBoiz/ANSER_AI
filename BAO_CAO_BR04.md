@@ -23,7 +23,7 @@
 4. **p95 ≈ 8,6–9,2 giây, vượt ngưỡng 5.000ms** — nhưng đó là thời gian sinh ~217 token ở ~25 token/giây, không phải hàng đợi. Ngưỡng cần định nghĩa lại (mục 6).
 5. **Brain gọi được vLLM thật qua `VLLM_BASE_URL`** — log vLLM ghi `POST /v1/chat/completions 200`. Nghiệm thu BR-03 trên Colab.
 6. **Lộ ra bẫy hỏng-im-lặng thứ tư, đã sửa**: grammar quyết định của vòng agentic **không được thi hành** trên đường server (mục 5.1).
-7. **Lộ ra một lỗi R1 còn mở**: model **chép thiếu dòng hàng** vào tool `vat`, Brain báo hai con số tiền sai mà trông như có nguồn (mục 5.2). **Chờ quyết định.**
+7. **Lộ ra một lỗi R1 còn mở**: model **chép thiếu dòng hàng** vào tool `vat`, Brain báo hai con số tiền sai mà trông như có nguồn (mục 5.2). Hai cách sửa A và B đã viết sẵn, **chờ chủ dự án chọn**.
 
 ---
 
@@ -130,15 +130,49 @@ Tool tính đúng trên thứ nó nhận (5.000.000 + VAT 10% = 5.500.000), và 
 
 Thêm: trường `thought` của bước gọi tool ghi *"không cần gọi công cụ"* trong khi vẫn gọi. Không dùng `thought` làm bằng chứng cho bất cứ điều gì.
 
-**Ba hướng, chờ chủ dự án chọn** (ngoài phạm vi SRS chu kỳ 01; BR-01 ghi "không sửa tool khác"):
+**Hai cách sửa, chờ chủ dự án chọn.** Cả hai nằm ngoài phạm vi SRS chu kỳ 01 (BR-01 ghi "không sửa tool khác"), nên cần quyết định trước khi làm. Chọn một, chọn cả hai, hoặc hoãn sang chu kỳ 02 — trong lúc chờ, câu soát hoá đơn qua Brain **vẫn có thể ra số tiền sai**.
 
-| | Cách làm | Ưu | Nhược |
-|---|---|---|---|
-| **A. Chốt neo đầu vào** | Sau khi model điền tham số, mã tất định đối chiếu: mọi số tiền trong câu người dùng phải có mặt trong `items`/`stated_total`. Thiếu thì hỏi lại hoặc báo rõ dòng nào chưa tính | Bắt cả chép thiếu lẫn chép sai chữ số; dùng chung cho `vat`, `quote` | Số không phải tiền (ngày, số lượng) có thể báo nhầm |
-| **B. Tách hoá đơn bằng mã** | Hoá đơn dán có cấu trúc (`{"tên": số}`, dòng "tên: số") thì mã bóc thành `items`, model không điền. Đúng SO_TAY §9 mục 12 | Triệt để cho ca phổ biến nhất | Không phủ câu viết tự do |
-| **C. Chỉ ghi nhận** | Đưa vào bảng phân loại lỗi BR-05, sửa chu kỳ 02 | Không phình phạm vi | Brain giữ lỗi đưa số tiền sai trong lúc chờ |
+Cả hai cách đặt cùng một chỗ: `provider` trong `_run_agentic` ([`chat.py`](src/api/routes/chat.py)), chạy **sau** khi model điền tham số và **trước** khi tool chạy. Chỗ đó đã có sẵn cho `report` (`_provide_tool_data` ghi đè dữ liệu hệ thống), và nó thấy được câu gốc của người dùng.
 
-Đề xuất của người làm: **A, cộng B nếu còn thời gian**.
+#### Cách A — chốt neo đầu vào
+
+**Ý.** Model điền tham số xong thì mã tất định đối chiếu: **mọi số tiền xuất hiện trong câu người dùng phải có mặt** trong tham số model gửi (`items[].price × qty` hoặc `stated_total`). Thiếu số nào thì **không chạy tool**, trả câu hỏi lại nêu đích danh số bị bỏ sót, ví dụ *"Tôi chưa đưa được khoản 500.000 vào phép tính — đây có phải một dòng của hoá đơn không?"*. Đi đường `data_missing` sẵn có, nên `asked_back` được ghi vào metrics.
+
+| | |
+|---|---|
+| Sửa ở đâu | Hàm mới `so_tien_trong_cau(cau) -> list[int]` trong `src/core/` (tất định, có unit test); `provider` của `_run_agentic` gọi nó cho các tool lấy số từ lời người dùng: `vat`, `quote` |
+| Bắt được | chép thiếu dòng (ca 5.2), chép sai chữ số (5.000.000 → 500.000), bịa thêm dòng không có trong câu (chiều ngược: số trong tham số không có trong câu) |
+| Không bắt được | model điền đủ số nhưng gán sai vai (đổi `price` với `stated_total`); câu viết bằng chữ ("năm triệu rưỡi") nếu bộ đọc số chưa hiểu |
+| Rủi ro báo nhầm | số không phải tiền trong câu: ngày (26/10/2026), số lượng, mã số thuế, biển số. Phải lọc: chỉ coi là tiền khi ≥ 4 chữ số hoặc có đơn vị (`đ`, `VND`, `nghìn`, `triệu`, `tr`), loại chuỗi dạng ngày và mã 10/13 số |
+| Nghiệm thu | (1) model giả gửi 1 trên 2 dòng → không có `calculated_total` trong câu trả lời, câu hỏi lại nêu `500.000`; (2) model giả gửi đủ → tool chạy như cũ; (3) câu có ngày tháng và MST → không báo nhầm; (4) câu hoá đơn qua Brain + vLLM thật trên Colab → hoặc `tool_calls=1` với đủ 2 dòng, hoặc hỏi lại đúng số bị thiếu |
+| Công | ~1 ngày, phần lớn là bộ đọc số tiền tiếng Việt và các ca báo nhầm |
+| Phủ | mọi cách người dùng viết hoá đơn, kể cả câu tự do — vì nó không cần hiểu cấu trúc, chỉ đối chiếu số |
+
+#### Cách B — tách hoá đơn bằng mã
+
+**Ý.** Khi người dùng **dán hoá đơn có cấu trúc**, mã tự bóc thành `items` rồi **ghi đè** `items` model điền — đúng cách `report` đang làm với dữ liệu hệ thống, và đúng SO_TAY §9 mục 12: *"không để model điền tham số mà hệ thống có nguồn thật"*. Model chỉ còn điền `stated_total` (và `default_is_reduced` nếu câu nói rõ).
+
+| | |
+|---|---|
+| Sửa ở đâu | Hàm mới `tach_hoa_don(cau) -> list[VatItem] \| None` trong `src/core/`, nhận hai dạng: object JSON `{"tên": số}` (đúng dạng ca 5.2) và các dòng `tên: số` / `tên – số`. Không nhận dạng nào thì trả `None` và **giữ nguyên** `items` của model. `provider` của `_run_agentic` gọi nó cho `vat`, ghi log khi ghi đè |
+| Bắt được | ca 5.2 và mọi hoá đơn dán đúng hai dạng trên — triệt để, vì model không còn chạm vào dòng hàng |
+| Không bắt được | câu viết tự do ("cước 5 triệu, phụ phí năm trăm nghìn, tổng 6 triệu rưỡi") — vẫn do model điền, vẫn có thể chép thiếu |
+| Rủi ro | bóc nhầm một dòng không phải hàng (ví dụ dòng "Tổng cộng: 6.500.000" bị coi là một dòng hàng). Phải loại các dòng có nhãn tổng / thuế / chiết khấu |
+| Nghiệm thu | (1) JSON `{"Cước…": 5000000, "Phụ phí…": 500000}` → đúng 2 `VatItem`, `qty=1`; (2) dạng dòng `tên: 5.000.000đ`; (3) dòng "Tổng cộng" không thành dòng hàng; (4) model giả gửi 1 dòng → tool nhận 2 dòng; (5) không nhận dạng được → `items` của model giữ nguyên; (6) câu hoá đơn qua Brain + vLLM thật → `calculated_total = 6.050.000`, chênh 450.000 |
+| Công | ~1 ngày |
+| Phủ | chỉ hoá đơn dán có cấu trúc — nhưng đó là cách người dùng thật hay làm nhất (dán từ Excel, từ tin nhắn) |
+
+#### So hai cách
+
+| | A — chốt neo đầu vào | B — tách bằng mã |
+|---|---|---|
+| Bản chất | **phát hiện** model chép sai, rồi hỏi lại | **không cho** model chép, mã chép thay |
+| Câu viết tự do | phủ | không phủ |
+| Hoá đơn dán có cấu trúc | phủ, nhưng phải hỏi lại một lượt | phủ, trả lời đúng ngay |
+| Rủi ro chính | báo nhầm số không phải tiền | bóc nhầm dòng tổng thành dòng hàng |
+| Kết hợp | **bổ sung nhau**: B lo ca phổ biến cho đúng ngay; A là lưới cho mọi ca còn lại, kể cả khi B trả `None` | |
+
+**Một câu hỏi chung, cả A và B đều chưa trả lời:** số tiền người dùng dán là giá **trước thuế** hay **đã gồm VAT**? Tool `vat` luôn hiểu là trước thuế rồi cộng VAT. Nếu "Cước vận chuyển 5.000.000" trên hoá đơn thật đã gồm VAT, thì kết quả "6.050.000" cũng sai. Đây là câu hỏi nghiệp vụ, cần người hiểu cách Hoàng Phát ghi hoá đơn trả lời, không sửa được bằng mã.
 
 ### 5.3. Ba script Colab không gửi `X-User-Id` — **đã sửa** (`bf63fef`)
 

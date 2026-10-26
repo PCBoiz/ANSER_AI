@@ -154,8 +154,11 @@ Câu soát hoá đơn hai dòng (5.000.000 + 500.000, ghi tổng 6.500.000): mod
 số tiền sai mà trông có nguồn. Chốt neo câu trả lời không bắt được vì các số đó
 đúng là có trong kết quả tool. Lỗi R1, chưa có chốt nào.
 
-Ba hướng (chốt neo đầu vào / tách hoá đơn bằng mã / chỉ ghi nhận) và đề xuất ở
-[BAO_CAO_BR04.md](BAO_CAO_BR04.md) §5.2. **Chờ chủ dự án quyết.**
+Hai cách sửa — **A: chốt neo đầu vào** (mã đối chiếu mọi số tiền trong câu với
+tham số model gửi, thiếu thì hỏi lại) và **B: tách hoá đơn bằng mã** (hoá đơn
+dán có cấu trúc thì mã bóc `items`, model không điền) — viết đủ chỗ sửa, phép
+thử nghiệm thu và công ở [BAO_CAO_BR04.md](BAO_CAO_BR04.md) §5.2. **Chờ chủ dự
+án chọn.**
 
 ---
 
