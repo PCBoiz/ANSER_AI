@@ -232,10 +232,113 @@ class CompletionRequest:
         }
         if self.stop:
             payload["stop"] = self.stop
+        payload.update(self.extra)
         if self.guided_json:
             payload["guided_json"] = self.guided_json
-        payload.update(self.extra)
+            # Cùng bất biến với ChatRequest (SRS §3.3 bẫy 3): bật grammar thì
+            # không phạt lặp. Đặt SAU `extra` để không gì đè được.
+            if payload["repetition_penalty"] != REPETITION_PENALTY_GRAMMAR:
+                logger.warning(
+                    "repetition_penalty=%s bị hạ về %s vì đang bật guided_json",
+                    payload["repetition_penalty"], REPETITION_PENALTY_GRAMMAR,
+                )
+            payload["repetition_penalty"] = REPETITION_PENALTY_GRAMMAR
         return payload
+
+
+# Phạt lặp mặc định khi sinh tự do. Trùng con số đường trong tiến trình đang
+# dùng ở engine.py ("Ngày 7: 1.15 chưa đủ, model vẫn lặp nguyên câu").
+REPETITION_PENALTY_TU_DO = 1.25
+# Khi bật grammar PHẢI là 1.0. JSON bắt buộc lặp token ("typeVersion",
+# "position", dấu ngoặc giữa các node); phạt lặp sẽ cấm đúng các token grammar
+# đòi, model bị dồn vào nhánh grammar kém hơn — hỏng im lặng (SRS §3.3 bẫy 3).
+REPETITION_PENALTY_GRAMMAR = 1.0
+
+
+@dataclass
+class ChatRequest:
+    """
+    Tham số cho `/v1/chat/completions` — đường mà SERVER áp chat template.
+
+    Vì sao cần riêng thay vì dựng prompt rồi gọi `complete()`: đường trong tiến
+    trình lấy chat template từ tokenizer của chính đối tượng `vllm.LLM`. Đường
+    server không có đối tượng đó, nên template phải do server áp (SRS §3.3 bẫy 1).
+
+    Hai bất biến, áp trong `to_payload` SAU `extra` để không gì đè được:
+
+    - `chat_template_kwargs.enable_thinking = False`. Qwen3 mặc định BẬT thinking:
+      thiếu cờ này model xổ `<think>` trước mọi câu, trong khi grammar ép `{` là
+      token đầu và dataset v3 train không think (bẫy 2).
+    - Có `guided_json` thì `repetition_penalty = 1.0` (bẫy 3).
+
+    `repetition_penalty=None` nghĩa là "để client chọn theo việc có grammar hay
+    không". Truyền số khác 1.0 cùng `guided_json` thì bị hạ về 1.0 kèm cảnh báo.
+    """
+    messages: list[dict[str, str]]
+    max_tokens: int = 1024
+    temperature: float = 0.1
+    repetition_penalty: Optional[float] = None
+    stop: Optional[list[str]] = None
+    guided_json: Optional[dict[str, Any]] = None
+    extra: dict[str, Any] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        if not self.messages:
+            raise ValueError("messages rỗng — không có gì để gửi cho model")
+        for m in self.messages:
+            if (
+                not isinstance(m, dict)
+                or m.get("role") not in ("system", "user", "assistant")
+                or not isinstance(m.get("content"), str)
+            ):
+                raise ValueError(f"message sai hình dạng {{role, content}}: {m!r}")
+
+    def repetition_penalty_hieu_luc(self) -> float:
+        if self.guided_json:
+            if self.repetition_penalty not in (None, REPETITION_PENALTY_GRAMMAR):
+                logger.warning(
+                    "repetition_penalty=%s bị hạ về %s vì đang bật guided_json",
+                    self.repetition_penalty, REPETITION_PENALTY_GRAMMAR,
+                )
+            return REPETITION_PENALTY_GRAMMAR
+        if self.repetition_penalty is None:
+            return REPETITION_PENALTY_TU_DO
+        return self.repetition_penalty
+
+    def to_payload(self, model: str) -> dict[str, Any]:
+        payload: dict[str, Any] = {
+            "model": model,
+            "messages": [dict(m) for m in self.messages],
+            "max_tokens": self.max_tokens,
+            "temperature": self.temperature,
+        }
+        if self.stop:
+            payload["stop"] = self.stop
+        payload.update(self.extra)
+
+        # Bất biến đặt SAU `extra`: một khoá `extra` vô tình không được đè chúng.
+        payload["repetition_penalty"] = self.repetition_penalty_hieu_luc()
+        kwargs = dict(payload.get("chat_template_kwargs") or {})
+        kwargs["enable_thinking"] = False
+        payload["chat_template_kwargs"] = kwargs
+        if self.guided_json:
+            payload["guided_json"] = self.guided_json
+        return payload
+
+
+def _chuan_hoa_base_url(url: str) -> str:
+    """
+    Bỏ `/` cuối và đuôi `/v1`. Client tự nối `/v1/...` cho mọi đường gọi.
+
+    Hai nguồn trong repo ghi hai dạng: AGENTS.md R5 ghi `http://127.0.0.1:8001/v1`,
+    compose ghi `http://vllm-text:8001`. Không chuẩn hoá thì làm theo AGENTS sẽ
+    gọi `/v1/v1/chat/completions` -> 404 -> `BackendError`, và `/health` của vLLM
+    (nằm ở gốc, không dưới `/v1`) cũng trượt theo.
+    """
+    url = (url or "").strip().rstrip("/")
+    if url.endswith("/v1"):
+        url = url[: -len("/v1")]
+    return url
 
 
 class VLLMServerClient:
@@ -266,8 +369,10 @@ class VLLMServerClient:
         api_key: Optional[str] = None,
         max_connections: int = 32,
     ):
-        self.base_url = (base_url or os.getenv("VLLM_BASE_URL", "")).rstrip("/")
-        self.model = model or os.getenv("VLLM_MODEL", "")
+        self.base_url: str = _chuan_hoa_base_url(
+            base_url or os.getenv("VLLM_BASE_URL") or ""
+        )
+        self.model: str = model or os.getenv("VLLM_MODEL") or ""
         self.timeout_s = timeout_s
         # Khoá đọc từ env, KHÔNG nhận qua tham số gọi từ tầng trên (R2b).
         self._api_key = api_key or os.getenv("VLLM_API_KEY", "")
@@ -306,8 +411,13 @@ class VLLMServerClient:
         except Exception as exc:
             return {"ok": False, "reason": f"{type(exc).__name__}: {exc}"}
 
-    async def complete(self, req: CompletionRequest) -> str:
-        """Sinh text. Ném Backend* để tầng trên ánh xạ sang mã HTTP đúng nghĩa."""
+    async def _post(self, path: str, payload: dict[str, Any]) -> dict[str, Any]:
+        """
+        Một chỗ duy nhất gọi HTTP và ánh xạ lỗi, dùng chung cho `complete` và
+        `chat` — hai đường không được phép xử lỗi khác nhau.
+
+        Ném Backend* để tầng trên ánh xạ sang mã HTTP đúng nghĩa.
+        """
         if not self.configured:
             raise BackendUnavailable(
                 "Chưa cấu hình VLLM_BASE_URL — Brain không biết gọi model ở đâu."
@@ -316,11 +426,7 @@ class VLLMServerClient:
 
         client = await self._ensure_client()
         try:
-            resp = await client.post(
-                "/v1/completions",
-                json=req.to_payload(self.model),
-                headers=self._headers(),
-            )
+            resp = await client.post(path, json=payload, headers=self._headers())
         except httpx.TimeoutException as exc:
             raise BackendTimeout(
                 f"vLLM không trả lời trong {self.timeout_s:g}s"
@@ -332,13 +438,42 @@ class VLLMServerClient:
 
         if resp.status_code >= 400:
             raise BackendError(f"vLLM trả {resp.status_code}: {resp.text[:400]}")
-
         try:
             data = resp.json()
-            return (data["choices"][0]["text"] or "").strip()
-        except (ValueError, KeyError, IndexError) as exc:
+            if not isinstance(data, dict):
+                raise ValueError("thân trả về không phải object")
+            return data
+        except ValueError as exc:
             raise BackendError(
                 f"vLLM trả nội dung không đọc được: {resp.text[:200]}"
+            ) from exc
+
+    async def complete(self, req: CompletionRequest) -> str:
+        """Sinh text từ prompt THÔ qua `/v1/completions`. Không áp chat template."""
+        data = await self._post("/v1/completions", req.to_payload(self.model))
+        try:
+            return (data["choices"][0]["text"] or "").strip()
+        except (KeyError, IndexError, TypeError) as exc:
+            raise BackendError(
+                f"vLLM trả nội dung không đọc được: {str(data)[:200]}"
+            ) from exc
+
+    async def chat(self, req: ChatRequest) -> str:
+        """
+        Sinh text từ `messages` qua `/v1/chat/completions` — server áp chat template.
+
+        Trả `str` đã `strip()`, cùng hình dạng với `ModelEngine.generate_chat`
+        đường trong tiến trình, để tầng gọi không biết mình đang đi đường nào.
+
+        `content` là `null` (model chỉ sinh token đặc biệt) thì trả chuỗi rỗng,
+        đúng như đường trong tiến trình làm với `outputs[0].outputs[0].text`.
+        """
+        data = await self._post("/v1/chat/completions", req.to_payload(self.model))
+        try:
+            return (data["choices"][0]["message"]["content"] or "").strip()
+        except (KeyError, IndexError, TypeError) as exc:
+            raise BackendError(
+                f"vLLM trả nội dung không đọc được: {str(data)[:200]}"
             ) from exc
 
     async def aclose(self):
@@ -372,6 +507,9 @@ __all__ = [
     "GuardStats",
     "ConcurrencyGuard",
     "CompletionRequest",
+    "ChatRequest",
+    "REPETITION_PENALTY_TU_DO",
+    "REPETITION_PENALTY_GRAMMAR",
     "VLLMServerClient",
     "guard_from_env",
 ]

@@ -19,6 +19,7 @@ from src.core.serving import (
     BackendError,
     BackendTimeout,
     BackendUnavailable,
+    ChatRequest,
     CompletionRequest,
     ConcurrencyGuard,
     Overloaded,
@@ -213,14 +214,34 @@ async def test_payload_giu_dung_ten_tham_so_cua_vllm():
     c = _client(handler)
     await c.complete(CompletionRequest(
         prompt="p", max_tokens=64, temperature=0.3, repetition_penalty=1.1,
-        stop=["</s>"], guided_json={"type": "object"},
+        stop=["</s>"],
     ))
     assert seen["model"] == "anser-v3"
     assert seen["max_tokens"] == 64
     assert seen["temperature"] == 0.3
     assert seen["repetition_penalty"] == 1.1        # field ngoài chuẩn OpenAI
     assert seen["stop"] == ["</s>"]
+    await c.aclose()
+
+
+async def test_complete_bat_grammar_thi_ha_repetition_penalty_ve_1():
+    """
+    SRS §3.3 bẫy 3. Bản trước test này gửi `guided_json` kèm 1,1 rồi đòi nhận
+    lại 1,1 — tức là khoá đúng cái bẫy: phạt lặp cấm các token JSON bắt buộc.
+    """
+    seen: dict = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        import json
+        seen.update(json.loads(request.content))
+        return httpx.Response(200, json={"choices": [{"text": "ok"}]})
+
+    c = _client(handler)
+    await c.complete(CompletionRequest(
+        prompt="p", repetition_penalty=1.1, guided_json={"type": "object"},
+    ))
     assert seen["guided_json"] == {"type": "object"}
+    assert seen["repetition_penalty"] == 1.0
     await c.aclose()
 
 
@@ -393,3 +414,205 @@ async def test_qua_tai_thi_tu_choi_som_thay_vi_dim_backend():
     assert hits == len(served), "backend chỉ được gọi cho request đã qua cửa"
     assert guard.stats.in_flight == 0
     await c.aclose()
+
+
+# ---------------------------------------------------------------------------
+# BR-02 — đường chat: /v1/chat/completions, server áp chat template
+#
+# Ba cái bẫy ở SRS §3.3 đều thuộc loại HỎNG IM LẶNG: chương trình không đổ,
+# chỉ có chất lượng sinh tụt. Nên mỗi cái có phép thử riêng, và phép thử đòi
+# SERVER GIẢ NHẬN ĐÚNG PAYLOAD — không kiểm thuộc tính của đối tượng Python.
+# ---------------------------------------------------------------------------
+
+def _server_ghi_payload(seen: dict, content: str | None = "ok"):
+    def handler(request: httpx.Request) -> httpx.Response:
+        import json
+        seen["path"] = request.url.path
+        seen.update(json.loads(request.content))
+        return httpx.Response(
+            200, json={"choices": [{"message": {"role": "assistant", "content": content}}]}
+        )
+    return handler
+
+
+_MSGS = [
+    {"role": "system", "content": "Bạn là trợ lý kế toán."},
+    {"role": "user", "content": "Tồn kho SP001?"},
+]
+
+
+async def test_chat_goi_chat_completions_va_doc_message_content():
+    seen: dict = {}
+    c = _client(_server_ghi_payload(seen, content="  tồn 12 thùng  "))
+    out = await c.chat(ChatRequest(messages=_MSGS))
+    assert seen["path"] == "/v1/chat/completions"
+    assert seen["messages"] == _MSGS          # server áp template, không phải client
+    assert "prompt" not in seen
+    assert out == "tồn 12 thùng"              # cùng hình dạng đường trong tiến trình
+    await c.aclose()
+
+
+async def test_chat_tat_thinking_qua_chat_template_kwargs():
+    """
+    Bẫy 2. Thiếu `chat_template_kwargs` thì Qwen3 xổ `<think>` trước mọi câu.
+    Ca này PHẢI ĐỎ nếu ai đó bỏ khoá đó khỏi payload (SRS BR-02 nghiệm thu).
+    """
+    seen: dict = {}
+    c = _client(_server_ghi_payload(seen))
+    await c.chat(ChatRequest(messages=_MSGS))
+    assert "chat_template_kwargs" in seen, "thiếu chat_template_kwargs -> Qwen3 sẽ think"
+    assert seen["chat_template_kwargs"]["enable_thinking"] is False
+    await c.aclose()
+
+
+async def test_chat_bat_grammar_gui_guided_json_va_repetition_penalty_1():
+    """Bẫy 3 + yêu cầu 6: server giả nhận đủ guided_json và rp == 1.0."""
+    schema = {"type": "object", "properties": {"tool": {"type": "string"}}}
+    seen: dict = {}
+    c = _client(_server_ghi_payload(seen, content='{"tool": "vat"}'))
+    await c.chat(ChatRequest(messages=_MSGS, guided_json=schema))
+    assert seen["guided_json"] == schema
+    assert seen["repetition_penalty"] == 1.0
+    assert seen["chat_template_kwargs"]["enable_thinking"] is False
+    await c.aclose()
+
+
+async def test_chat_khong_grammar_giu_phat_lap_mac_dinh_va_khong_gui_guided_json():
+    seen: dict = {}
+    c = _client(_server_ghi_payload(seen))
+    await c.chat(ChatRequest(messages=_MSGS))
+    assert "guided_json" not in seen
+    assert seen["repetition_penalty"] == 1.25   # trùng đường trong tiến trình
+    await c.aclose()
+
+
+async def test_chat_rp_tuong_minh_cung_grammar_van_bi_ha_ve_1():
+    seen: dict = {}
+    c = _client(_server_ghi_payload(seen))
+    await c.chat(ChatRequest(
+        messages=_MSGS, repetition_penalty=1.25, guided_json={"type": "object"},
+    ))
+    assert seen["repetition_penalty"] == 1.0
+    await c.aclose()
+
+
+async def test_extra_khong_de_duoc_hai_bat_bien():
+    """`extra` là lối thoát cho tham số vLLM lạ, không phải cửa sau để bật lại bẫy."""
+    seen: dict = {}
+    c = _client(_server_ghi_payload(seen))
+    await c.chat(ChatRequest(
+        messages=_MSGS,
+        guided_json={"type": "object"},
+        extra={
+            "repetition_penalty": 1.3,
+            "chat_template_kwargs": {"enable_thinking": True, "khac": 1},
+            "top_p": 0.9,
+        },
+    ))
+    assert seen["repetition_penalty"] == 1.0
+    assert seen["chat_template_kwargs"] == {"enable_thinking": False, "khac": 1}
+    assert seen["top_p"] == 0.9                 # tham số lạ hợp lệ vẫn đi qua
+    await c.aclose()
+
+
+@pytest.mark.parametrize("handler,loai", [
+    (lambda r: httpx.Response(422, text="max_model_len exceeded"), BackendError),
+    (lambda r: httpx.Response(200, text="<html>502 Bad Gateway</html>"), BackendError),
+    (lambda r: httpx.Response(200, json={"choices": []}), BackendError),
+    (lambda r: httpx.Response(200, json=["khong-phai-object"]), BackendError),
+], ids=["4xx", "html", "choices-rong", "json-mang"])
+async def test_chat_giu_nguyen_anh_xa_loi_tra_ve(handler, loai):
+    """Yêu cầu 4: cùng ngoại lệ với `complete()` — một chỗ `_post` cho cả hai."""
+    c = _client(handler)
+    with pytest.raises(loai):
+        await c.chat(ChatRequest(messages=_MSGS))
+    await c.aclose()
+
+
+@pytest.mark.parametrize("loi,loai", [
+    (httpx.ConnectError("refused"), BackendUnavailable),
+    (httpx.ReadTimeout("too slow"), BackendTimeout),
+], ids=["khong-noi-duoc", "qua-gio"])
+async def test_chat_giu_nguyen_anh_xa_loi_mang(loi, loai):
+    def handler(request):
+        raise loi
+
+    c = _client(handler)
+    with pytest.raises(loai):
+        await c.chat(ChatRequest(messages=_MSGS))
+    await c.aclose()
+
+
+async def test_chat_chua_cau_hinh_thi_noi_ro():
+    with pytest.raises(BackendUnavailable) as exc:
+        await VLLMServerClient(base_url="", model="").chat(ChatRequest(messages=_MSGS))
+    assert "VLLM_BASE_URL" in str(exc.value)
+
+
+async def test_chat_content_null_thanh_chuoi_rong_khong_sap():
+    c = _client(_server_ghi_payload({}, content=None))
+    assert await c.chat(ChatRequest(messages=_MSGS)) == ""
+    await c.aclose()
+
+
+async def test_messages_sai_hinh_dang_bi_chan_truoc_khi_goi_mang():
+    with pytest.raises(ValueError):
+        ChatRequest(messages=[])
+    with pytest.raises(ValueError):
+        ChatRequest(messages=[{"role": "tool", "content": "x"}])
+    with pytest.raises(ValueError):
+        ChatRequest(messages=[{"role": "user", "content": None}])
+
+
+@pytest.mark.parametrize("url", [
+    "http://vllm:8001", "http://vllm:8001/", "http://vllm:8001/v1", "http://vllm:8001/v1/",
+])
+async def test_base_url_co_hay_khong_co_v1_deu_goi_dung_duong(url):
+    """
+    AGENTS.md R5 ghi mẫu `.../v1`, compose ghi không có `/v1`. Không chuẩn hoá
+    thì làm theo AGENTS trên Colab (BR-04) sẽ gọi `/v1/v1/...` -> 404.
+    """
+    c = VLLMServerClient(base_url=url, model="m")
+    assert c.base_url == "http://vllm:8001"
+
+    duong: list[str] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        duong.append(request.url.path)
+        if request.url.path == "/health":
+            return httpx.Response(200)
+        return httpx.Response(200, json={"choices": [{"message": {"content": "ok"}}]})
+
+    c._client = httpx.AsyncClient(base_url=c.base_url, transport=httpx.MockTransport(handler))
+    await c.chat(ChatRequest(messages=_MSGS))
+    assert (await c.health())["ok"] is True
+    assert duong == ["/v1/chat/completions", "/health"]
+    await c.aclose()
+
+
+async def test_ghim_vllm_duoi_0_12_vi_0_12_go_guided_decoding():
+    """
+    Yêu cầu 5: server và Brain dùng CÙNG một khoảng ghim.
+
+    Hai lý do, hai đường:
+    - Đường trong tiến trình: 0.12 gỡ `GuidedDecodingParams` (engine.py).
+    - Đường server: trường `guided_json` ở thân request còn được thi hành ở
+      các bản 0.2x đầu, nhưng tới khoảng 0.26–0.28 thì bị BỎ QUA IM LẶNG —
+      trả 200 kèm text không ràng buộc, chỉ log ở mức DEBUG
+      (vllm-project/vllm#53975). Tên mới là `structured_outputs`.
+
+    Ai nâng trần ghim mà không đổi client thì grammar biến mất không một dấu
+    vết. Test này đỏ để buộc người đó đọc. `smoke_test_guided()` ở BR-05 là
+    chốt thứ hai, đo trên server thật.
+    """
+    import re
+    from pathlib import Path
+
+    req = (Path(__file__).resolve().parents[1] / "requirements.txt").read_text(encoding="utf-8")
+    ghim = re.search(r"^vllm\s*([^\n#]*)", req, re.MULTILINE)
+    assert ghim, "requirements.txt không còn ghim vllm"
+    assert "<0.12" in ghim.group(1).replace(" ", ""), (
+        f"vllm đang ghim '{ghim.group(1).strip()}'. Nâng trần thì đổi engine.py "
+        "(GuidedDecodingParams) và ChatRequest/CompletionRequest (guided_json -> "
+        "structured_outputs) trước, rồi chạy smoke_test_guided() trên server thật."
+    )
