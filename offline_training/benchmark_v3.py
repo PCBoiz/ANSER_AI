@@ -631,7 +631,7 @@ def smoke_test_guided(nha: NhaCungCap) -> list[str]:
 
     # ---- lược đồ THẬT của vòng agentic --------------------------------------
     # Lược đồ đồ chơi ở trên chỉ chứng minh guided decoding có chạy. Lược đồ
-    # thật thì lồng `oneOf`, `$defs` + `$ref`, và `enum` một phần tử — xgrammar
+    # thật thì lồng `anyOf`, `$defs` + `$ref`, và `enum` một phần tử — xgrammar
     # đỡ những thứ đó ở mức khác hẳn. Dựng hỏng thì nó nổ lúc DỰNG grammar, tức
     # là ở phút 20 của phiên Colab chứ không phải bây giờ.
     from src.agents.agentic import arguments_schema, build_decision_schema

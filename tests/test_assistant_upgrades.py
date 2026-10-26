@@ -153,9 +153,13 @@ _TOOLS = [
 def test_decision_schema_forbids_tool_and_answer_together():
     """Grammar không cho vừa gọi tool vừa tuyên bố đáp án."""
     schema = build_decision_schema(["report", "vat"])
-    assert schema["properties"]["tool"]["enum"] == ["report", "vat"]
-    assert len(schema["oneOf"]) == 2
-    assert schema["additionalProperties"] is False
+    goi_tool, tra_loi = schema["anyOf"]
+    assert goi_tool["properties"]["tool"]["enum"] == ["report", "vat"]
+    # Không nhánh nào khai cả `tool` lẫn `answer`, và nhánh nào cũng đóng.
+    assert "answer" not in goi_tool["properties"]
+    assert "tool" not in tra_loi["properties"]
+    assert goi_tool["additionalProperties"] is False
+    assert tra_loi["additionalProperties"] is False
 
 
 def test_render_tools_marks_required_params():

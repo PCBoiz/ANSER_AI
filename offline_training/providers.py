@@ -167,9 +167,10 @@ KHOA_KHONG_DO = frozenset({
 # Khoá CẤU TRÚC Anthropic không đỡ. KHÁC HẲN nhóm trên: những khoá này quyết
 # định model được phép sinh ra HÌNH DẠNG nào, nên bỏ đi là đổi phép đo.
 #
-# `build_decision_schema` dùng `oneOf` + `not` để cấm model xuất nửa vời — vừa
-# gọi tool vừa tuyên bố đáp án. Lọc hai khoá đó là cho phép đúng cái nó sinh ra
-# để chặn, rồi vẫn chấm điểm như thể đã chặn.
+# Những khoá này quyết định HÌNH DẠNG hợp lệ. Lọc đi là cho phép đúng cái lược đồ
+# sinh ra để chặn, rồi vẫn chấm điểm như thể đã chặn. (`build_decision_schema`
+# từng dùng `oneOf` + `not`; từ 26/10/2026 nó là `anyOf` hai nhánh đóng, vì
+# xgrammar bỏ qua khoá đứng cạnh `oneOf` — xem docstring của hàm đó.)
 #
 # `anyOf` KHÔNG nằm đây: nó qua được (lược đồ quote có `anyOf` và lỗi 400 gọi
 # đích danh `oneOf`, không gọi `anyOf`).
@@ -210,10 +211,11 @@ def dong_luoc_do(luoc_do: dict) -> tuple[dict | None, list[str], set[str]]:
 
     KHOÁ CẤU TRÚC
     -------------
-    Cùng lý do, một dạng khác: `oneOf`/`not` trong `build_decision_schema` quyết
-    định hình dạng hợp lệ. Anthropic không đỡ (`Schema type 'oneOf' is not
-    supported`), mà lọc đi là cho phép đúng cái lược đồ sinh ra để cấm. Nên xếp
-    chung nhóm "không diễn đạt được" với object tự do.
+    Cùng lý do, một dạng khác: `oneOf`/`not` quyết định hình dạng hợp lệ.
+    Anthropic không đỡ (`Schema type 'oneOf' is not supported`), mà lọc đi là
+    cho phép đúng cái lược đồ sinh ra để cấm. Nên xếp chung nhóm "không diễn đạt
+    được" với object tự do. Lược đồ quyết định agentic nay dùng `anyOf` nên không
+    còn rơi vào nhóm này.
 
     Trả về `(lược_đồ, lý_do_không_diễn_đạt_được, khoá_đã_lọc)`. Danh sách lý do
     rỗng nghĩa là đóng thành công.

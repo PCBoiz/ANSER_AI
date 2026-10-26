@@ -135,8 +135,22 @@ def build_decision_schema(
     """
     JSON Schema cho MỘT quyết định của agent — đưa vào guided_json.
 
-    `oneOf` gọi-tool / trả-lời: grammar không cho model xuất nửa vời (vừa gọi
-    tool vừa tuyên bố đáp án), thứ hay xảy ra khi chỉ dặn bằng lời trong prompt.
+    Hai nhánh `anyOf`, MỖI NHÁNH LÀ MỘT OBJECT ĐÓNG ĐỦ (`properties`, `required`,
+    `additionalProperties: False`): gọi-tool / trả-lời (hoặc hỏi-lại). Grammar
+    không cho model xuất nửa vời — vừa gọi tool vừa tuyên bố đáp án — vì không
+    nhánh nào khai cả hai trường. Không cần `not`.
+
+    VÌ SAO KHÔNG CÒN `oneOf` + `not` + `properties` Ở GỐC (26/10/2026). Bản trước
+    đặt `properties`/`additionalProperties` ở gốc và `oneOf` với `not` đứng
+    cạnh. JSON Schema hiểu đúng, `jsonschema` kiểm đúng, nhưng xgrammar — backend
+    grammar mặc định của vLLM 0.11 — dựng grammar từ các nhánh `oneOf` và BỎ QUA
+    các khoá đứng cạnh, nên mỗi nhánh thành "object bất kỳ có đủ khoá bắt buộc".
+    Đo trên Colab bằng chính lược đồ này: grammar nhận `{"thought", "answer"}` và
+    nhận cả "vừa gọi tool vừa hỏi lại". vLLM không cảnh báo gì vì nó coi lược đồ
+    là xgrammar hỗ trợ được. Hậu quả đo được ở BR-04: câu soát hoá đơn có kế
+    hoạch ["vat"], `tool_calls=0`, `asked_back=False` — model đi qua đúng cái
+    nhánh `answer` mà grammar được cho là đã khoá, năm lần trên năm.
+    `test_luoc_do_quyet_dinh_khong_dat_khoa_canh_anyOf` giữ hình dạng này.
 
     `arg_schema` (tuỳ chọn): ràng buộc `arguments` khi đã biết chắc tool nào sẽ
     chạy — xem `arguments_schema`.
@@ -175,47 +189,51 @@ def build_decision_schema(
     # sinh. Loại lỗi nổ ở phút 20 của phiên Colab.
     defs = args.pop("$defs", None)
 
-    thuoc_tinh: dict[str, Any] = {
-        "thought": {"type": "string", "maxLength": 400},
-        "tool": {"type": "string", "enum": tool_names},
-        "arguments": args,
+    thought = {"type": "string", "maxLength": 400}
+    goi_tool = {
+        "type": "object",
+        "properties": {
+            "thought": thought,
+            "tool": {"type": "string", "enum": tool_names},
+            "arguments": args,
+        },
+        "required": ["thought", "tool", "arguments"],
+        "additionalProperties": False,
     }
-    schema: dict[str, Any]
     if bat_buoc_tool:
         # `hoi_lai` NGẮN và tên trường nói đúng công dụng: chỗ này để hỏi, không
-        # phải để trả lời. Cộng với `additionalProperties: False`, grammar không
-        # sinh nổi một quyết định mang theo kết quả tự tính.
-        thuoc_tinh["hoi_lai"] = {
-            "type": "string",
-            "maxLength": 300,
-            "description": "Chỉ dùng khi THIẾU tham số bắt buộc: hỏi người dùng "
-                           "cung cấp thêm. Không đặt kết quả tính toán vào đây.",
-        }
-        schema = {
-            "type": "object",
-            "properties": thuoc_tinh,
-            "required": ["thought"],
-            "oneOf": [
-                {"required": ["tool", "arguments"], "not": {"required": ["hoi_lai"]}},
-                {"required": ["hoi_lai"], "not": {"required": ["tool"]}},
-            ],
-            "additionalProperties": False,
+        # phải để trả lời. Nhánh đóng, nên grammar không sinh nổi một quyết định
+        # mang theo kết quả tự tính.
+        ket = {
+            "hoi_lai": {
+                "type": "string",
+                "maxLength": 300,
+                "description": "Chỉ dùng khi THIẾU tham số bắt buộc: hỏi người dùng "
+                               "cung cấp thêm. Không đặt kết quả tính toán vào đây.",
+            },
         }
     else:
-        thuoc_tinh["answer"] = {"type": "string", "maxLength": 2000}
-        schema = {
-            "type": "object",
-            "properties": thuoc_tinh,
-            "required": ["thought"],
-            "oneOf": [
-                {"required": ["tool", "arguments"], "not": {"required": ["answer"]}},
-                {"required": ["answer"], "not": {"required": ["tool"]}},
-            ],
-            "additionalProperties": False,
-        }
+        ket = {"answer": {"type": "string", "maxLength": 2000}}
+    nhanh_ket = {
+        "type": "object",
+        "properties": {"thought": thought, **ket},
+        "required": ["thought", *ket],
+        "additionalProperties": False,
+    }
+    # Gốc CHỈ có `anyOf` (+ `$defs`). Đặt thêm khoá nào cạnh `anyOf` ở gốc là mở
+    # lại đúng lỗ ở docstring: xgrammar bỏ qua chúng mà không báo.
+    schema: dict[str, Any] = {"anyOf": [goi_tool, nhanh_ket]}
     if defs:
         schema["$defs"] = defs
     return schema
+
+
+def cac_truong_quyet_dinh(schema: dict[str, Any]) -> dict[str, Any]:
+    """Hợp `properties` của mọi nhánh — để đọc lược đồ mà không phải biết hình dạng."""
+    gop: dict[str, Any] = {}
+    for nhanh in schema.get("anyOf") or [schema]:
+        gop.update(nhanh.get("properties") or {})
+    return gop
 
 
 def build_answer_schema() -> dict[str, Any]:

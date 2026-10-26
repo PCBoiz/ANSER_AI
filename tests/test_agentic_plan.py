@@ -21,6 +21,7 @@ from src.agents.agentic import (
     arguments_schema,
     build_answer_schema,
     build_decision_schema,
+    cac_truong_quyet_dinh,
 )
 
 _TOOLS = [
@@ -48,7 +49,7 @@ class _GhiSchema:
 
 
 def _enum(schema) -> list | None:
-    return ((schema.get("properties") or {}).get("tool") or {}).get("enum")
+    return (cac_truong_quyet_dinh(schema).get("tool") or {}).get("enum")
 
 
 # --------------------------------------------------------------------------
@@ -152,7 +153,7 @@ async def test_van_hoi_lai_duoc_khi_thieu_tham_so():
     assert out["answer"].startswith("Đơn hàng tổng")
     assert out["tool_calls"] == 0
     assert out["data_missing"] is True          # -> metric.asked_back
-    assert "hoi_lai" in (manager.schemas[0].get("properties") or {})
+    assert "hoi_lai" in cac_truong_quyet_dinh(manager.schemas[0])
 
 
 @pytest.mark.asyncio
@@ -182,13 +183,13 @@ async def test_con_ke_hoach_thi_khong_the_tu_tinh():
         manager, _TOOLS, lambda n, a: {"is_valid": False}, planner=lambda q, names: ["vat"],
     ).run("Kiểm tra hoá đơn tổng ghi 6.500.000đ")
 
-    buoc1 = manager.schemas[0].get("properties") or {}
+    buoc1 = cac_truong_quyet_dinh(manager.schemas[0])
     assert "answer" not in buoc1, "còn kế hoạch mà vẫn cho `answer` — đúng lỗ hổng cũ"
     assert "tool" in buoc1 and "hoi_lai" in buoc1
     assert out["tool_calls"] >= 1, "tool PHẢI chạy, không được tự nhẩm"
 
     # Hết kế hoạch thì `answer` quay lại — nếu không thì không ai kết luận được.
-    assert "answer" in (manager.schemas[1].get("properties") or {})
+    assert "answer" in cac_truong_quyet_dinh(manager.schemas[1])
 
 
 def test_luoc_do_ep_tool_khong_hop_le_hoa_cau_tra_loi_thang():
@@ -210,10 +211,76 @@ def test_luoc_do_ep_tool_khong_hop_le_hoa_cau_tra_loi_thang():
 def test_khong_ke_hoach_thi_luoc_do_giu_nguyen_nhu_cu():
     """Mặc định KHÔNG đổi — `bat_buoc_tool` phải là lựa chọn, không phải mặc định."""
     s = build_decision_schema(["report", "vat"])
-    props = s["properties"]
+    props = cac_truong_quyet_dinh(s)
     assert "answer" in props and "hoi_lai" not in props
-    assert s["required"] == ["thought"]
-    assert len(s["oneOf"]) == 2
+    assert all("thought" in n["required"] for n in s["anyOf"])
+    assert len(s["anyOf"]) == 2
+
+
+@pytest.mark.parametrize("bat_buoc", [True, False])
+def test_luoc_do_quyet_dinh_khong_dat_khoa_canh_anyOf(bat_buoc):
+    """
+    Hình dạng mà xgrammar THI HÀNH được, chạy ở mọi máy (không cần xgrammar).
+
+    Bản trước đặt `properties`/`additionalProperties` ở gốc cạnh `oneOf` + `not`.
+    `jsonschema` kiểm đúng, nhưng xgrammar (backend mặc định của vLLM 0.11) bỏ
+    qua các khoá đứng cạnh nhánh: đo trên Colab 26/10/2026, grammar nhận
+    `{"thought", "answer"}` dù lược đồ đã cấm, và câu soát hoá đơn ra
+    `tool_calls=0` năm lần trên năm.
+
+    Luật: gốc chỉ có `anyOf` (+ `$defs`); không `not`, không `oneOf`; mỗi nhánh
+    tự đóng.
+    """
+    s = build_decision_schema(["vat"], None, bat_buoc_tool=bat_buoc)
+    assert set(s) <= {"anyOf", "$defs"}, f"khoá cạnh anyOf ở gốc: {set(s) - {'anyOf', '$defs'}}"
+
+    def quet(o):
+        if isinstance(o, dict):
+            assert "not" not in o and "oneOf" not in o, o
+            for v in o.values():
+                quet(v)
+        elif isinstance(o, list):
+            for v in o:
+                quet(v)
+    quet(s)
+    for nhanh in s["anyOf"]:
+        assert nhanh["additionalProperties"] is False
+        assert set(nhanh["required"]) <= set(nhanh["properties"])
+
+
+@pytest.mark.parametrize("bat_buoc,ket", [(True, "hoi_lai"), (False, "answer")])
+def test_xgrammar_THAT_chan_quyet_dinh_nua_voi(bat_buoc, ket):
+    """
+    Cùng điều trên, đo bằng chính xgrammar. Chỉ chạy nơi có xgrammar (Colab có
+    vLLM); máy không có thì skip, và test cấu trúc ở trên vẫn canh hình dạng.
+    """
+    xgr = pytest.importorskip("xgrammar")
+    from xgrammar.testing import _is_grammar_accept_string as nhan
+
+    from src.api.routes.tools import get_tool_defs
+    from src.core.tool_planner import system_data_fields
+
+    vat = next(t for t in get_tool_defs() if t["name"] == "vat")
+    s = build_decision_schema(
+        ["vat"], arguments_schema(vat, system_data_fields("vat")), bat_buoc_tool=bat_buoc
+    )
+    g = xgr.Grammar.from_json_schema(json.dumps(s))
+    goi = {"thought": "t", "tool": "vat", "arguments": {
+        "items": [{"name": "Cước", "price": 5000000, "qty": 1}], "stated_total": 6500000}}
+
+    def j(o):
+        return json.dumps(o, ensure_ascii=False)
+
+    assert nhan(g, j(goi)), "chặn cả lời gọi tool hợp lệ"
+    assert nhan(g, j({"thought": "t", ket: "x"})), f"chặn cả nhánh {ket} hợp lệ"
+    sai_nhanh = "answer" if bat_buoc else "hoi_lai"
+    assert not nhan(g, j({"thought": "t", sai_nhanh: "Tổng là 6.500.000"})), (
+        f"grammar nhận `{sai_nhanh}` — nhánh không có trong lược đồ lọt qua"
+    )
+    assert not nhan(g, j({**goi, ket: "x"})), "vừa gọi tool vừa kết thúc vẫn lọt"
+    assert not nhan(g, j({**goi, "arguments": {**goi["arguments"], "la": 1}})), (
+        "trường lạ trong `arguments` lọt qua"
+    )
 
 
 # --------------------------------------------------------------------------
@@ -335,7 +402,7 @@ def test_defs_duoc_nang_len_goc_tai_lieu():
     }}
     s = build_decision_schema(["report"], arguments_schema(tool, ()))
     assert "SaleLineIn" in s["$defs"]
-    assert "$defs" not in s["properties"]["arguments"]
+    assert "$defs" not in cac_truong_quyet_dinh(s)["arguments"]
 
 
 def test_moi_tool_that_deu_dung_schema_hop_le():
@@ -389,7 +456,7 @@ async def test_vong_lap_dung_schema_da_chan_cho_tool_can_du_lieu():
         data_provider=lambda n, a: ({**a, "sales": [{"revenue": 1}]}, None),
     ).run("quý này lãi hay lỗ")
 
-    arg_props = manager.schemas[0]["properties"]["arguments"]["properties"]
+    arg_props = cac_truong_quyet_dinh(manager.schemas[0])["arguments"]["properties"]
     assert "sales" not in arg_props, "model vẫn bị hỏi mảng dữ liệu sẽ bị vứt đi"
     assert "granularity" in arg_props
 

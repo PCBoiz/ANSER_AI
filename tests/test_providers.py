@@ -468,15 +468,29 @@ def test_anyOf_KHONG_bi_coi_la_khong_do_duoc():
     assert mo == [] and dong is not None
 
 
-def test_luoc_do_quyet_dinh_agentic_THAT_khong_dien_dat_duoc():
+def test_luoc_do_quyet_dinh_agentic_THAT_nay_dien_dat_duoc():
     """
-    Hồi quy cho lỗi 400 thứ ba (23/08/2026): `Schema type 'oneOf' is not supported`.
+    Lỗi 400 thứ ba (23/08/2026) là `Schema type 'oneOf' is not supported`, nên
+    bản trước của lược đồ quyết định không gửi được cho Anthropic. Từ 26/10/2026
+    lược đồ đó là `anyOf` hai nhánh đóng (xgrammar bỏ qua khoá cạnh `oneOf`, xem
+    `build_decision_schema`) — và nhờ vậy đường Anthropic cũng ép được nó.
+
+    Có lược đồ `arguments` thật thì đóng trọn. Không có (object tự do) thì vẫn
+    lùi như mọi object tự do khác — nhưng không còn vì `oneOf`.
     """
-    from src.agents.agentic import build_decision_schema
+    from src.agents.agentic import arguments_schema, build_decision_schema
+    from src.api.routes.tools import get_tool_defs
+    from src.core.tool_planner import system_data_fields
+
+    vat = next(t for t in get_tool_defs() if t["name"] == "vat")
+    dong, mo, _ = dong_luoc_do(build_decision_schema(
+        ["vat"], arguments_schema(vat, system_data_fields("vat")), bat_buoc_tool=True
+    ))
+    assert dong is not None and mo == [], mo
 
     dong, mo, _ = dong_luoc_do(build_decision_schema(["report"]))
     assert dong is None
-    assert any("oneOf" in ly_do for ly_do in mo), mo
+    assert not any("oneOf" in ly_do or "'not'" in ly_do for ly_do in mo), mo
 
 
 def test_thieu_grammar_thi_DUNG_chu_khong_canh_bao_roi_chay_tiep():
