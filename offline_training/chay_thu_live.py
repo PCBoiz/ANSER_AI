@@ -94,7 +94,13 @@ def hoi(msg: str, gio: float) -> tuple[str, float]:
         han = time.time() + gio
         while time.time() < han:
             time.sleep(2)
-            trang_thai = client.get(f"{BRAIN_URL}/api/v1/task/{task_id}").json()
+            # `X-User-Id` khớp `user_id` của POST: endpoint này chỉ trả task cho
+            # chủ, thiếu header là 404 mãi và vòng này chờ tới hết giờ.
+            rp = client.get(f"{BRAIN_URL}/api/v1/task/{task_id}",
+                            headers={"X-User-Id": "live-test"})
+            if rp.status_code != 200:
+                return f"[GET task {rp.status_code}] {rp.text[:200]}", time.time() - t0
+            trang_thai = rp.json()
             if trang_thai.get("status") == "completed":
                 kq = trang_thai.get("result") or {}
                 ans = kq.get("answer") if isinstance(kq, dict) else str(kq)

@@ -300,8 +300,12 @@ def _chay():
     ans = None
     for _ in range(150):
         time.sleep(2)
-        with urllib.request.urlopen(
-                f"http://127.0.0.1:8000/api/v1/task/{tid}", timeout=15) as rp:
+        # `X-User-Id` khớp `user_id` của POST ở trên: endpoint chỉ trả task cho
+        # chủ, thiếu header là 404 và urlopen ném HTTPError giữa lúc hâm nóng.
+        with urllib.request.urlopen(urllib.request.Request(
+                f"http://127.0.0.1:8000/api/v1/task/{tid}",
+                headers={"X-User-Id": "ham-nong",
+                         "X-API-Token": env["API_AUTH_TOKEN"]}), timeout=15) as rp:
             tt = json.loads(rp.read())
         if tt.get("status") == "completed":
             kq = tt.get("result") or {}

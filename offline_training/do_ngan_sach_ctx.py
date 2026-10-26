@@ -219,16 +219,27 @@ def _hoi_brain(msg: str, gio: float) -> tuple[str, float]:
     # `POST /chat` chờ trọn lúc nạp runtime TRƯỚC khi trả task_id (chat.py), nên
     # `gio` áp cho cả POST. Hết giờ thì trả chuỗi lỗi, không ném: ném ra ngoài là
     # mất luôn đuôi log Brain — thứ duy nhất nói vì sao nó chậm.
+    #
+    # `X-User-Id` PHẢI khớp `user_id` trong thân: GET /api/v1/task/{id} chỉ trả
+    # kết quả cho chủ task, sai hoặc thiếu thì 404 (chat.py). Bản đầu không gửi
+    # header này, nhận 404 mỗi lần hỏi và chờ trọn 30 phút trong khi câu trả lời
+    # đã nằm sẵn trong Brain (phiên Colab 26/10/2026).
+    nguoi = "br04"
     try:
-        with httpx.Client(timeout=gio) as c:
-            r = c.post(f"{goc}/chat", json={"user_id": "br04", "store_id": "1", "message": msg})
+        with httpx.Client(timeout=gio, headers={"X-User-Id": nguoi}) as c:
+            r = c.post(f"{goc}/chat", json={"user_id": nguoi, "store_id": "1", "message": msg})
             if r.status_code != 200:
                 return f"[POST /chat {r.status_code}] {r.text[:200]}", time.time() - t0
             tid = r.json().get("task_id")
             han = time.time() + gio
             while time.time() < han:
                 time.sleep(2)
-                tt = c.get(f"{goc}/api/v1/task/{tid}").json()
+                rp = c.get(f"{goc}/api/v1/task/{tid}")
+                if rp.status_code != 200:
+                    # Không hỏi lại: 404 ở đây là sai chủ hoặc task mất, chờ thêm
+                    # không làm nó tự đúng.
+                    return f"[GET task {rp.status_code}] {rp.text[:200]}", time.time() - t0
+                tt = rp.json()
                 if tt.get("status") == "completed":
                     kq = tt.get("result") or {}
                     return str(kq.get("answer") if isinstance(kq, dict) else kq), time.time() - t0
