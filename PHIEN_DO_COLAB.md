@@ -6,6 +6,15 @@ gốc không, và hơn đủ để đáng dùng không?*
 > **Đừng thuê GPU trước khi có kết quả phiên này.** Trả tiền hằng tháng cho một
 > lớp chưa đo bao giờ là cách nhanh nhất để tốn tiền vào thứ có thể không cần.
 
+> **Từ 26/10/2026 (BR-04):** đường phục vụ là **vLLM server**, không còn
+> `vllm.LLM` trong tiến trình. Runbook dựng vLLM server + Brain trên L4 nằm ở
+> [BAO_CAO_BR04.md](BAO_CAO_BR04.md) §7. SRS BR-05 yêu cầu đo bản fine-tune
+> **qua đường server đó**. Trước khi đo, chạy
+> `pytest tests/test_agentic_plan.py -k xgrammar`: hai ca phải **passed**,
+> không skipped. Grammar quyết định của vòng agentic từng không được thi hành
+> trên đường server (BAO_CAO_BR04 §5.1), và một phiên đo trên grammar hỏng là
+> một phiên mất trắng.
+
 ---
 
 ## Phiên 15/08/2026 đã chạy. Đây là phiên ĐO LẠI.

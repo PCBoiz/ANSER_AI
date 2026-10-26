@@ -217,17 +217,17 @@ Colab **chỉ** được dùng cho: fine-tune, quantize, thử nghiệm rời r�
 
 Toàn bộ chạy local, không có API bên ngoài (P2).
 
-| Vai trò | Model | Định dạng | VRAM |
-|---|---|---|---|
-| **Agentic brain** — tool-calling, chat, XAI narration, sinh workflow | `Qwen3-8B-Instruct` | AWQ 4-bit | ~5,5 GB |
-| KV-cache @ ctx 32k, batch vừa | — | — | ~5,0 GB |
-| **Vision** — OCR hóa đơn | `Qwen2.5-VL-3B-Instruct` | AWQ 4-bit | ~3,0 GB |
-| **Embedding** | `paraphrase-multilingual-MiniLM-L12-v2` | FP16 | ~0,5 GB |
-| **Reranker** | `ms-marco-MiniLM-L-6-v2` | FP16 | ~0,3 GB |
-| Đệm | — | — | ~0,7 GB |
-| **TỔNG** | | | **~15,0 GB** |
+**Đo trên L4 23.034 MiB ngày 26/10/2026** (BR-04, chi tiết ở [BAO_CAO_BR04.md](BAO_CAO_BR04.md)). Bảng cũ ghi vision AWQ ~3,0 GB và tổng ~15,0 GB — sai: mã nạp vision **bf16**, và embedder/reranker đã đổi.
 
-Vừa card 16GB, dư thoải mái trên 3090/4090 24GB.
+| Vai trò | Model | Định dạng | Ở đâu | VRAM đo được |
+|---|---|---|---|---|
+| **Agentic brain** — tool-calling, chat, XAI narration, sinh workflow | `Qwen3-8B` → bản fine-tune `anser-v3-awq` | AWQ 4-bit | `vllm serve`, tiến trình riêng | **~13.274 MiB** giữ chỗ cứng (`gpu_memory_utilization=0.55`), gồm weights + **KV cache 36.176 token** |
+| **Vision** — OCR hóa đơn | `Qwen2.5-VL-3B-Instruct` | **bf16**, không lượng tử hoá | trong tiến trình Brain | **~7.874 MiB** (gồm CUDA context của Brain) |
+| **Embedding** | `BAAI/bge-m3` | — | **CPU** | 0 |
+| **Reranker** | `namdp-ptit/ViRanker` | — | **CPU** | 0 |
+| **TỔNG, đỉnh** | | | | **21.156 MiB / 23.034** — dư ~1,9 GB |
+
+Cùng con số ở cả ba mức `max_model_len` 8192 / 16384 / 32768: bể KV do `gpu_memory_utilization` quyết định, không do `max_model_len`. T4 16 GB không đủ.
 
 ### 5.2. Vì sao 8B — và vì sao *không* to hơn
 
@@ -269,7 +269,19 @@ Model v2 (`anser-retail-v2-awq`, LoRA r=64 trên Qwen2.5-7B, distill DeepSeek-R1
 
 **Kiến trúc mục tiêu:** vLLM chạy **process riêng** ở chế độ OpenAI-compatible server; Brain gọi qua HTTP nội bộ.
 
-> **Trạng thái 26/10/2026: đường text đã nối (BR-02, BR-03).** Có `VLLM_BASE_URL` thì `ModelEngine` gọi `VLLMServerClient.chat()` tới `/v1/chat/completions`; không có thì giữ đường `vllm.LLM` trong tiến trình ở trên. Backend chọn ở một chỗ, [`engine.py::chon_backend()`](src/core/engine.py), và `/health` khai `text_backend`, `vision_backend`, `vllm_server`. Ba cái bẫy riêng của đường server đều có phép thử: server áp chat template, `chat_template_kwargs.enable_thinking=false`, và `repetition_penalty=1.0` khi có grammar. Vision vẫn nạp trong tiến trình; qua HTTP thuộc chu kỳ 02. Số đo trên L4 thật (KV cache, p95) thuộc BR-04 và sẽ ghi vào §5.1 khi có.
+> **Trạng thái 26/10/2026: đường text đã nối (BR-02, BR-03).** Có `VLLM_BASE_URL` thì `ModelEngine` gọi `VLLMServerClient.chat()` tới `/v1/chat/completions`; không có thì giữ đường `vllm.LLM` trong tiến trình ở trên. Backend chọn ở một chỗ, [`engine.py::chon_backend()`](src/core/engine.py), và `/health` khai `text_backend`, `vision_backend`, `vllm_server`. Ba cái bẫy riêng của đường server đều có phép thử: server áp chat template, `chat_template_kwargs.enable_thinking=false`, và `repetition_penalty=1.0` khi có grammar. Vision vẫn nạp trong tiến trình; qua HTTP thuộc chu kỳ 02.
+
+> **Ngân sách ngữ cảnh, BR-04 (26/10/2026) — ĐỀ XUẤT, chờ chủ dự án chốt.** Số đo và lý do đầy đủ ở [BAO_CAO_BR04.md](BAO_CAO_BR04.md) §6.
+>
+> | Tham số | Đề xuất | Căn cứ đo |
+> |---|---|---|
+> | `TEXT_MAX_MODEL_LEN` | **32768** | dựng được cùng vision; KV 36.176 token không đổi theo `max_model_len` |
+> | `gpu_memory_utilization` | **0.55** | VRAM đỉnh 21,1 / 22,5 GB |
+> | `ANSER_TEXT_MAX_CONCURRENT` | **4** | 4 request đồng thời chỉ chậm hơn 1 request ~6% |
+>
+> Chỉ **1,1 chuỗi dài trọn 32k** vừa bể KV cùng lúc; request ngắn thì song song thoải mái nhờ paged attention. Chưa đo một ca thật 3 tool + RAG (SRS BR-04 yêu cầu 8).
+>
+> **Bẫy thứ tư của đường server, đã sửa 26/10:** xgrammar (backend mặc định của vLLM 0.11) bỏ qua `properties`/`additionalProperties` đứng cạnh `oneOf` ở gốc lược đồ, nên grammar quyết định của vòng agentic từng **không được thi hành**. `build_decision_schema` nay là `anyOf` hai nhánh đóng; `test_xgrammar_THAT_chan_quyet_dinh_nua_voi` đo bằng xgrammar thật. Quy tắc cho mọi lược đồ đưa vào `guided_json`: **không đặt khoá nào cạnh `anyOf`/`oneOf`, không dùng `not`**.
 
 | Lợi ích | Chi tiết |
 |---|---|
@@ -818,7 +830,7 @@ Ghi log từ request đầu tiên. Không có số đo thì mọi tranh luận v
 
 | Nhóm | Chỉ số | Ngưỡng |
 |---|---|---|
-| **Hạ tầng** | `inference_latency_p95` | ≤ 5.000ms |
+| **Hạ tầng** | `inference_latency_p95` | ≤ 5.000ms — **cần định nghĩa lại**: đo 26/10 trên L4 ra 8,6–9,2 giây cho câu trả lời ~217 token (~25 token/giây), tức ngưỡng này chỉ đạt với câu dưới ~125 token. Đề xuất tách p95 bước quyết định JSON và token/giây, xem [BAO_CAO_BR04.md](BAO_CAO_BR04.md) §6 |
 | | `vram_utilization_pct` | > 90% cảnh báo |
 | | `gpu_hours_per_month` | ≤ ngân sách bậc hiện tại |
 | | `oom_incident_count` | 0 |

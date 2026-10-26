@@ -201,13 +201,13 @@ Làm bước này trước. Nó mất gần hai phút và cho bạn biết môi 
 ENV=LOCAL pytest -q
 ```
 
-Kết quả đúng, đo ngày 26/10/2026 trên Colab, sau BR-01 đến BR-03:
+Kết quả đúng, đo ngày 26/10/2026 trên Colab sau bản sửa lược đồ quyết định (`82e9e9c`), tổng 1045 ca:
 
 ```
-1038 passed, 3 skipped
+1041 passed, 4 skipped
 ```
 
-Ba ca skip là các ca cần thứ không có trên máy, ví dụ bản sao repo Body cho `test_body_contract`. Số skip đổi theo thư viện đang cài: có SDK `anthropic` thì `test_providers` bỏ thêm một ca và ra `1037 passed, 4 skipped`, vẫn đạt. Muốn biết từng ca skip vì sao thì thêm `-rs`. Trên Windows có thể thêm một warning về symlink của HuggingFace, vô hại.
+Số skip đổi theo thư viện đang cài, nên tổng passed + skipped mới là thứ cần khớp. Ba ca luôn skip trên máy không có thứ chúng cần, ví dụ bản sao repo Body cho `test_body_contract`. Có SDK `anthropic` thì `test_providers` bỏ thêm một ca. Không có xgrammar (máy chưa cài vLLM) thì hai ca `test_xgrammar_THAT_*` skip; trên Colab đã cài vLLM, hai ca này **phải** passed. Muốn biết từng ca skip vì sao thì thêm `-rs`. Trên Windows có thể thêm một warning về symlink của HuggingFace, vô hại.
 
 `pythonpath` và `testpaths` đã khai trong `pyproject.toml`, nên bạn chạy từ thư mục gốc là được, không cần `PYTHONPATH`.
 
@@ -402,7 +402,7 @@ src/
 │   ├── docs/              # 43MB tài liệu luật thuế và báo cáo ngành, nguồn RAG
 │   └── blueprints/        # 6 workflow mẫu định dạng Make.com, KHÔNG dùng để train
 offline_training/          # sinh dữ liệu, train, lượng tử hoá, benchmark
-tests/                     # 45 file test, 1041 ca (26/10/2026)
+tests/                     # 45 file test, 1045 ca (26/10/2026)
 data/n8n_templates/        # 32 workflow n8n thật, trích từ Body
 data/sheet_templates/      # mẫu Google Sheet cho pilot vận tải
 sample_data/               # bộ dữ liệu có lỗi gieo sẵn
@@ -594,7 +594,7 @@ Trả một bài viết trên mạng cho câu đầu là trình bày thông tin 
 
 Runbook đầy đủ ở [PHIEN_DO_COLAB.md](PHIEN_DO_COLAB.md). Cần GPU L4 hoặc A100; T4 16GB không đủ cho Qwen3-8B AWQ. Khoảng một giờ khi đo lại, vì dữ liệu sinh phiên 15/08 còn trên Drive.
 
-Notebook đã có ở `offline_training/ANSER_train_v3_colab.ipynb`. Người làm Brain được tạo thêm script hoặc notebook cho việc đo khi cần; ví dụ `offline_training/do_ngan_sach_ctx.py` cho BR-04. Bản trước của sổ tay ghi "không tự tạo notebook mới" là chỗ sai, đã sửa 26/10/2026.
+Notebook đã có ở `offline_training/ANSER_train_v3_colab.ipynb`. Người làm Brain được tạo thêm script hoặc notebook cho việc đo khi cần; ví dụ `offline_training/do_ngan_sach_ctx.py` cho BR-04. Runbook dựng vLLM server + Brain trên Colab L4, kèm bảng các bẫy đã gặp, ở [BAO_CAO_BR04.md](BAO_CAO_BR04.md) §7. Bản trước của sổ tay ghi "không tự tạo notebook mới" là chỗ sai, đã sửa 26/10/2026.
 
 Dựng lại Brain giữa phiên dùng `offline_training/bat_lai_brain.py`, chạy bằng `%run -i`. Script đó đặt `ENV=GPU`; từ BR-03, `ENV=SERVER` mà không có `VLLM_BASE_URL` là lỗi cấu hình.
 

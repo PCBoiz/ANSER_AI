@@ -166,6 +166,8 @@ chat.py ─► manager ─► ModelEngine.generate_chat
 | 2 | **`enable_thinking=False`** | đặt tại [`engine.py:358`](src/core/engine.py#L358) | Chưa có. Qwen3 mặc định **bật** thinking, nên model xổ `<think>` trước mọi câu, trong khi grammar ép `{` là token đầu và dataset v3 train **không** think |
 | 3 | **`repetition_penalty` khi bật grammar** | hạ 1,25 → 1,0 tại [`engine.py:341`](src/core/engine.py#L341) | `CompletionRequest` mặc định 1,25 và không chỗ nào hạ. JSON **bắt buộc** lặp token (`"typeVersion"`, `"position"`, dấu ngoặc), nên phạt lặp sẽ cấm chính các token grammar đòi |
 
+> **Bẫy thứ tư, phát hiện ở BR-04 ngày 26/10/2026 — đã sửa.** Lược đồ quyết định của vòng agentic (`build_decision_schema`) đặt `properties` + `additionalProperties: false` cạnh `oneOf` + `not`. xgrammar, backend mặc định của vLLM 0.11, bỏ qua khoá đứng cạnh `oneOf`, nên grammar nhận cả câu trả lời tự do lẫn "vừa gọi tool vừa hỏi lại"; vLLM không cảnh báo. Câu soát hoá đơn ra `tool_calls=0` năm lần trên năm. Sửa ở `82e9e9c`: `anyOf` hai nhánh đóng; phép thử đo bằng xgrammar thật. Chi tiết ở [BAO_CAO_BR04.md](BAO_CAO_BR04.md) §5.1.
+
 Bẫy 2 và 3 không làm chương trình đổ. Chúng làm chất lượng sinh tụt, và trong lịch sử dự án đúng loại này đã **đốt trọn một vòng đo**: phiên 15/08 sửa `additionalProperties: False` mà kết quả không đổi một đơn vị nào, vì backend giải mã bỏ qua ràng buộc đó.
 
 ---

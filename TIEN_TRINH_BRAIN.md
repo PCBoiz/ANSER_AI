@@ -1,6 +1,6 @@
 # TIẾN TRÌNH BRAIN — bản kiểm soát lộ trình
 
-**Cập nhật 25/08/2026.** File này trả lời bốn câu cho người tiếp quản:
+**Cập nhật 25/08/2026**, bổ sung 26/10/2026 (BR-01 đến BR-04: P1 đính chính, việc treo #3 và #5). File này trả lời bốn câu cho người tiếp quản:
 *đang ở đâu, cái gì đã chắc, cái gì đang dở, và đụng vào đâu thì gãy.*
 
 Khác với [BAN_GIAO_VAN_TAI.md](BAN_GIAO_VAN_TAI.md) — bản đó chỉ nói phần **vận
@@ -136,7 +136,9 @@ chú thích:
 2. **`vllm-vision`** — chưa có client HTTP cho vision. Vision vẫn nạp thẳng trong
    tiến trình qua transformers.
 3. Vì (2), **`brain` không thật sự chạy được bằng CPU** khi bật nhánh vision. Sơ
-   đồ trong compose là đích đến, chưa phải hiện trạng.
+   đồ trong compose là đích đến, chưa phải hiện trạng. *(Từ BR-03, 26/10:
+   `ENV=SERVER` tắt vision có tuyên bố, nên `brain` chạy CPU được — đổi lại là
+   không có vision ở cấu hình compose.)*
 
 Ba thứ này **không chặn phần kế toán** — phần đó không cần model.
 
@@ -144,6 +146,16 @@ Ba thứ này **không chặn phần kế toán** — phần đó không cần m
 
 571 dòng mã, 70 test đơn vị, **không một chỉ số recall/MRR/faithfulness nào**.
 Phương án chi tiết ở [BAN_GIAO_VAN_TAI.md](BAN_GIAO_VAN_TAI.md) mục E.3.
+
+### 🔴 Việc treo #5 — model chép thiếu đầu vào cho tool (mở 26/10/2026)
+
+Câu soát hoá đơn hai dòng (5.000.000 + 500.000, ghi tổng 6.500.000): model gọi
+`vat` với **một** dòng, tool tính đúng trên một dòng đó, Brain trả lời hai con
+số tiền sai mà trông có nguồn. Chốt neo câu trả lời không bắt được vì các số đó
+đúng là có trong kết quả tool. Lỗi R1, chưa có chốt nào.
+
+Ba hướng (chốt neo đầu vào / tách hoá đơn bằng mã / chỉ ghi nhận) và đề xuất ở
+[BAO_CAO_BR04.md](BAO_CAO_BR04.md) §5.2. **Chờ chủ dự án quyết.**
 
 ---
 
@@ -164,6 +176,16 @@ gì báo.
 
 Đã chặn ở tầng sampling (`bat_buoc_tool` trong `build_decision_schema`): còn kế
 hoạch thì `answer` **không có trong lược đồ**, chỉ còn `tool` và `hoi_lai`.
+
+> **Đính chính 26/10/2026.** Chốt chặn trên **chưa từng thi hành trên đường vLLM
+> server**: xgrammar bỏ qua khoá đứng cạnh `oneOf`, nên grammar vẫn nhận
+> `answer`. BR-04 đo lại đúng câu này: `tool_calls=0` năm lần trên năm. Sửa ở
+> `82e9e9c` (`anyOf` hai nhánh đóng), kiểm bằng xgrammar thật; sau sửa
+> `tool_calls=1`. Xem [BAO_CAO_BR04.md](BAO_CAO_BR04.md) §5.1.
+>
+> **Lỗ tiếp theo, đang mở:** gọi được tool rồi thì model **chép thiếu dòng hàng**
+> vào `items` — Brain báo "tổng thực tế 5.500.000" thay vì 6.050.000, kèm câu
+> "kết quả từ công cụ VAT". Xem việc treo #5.
 
 > Vì sao không cấm tiệt cả hai: "tính thuế giúp tôi" không kèm số tiền mà bị ép
 > gọi `vat` thì model phải **bịa** `stated_total`. Đổi một lỗi R1 lấy một lỗi R1

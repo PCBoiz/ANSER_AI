@@ -124,7 +124,7 @@ Mọi đường dẫn file trong ARCHITECTURE.md §1 và §2.2 tồn tại. Lệ
 > - **Bước 3 xong.** Compose đã đặt `VLLM_MODEL: anser-v3`; đường server không cần `TEXT_MODEL_ID`, và biến này không còn mặc định trỏ vào Drive.
 > - **Bước 4 chưa làm.** Dockerfile vẫn cài cả `vllm` và `torch`.
 > - **Bước 5 thuộc chu kỳ 02.**
-> - **Còn mở:** bằng chứng trên Colab với vLLM thật, và p95 ở 4 request đồng thời. Cả hai thuộc BR-04, chạy bằng `offline_training/do_ngan_sach_ctx.py`.
+> - **Nghiệm thu trên Colab xong (BR-04, 26/10):** log vLLM ghi request của Brain; p95 ở 4 request đồng thời đã đo. Kèm hai phát hiện: grammar quyết định từng không được thi hành (đã sửa), và model chép thiếu đầu vào cho tool (đang mở). Xem [BAO_CAO_BR04.md](BAO_CAO_BR04.md).
 >
 > Phần dưới giữ nguyên như lúc giao ngày 22/10, để đối chiếu.
 
