@@ -31,8 +31,10 @@
 #      OrderedDict trong RAM (src/core/engine.py). Restart là mất task đang chạy.
 #   2. `vllm-vision` — chưa có client HTTP cho vision. serving.py mới có đường
 #      text. Vision vẫn nạp thẳng trong tiến trình qua transformers.
-#   3. Vì (2), `brain` KHÔNG thật sự chạy được bằng CPU khi bật nhánh vision —
-#      nó vẫn cần GPU. Sơ đồ trên là đích đến, chưa phải hiện trạng.
+#   3. Vì (2), `ENV: SERVER` dưới đây TẮT vision có tuyên bố (BR-03, 26/10/2026):
+#      `brain` chạy được bằng CPU, text qua `vllm-text`, nhưng mọi lời gọi vision
+#      trả BackendUnavailable và `/health` khai `vision_backend: "none"`.
+#      `vllm-vision` dựng lên mà chưa ai gọi. Sơ đồ trên là đích đến.
 #
 # `tests/test_deploy_config.py` giữ danh sách này đồng bộ với code: nối xong cái
 # nào thì test đỏ, buộc phải sửa cả chú thích này.

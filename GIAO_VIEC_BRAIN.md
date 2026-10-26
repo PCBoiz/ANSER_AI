@@ -95,6 +95,8 @@ Người tiếp quản đọc §13b.3 rồi đi vá lại là mất vài ngày c
 | 6 | Cảnh báo "config.py đang để 4096" | [`deploy/.env.example`](deploy/.env.example) | Mặc định nay là 8192. Một cảnh báo sai lệch còn tệ hơn không có cảnh báo, vì lần sau không ai tin nó |
 | 7 | §13b.3 liệt kê bốn lỗ hổng RAG như thể chưa vá | [ARCHITECTURE.md §13b.3](ARCHITECTURE.md) | Xem 1.3. Người tiếp quản đi vá lại thứ đã xong |
 
+**Cập nhật 26/10/2026:** mục 1 đã xong ở BR-03. `TEXT_MODEL_ID` không còn mặc định, chọn rỗng thay vì `Qwen/Qwen3-8B` để thiếu biến là báo lỗi rõ chứ không lặng lẽ tải 16GB từ Hub; `grep -rn "content/drive" src/` nay rỗng. Mục 5 xong một nửa: log "Booting COLAB engine" đã gỡ, docstring `config.py` vẫn còn.
+
 Phần lint đã làm xong ngày 22/10, xem 1.1. Việc còn lại là mở rộng danh sách `ruff` trong `ci.yml` để chúng không quay lại.
 
 **Cổng nghiệm thu.** Cả năm dòng dưới đều phải đúng:
@@ -114,6 +116,17 @@ Mọi đường dẫn file trong ARCHITECTURE.md §1 và §2.2 tồn tại. Lệ
 ---
 
 ### V2. Nối `VLLMServerClient` vào đường phục vụ
+
+> **Cập nhật 26/10/2026: đã nối, phần nghiệm thu GPU còn mở.** Làm qua BR-02 và BR-03 của [SRS_CHU_KY_01.md](SRS_CHU_KY_01.md). Bảng "việc phải làm" dưới đây:
+>
+> - **Bước 1 xong.** `engine.py::chon_backend()` quyết định ở một chỗ; có `VLLM_BASE_URL` thì `generate_chat` đi `/v1/chat/completions`, kèm `enable_thinking=False` và `repetition_penalty=1.0` khi có grammar. `tests/test_engine_backend.py` dựng server HTTP thật và đòi nó nhận được request.
+> - **Bước 2 xong.** `ENV=SERVER` nghĩa là Brain không nạp model nào: bắt buộc có `VLLM_BASE_URL`, vision tắt có tuyên bố. Giá trị `ENV` lạ là lỗi cấu hình.
+> - **Bước 3 xong.** Compose đã đặt `VLLM_MODEL: anser-v3`; đường server không cần `TEXT_MODEL_ID`, và biến này không còn mặc định trỏ vào Drive.
+> - **Bước 4 chưa làm.** Dockerfile vẫn cài cả `vllm` và `torch`.
+> - **Bước 5 thuộc chu kỳ 02.**
+> - **Còn mở:** bằng chứng trên Colab với vLLM thật, và p95 ở 4 request đồng thời. Cả hai thuộc BR-04, chạy bằng `offline_training/do_ngan_sach_ctx.py`.
+>
+> Phần dưới giữ nguyên như lúc giao ngày 22/10, để đối chiếu.
 
 **Đây là phát hiện mới ngày 22/10/2026, chưa có trong TIEN_TRINH_BRAIN.md §3.**
 
@@ -265,7 +278,7 @@ Hai thứ cần nhìn sau phiên này:
 
 **Công:** một buổi. **Chi phí:** một buổi Colab Pro, không phải chi phí thường xuyên. **Chặn bởi:** GPU L4 hoặc A100; T4 16GB không đủ cho Qwen3-8B AWQ.
 
-**Nhắc:** notebook đã có ở `offline_training/ANSER_train_v3_colab.ipynb`. Chỉ thị của chủ dự án là không tự tạo notebook mới.
+**Nhắc:** notebook đã có ở `offline_training/ANSER_train_v3_colab.ipynb`. Tạo thêm script hoặc notebook đo khi cần là được phép; bản trước ghi "không tự tạo notebook mới" là chỗ sai, đã sửa 26/10/2026.
 
 ---
 

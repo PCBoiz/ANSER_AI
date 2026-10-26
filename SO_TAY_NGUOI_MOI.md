@@ -8,7 +8,7 @@ Bạn không cần GPU, không cần tài khoản cloud, không cần dữ liệ
 
 Bản in: [`docs/ban-in/SO_TAY_NGUOI_MOI.pdf`](docs/ban-in/SO_TAY_NGUOI_MOI.pdf), 27 trang. Sửa file `.md` này rồi chạy `powershell -File docs/dung-ban-in.ps1` để dựng lại bản PDF trong cùng PR.
 
-> **Quy ước của sổ tay này.** Mỗi khẳng định đi kèm bằng chứng kiểm được và giới hạn của nó. "1003 test xanh" nói rằng mã làm đúng thứ chúng ta định làm; nó không nói cách hiểu nghiệp vụ của chúng ta là đúng. Chỗ nào chưa chắc thì sổ tay ghi là chưa chắc. Nếu bạn thấy một câu không có cách nào kiểm lại, coi đó là lỗi của sổ tay và sửa nó.
+> **Quy ước của sổ tay này.** Mỗi khẳng định đi kèm bằng chứng kiểm được và giới hạn của nó. "bộ test xanh" nói rằng mã làm đúng thứ chúng ta định làm; nó không nói cách hiểu nghiệp vụ của chúng ta là đúng. Chỗ nào chưa chắc thì sổ tay ghi là chưa chắc. Nếu bạn thấy một câu không có cách nào kiểm lại, coi đó là lỗi của sổ tay và sửa nó.
 
 ---
 
@@ -134,7 +134,7 @@ pip install -r requirements-dev.txt
 pip install fastapi httpx pydantic numpy json_repair sqlalchemy requests ddgs python-multipart openpyxl
 ```
 
-Mức nhẹ chạy được toàn bộ 1003 test và toàn bộ `/tools/*`. Bằng chứng: CI dùng đúng hai lệnh trên và suite xanh.
+Mức nhẹ chạy được toàn bộ bộ test và toàn bộ `/tools/*`. Bằng chứng: CI dùng đúng hai lệnh trên và suite xanh.
 
 `requirements.txt` đầy đủ kéo theo `torch`, `vllm`, `chromadb`, `sentence-transformers`. Khoảng vài GB, và chỉ cần khi bạn nạp model thật hoặc chạy kho tri thức. Cài khi nào cần:
 
@@ -158,19 +158,31 @@ Không có biến nào là bắt buộc. Mặc định được chọn để ch�
 
 | Biến | Mặc định | Làm gì |
 |---|---|---|
-| `ENV` | `LOCAL` | `LOCAL` trả mock thay vì nạp model thật. Mọi giá trị khác đi vào nhánh nạp model lên GPU |
+| `ENV` | `LOCAL` | Một trong `LOCAL`, `GPU`, `COLAB`, `SERVER`. Giá trị khác làm engine báo lỗi ngay, không lặng lẽ nạp model. Cùng với `VLLM_BASE_URL` quyết định backend, xem bảng dưới |
 | `API_AUTH_TOKEN` | rỗng | Token Body phải gửi kèm. **Rỗng nghĩa là tắt kiểm tra.** `GET /health` khai trạng thái này ở trường `auth_enabled` |
 | `DATABASE_URL` | SQLite trong RAM | DB của Body. Thiếu thì mọi câu tra cứu hàng hoá trả "không tìm thấy" |
-| `TEXT_MODEL_ID` | xem cảnh báo dưới | Đường dẫn hoặc HuggingFace id của model text |
+| `TEXT_MODEL_ID` | rỗng | Đường dẫn hoặc HuggingFace id của model text AWQ. Chỉ cần khi nạp text **trong tiến trình**. Thiếu thì engine báo lỗi rõ, không có mặc định |
 | `VISION_MODEL_ID` | `Qwen/Qwen2.5-VL-3B-Instruct` | Model đọc ảnh hoá đơn |
 | `TEXT_MAX_MODEL_LEN` | `8192` | Cửa sổ ngữ cảnh. Dùng chung tên với `docker-compose.yml` theo R4 |
 | `KB_WORKSPACE_ID` | `default` | Phạm vi kho tri thức. Phải khớp `BRAIN_KB_WORKSPACE` bên Body |
-| `VLLM_BASE_URL` | rỗng | Địa chỉ vLLM chạy chế độ server. Xem mục 10 về trạng thái thật của biến này |
+| `VLLM_BASE_URL` | rỗng | Địa chỉ vLLM chạy chế độ server. Có biến này thì text đi qua HTTP ở **mọi** `ENV`. Ghi có hay không có đuôi `/v1` đều được |
+| `VLLM_MODEL` | rỗng | Tên model gửi cho vLLM server, khớp `--served-model-name`. Compose dùng `anser-v3` |
 | `AI_METRICS_PATH` | `src/data/ai_metrics_log.jsonl` | Nơi ghi nhật ký đo lường từng lượt |
 | `AI_METRICS_LOG_CONTENT` | `0` | `1` thì ghi cả nội dung tin nhắn. Biên lợi nhuận và secret luôn bị che |
 | `ALLOWED_ORIGINS` | `http://localhost:3000` | CORS |
 
-> **Cảnh báo về `TEXT_MODEL_ID`.** Mặc định trong [`config.py:55`](src/core/config.py#L55) hiện là `/content/drive/MyDrive/ANSER_data/anser-retail-v2-awq`. Đường dẫn Google Drive trong code vi phạm R5, và `anser-retail-v2` là model đã nghỉ hưu từ 27/07/2026. Nếu bạn chạy với `ENV` khác `LOCAL` mà không đặt biến này, việc nạp model sẽ thất bại. Việc sửa nằm ở [GIAO_VIEC_BRAIN.md](GIAO_VIEC_BRAIN.md) mục V1. Model nền đúng theo quyết định hiện hành là `Qwen/Qwen3-8B`.
+**`ENV` và `VLLM_BASE_URL` chọn backend ra sao.** Quyết định nằm ở đúng một hàm, [`chon_backend()`](src/core/engine.py), và `/health` khai kết quả ở hai trường `text_backend`, `vision_backend`:
+
+| `ENV` | `VLLM_BASE_URL` | Text | Vision | Dùng khi nào |
+|---|---|---|---|---|
+| `LOCAL` | rỗng | mock | mock | máy dev, chạy test |
+| `LOCAL` | có | vLLM server | mock | máy dev gọi một vLLM ở xa |
+| `GPU`, `COLAB` | rỗng | nạp trong tiến trình | nạp trong tiến trình | đường cũ, cần `TEXT_MODEL_ID` |
+| `GPU`, `COLAB` | có | vLLM server | nạp trong tiến trình | Colab ở BR-04: vLLM server cộng vision |
+| `SERVER` | có | vLLM server | **tắt có tuyên bố** | compose: Brain không nạp model nào. Vision qua HTTP thuộc chu kỳ 02 |
+| `SERVER` | rỗng | lỗi | | `SERVER` nghĩa là không nạp gì, nên phải có địa chỉ server |
+
+> **`TEXT_MODEL_ID` không còn mặc định**, cố ý (NFR-06). Mặc định cũ là một đường dẫn Google Drive tới `anser-retail-v2-awq`, model đã nghỉ hưu từ 27/07/2026. Model nền đúng theo quyết định hiện hành là `Qwen/Qwen3-8B`, bản fine-tune là `anser-v3-awq`.
 
 Đặt biến cho một phiên làm việc:
 
@@ -189,13 +201,13 @@ Làm bước này trước. Nó mất gần hai phút và cho bạn biết môi 
 ENV=LOCAL pytest -q
 ```
 
-Kết quả đúng, đo ngày 22/10/2026:
+Kết quả đúng, đo ngày 26/10/2026 trên Colab, sau BR-01 đến BR-03:
 
 ```
-1003 passed, 1 warning in 107.27s
+1038 passed, 3 skipped
 ```
 
-Một warning về symlink của HuggingFace trên Windows, vô hại.
+Ba ca skip là các ca cần thứ không có trên máy, ví dụ bản sao repo Body cho `test_body_contract`. Số skip đổi theo thư viện đang cài: có SDK `anthropic` thì `test_providers` bỏ thêm một ca và ra `1037 passed, 4 skipped`, vẫn đạt. Muốn biết từng ca skip vì sao thì thêm `-rs`. Trên Windows có thể thêm một warning về symlink của HuggingFace, vô hại.
 
 `pythonpath` và `testpaths` đã khai trong `pyproject.toml`, nên bạn chạy từ thư mục gốc là được, không cần `PYTHONPATH`.
 
@@ -325,7 +337,9 @@ curl -s -X POST http://127.0.0.1:8000/tools/inventory-import \
 | `python` mở Microsoft Store | PATH trỏ vào bản giả của Store | Dùng đường dẫn interpreter thật, xem 2.1 |
 | `uvicorn: command not found` | chưa activate venv | `source .venv/Scripts/activate` |
 | `ModuleNotFoundError: src` | chạy từ thư mục con | Chạy từ gốc repo. `pyproject.toml` đã khai `pythonpath = ["."]` |
-| `/chat` trả 503 `Text runtime unavailable` | `ENV` khác `LOCAL` mà không có model | Đặt `ENV=LOCAL`, hoặc đặt `TEXT_MODEL_ID` hợp lệ |
+| `/chat` trả 503 `Text runtime unavailable` | cấu hình backend sai. `engine_error` trong `/health` nêu đúng biến thiếu: `ENV` lạ, `ENV=SERVER` thiếu `VLLM_BASE_URL`, hoặc nạp trong tiến trình thiếu `TEXT_MODEL_ID` | Sửa biến mà `engine_error` nêu. Chỉ cần mock thì đặt `ENV=LOCAL` và bỏ `VLLM_BASE_URL` |
+| `/health` có `degraded: true` và `vllm_server.ok: false` | Brain sống nhưng vLLM server không trả lời `/health` trong 2 giây | Kiểm vLLM server và `VLLM_BASE_URL`. `/tools/*` vẫn chạy được trong lúc đó |
+| Trên Colab, `ModuleNotFoundError: No module named 'tests.test_knowledge'` lúc collect | bản trước 26/10 thiếu `tests/__init__.py`, và Colab có sẵn gói `tests` khác trong `site-packages` | Kéo nhánh mới, hoặc `touch tests/__init__.py` |
 | Lệnh `uvicorn src.server:app` lỗi | `src/README.md` đã cũ | Dùng `src.api.main:app` |
 | Ba endpoint `.xlsx` trả 500 | thiếu `openpyxl` | `pip install openpyxl` |
 | Phần tài liệu trả 503, `kb_error` có nội dung | thiếu thư viện RAG | `pip install chromadb sentence-transformers rank_bm25 underthesea` |
@@ -388,7 +402,7 @@ src/
 │   ├── docs/              # 43MB tài liệu luật thuế và báo cáo ngành, nguồn RAG
 │   └── blueprints/        # 6 workflow mẫu định dạng Make.com, KHÔNG dùng để train
 offline_training/          # sinh dữ liệu, train, lượng tử hoá, benchmark
-tests/                     # 43 file, 1003 test
+tests/                     # 45 file test, 1041 ca (26/10/2026)
 data/n8n_templates/        # 32 workflow n8n thật, trích từ Body
 data/sheet_templates/      # mẫu Google Sheet cho pilot vận tải
 sample_data/               # bộ dữ liệu có lỗi gieo sẵn
@@ -580,7 +594,9 @@ Trả một bài viết trên mạng cho câu đầu là trình bày thông tin 
 
 Runbook đầy đủ ở [PHIEN_DO_COLAB.md](PHIEN_DO_COLAB.md). Cần GPU L4 hoặc A100; T4 16GB không đủ cho Qwen3-8B AWQ. Khoảng một giờ khi đo lại, vì dữ liệu sinh phiên 15/08 còn trên Drive.
 
-Notebook đã có ở `offline_training/ANSER_train_v3_colab.ipynb`. Chỉ thị của chủ dự án: **không tự tạo notebook mới**.
+Notebook đã có ở `offline_training/ANSER_train_v3_colab.ipynb`. Người làm Brain được tạo thêm script hoặc notebook cho việc đo khi cần; ví dụ `offline_training/do_ngan_sach_ctx.py` cho BR-04. Bản trước của sổ tay ghi "không tự tạo notebook mới" là chỗ sai, đã sửa 26/10/2026.
+
+Dựng lại Brain giữa phiên dùng `offline_training/bat_lai_brain.py`, chạy bằng `%run -i`. Script đó đặt `ENV=GPU`; từ BR-03, `ENV=SERVER` mà không có `VLLM_BASE_URL` là lỗi cấu hình.
 
 Trước khi đọc điểm số, đọc ba dòng cảnh báo khung đo:
 
@@ -829,25 +845,25 @@ Kiểm bằng cách mở từng file. Đọc bảng này trước khi tin ARCHIT
 
 | Chỗ lệch | Thực tế trong mã |
 |---|---|
-| `TEXT_MODEL_ID` mặc định là đường dẫn Google Drive trỏ vào model v2 đã nghỉ hưu | [`config.py:55`](src/core/config.py#L55). Vi phạm R5 |
 | AGENTS.md và ARCHITECTURE.md mô tả Body là Flask, Redis + RQ, `workflow_engine.py` | Body là Next.js, `Dgsonn/ANSER-v2` |
 | ARCHITECTURE.md §1 và §2.2 trỏ vào `core/tools.py`, `agents/researcher.py`, `integrations.py`, `external_data.py` | Cả bốn file **không tồn tại**. `core/tools.py` được nêu làm ví dụ minh hoạ R1 |
 | `src/README.md` mô tả "Project A", entrypoint `src/server.py`, cổng chất lượng chạy trên `core/tools.py` | `src/server.py` đã tách thành `src/api/`. Lệnh uvicorn và lệnh ruff trong file đó đều gãy |
-| `config.py` docstring "tối ưu cho Google Colab Pro, GPU L4"; log "Booting COLAB engine" | Colab đã bị loại khỏi lộ trình production |
+| `config.py` docstring "tối ưu cho Google Colab Pro, GPU L4" | Colab đã bị loại khỏi lộ trình production. Log "Booting COLAB engine" đã gỡ ở BR-03 |
 | `deploy/.env.example` cảnh báo "config.py đang để 4096" | Mặc định nay là 8192 |
 | `SCHEMA MAP` trong `saas_api.py` | 4 trên 8 định danh lệch Body: `stock_quantity` so với `stock`, bảng `sales` so với `sales_invoices`, `amount` so với `total`, `workspace_id` so với `warehouse_id`. Body **không có khái niệm `workspace`** nào cả. Lược đồ thật 13 bảng đã chép vào [GIAO_VIEC_BRAIN.md](GIAO_VIEC_BRAIN.md) V3, kèm ba cạm bẫy |
 | ARCHITECTURE.md §5.1 ghi vision `Qwen2.5-VL-3B AWQ ~3,0 GB`, tổng `~15,0 GB` | Mã nạp vision bằng `torch_dtype=torch.bfloat16`, **không lượng tử hoá gì cả**, nên nó tốn ~7,5 GB. [RAG_VLM_KE_HOACH.md §B.2.4](RAG_VLM_KE_HOACH.md) đã tính lại ngày 03/08/2026: thật ra ~19,9 GB trên card 22,5 GB sau khi đã đẩy embedder và reranker sang CPU. Dùng bảng ở §B.2.4, đừng dùng §5.1 |
 | ARCHITECTURE.md §13b.3 liệt kê bốn lỗ hổng RAG "phải vá trước khi nạp dữ liệu thật" | **Cả bốn đã vá.** `workspace_id` bắt buộc ở mọi lối vào, `Passage` có `source` và ngày hiệu lực, tài liệu hết hiệu lực bị loại hẳn, `ingest_folder` đã ra khỏi `__init__`. Đọc rồi đi vá lại là mất vài ngày cho việc đã xong |
 | BAN_GIAO_VAN_TAI.md §B.5 hướng dẫn mang gì theo khi tách repo vận tải | **Không tách nữa.** Chủ dự án chốt 22/10/2026: mảng vận tải ở lại repo này, lớp nền giữ một bản |
-| ARCHITECTURE.md §5.4 nói vLLM chạy process riêng, Brain gọi qua HTTP | `VLLMServerClient` tồn tại trong `serving.py`, có test, được khai trong compose, và **không caller nào** ngoài test của chính nó. `engine.py` vẫn nạp `vllm.LLM` trong tiến trình |
 
-Dòng cuối là ví dụ thứ tư của một lỗi mà dự án đã dính bốn lần: một lớp trông như đã có mà thực ra chưa nối. Ba lần trước là `API_TOKEN` so với `API_AUTH_TOKEN`, `arguments_schema()` lọc trường nhưng không đóng object, và trần token benchmark rộng hơn production. Không test đơn vị nào bắt được cả bốn. Cả bốn lộ ra khi chạy thật qua HTTP hoặc khi đọc tay đầu ra.
+**Đã sửa ngày 26/10/2026 (BR-03), bỏ khỏi bảng:** `TEXT_MODEL_ID` mặc định trỏ vào Google Drive, và `VLLMServerClient` không caller nào gọi. Nay `engine.py` gọi vLLM server khi có `VLLM_BASE_URL`, và `tests/test_engine_backend.py` dựng một server HTTP thật trên 127.0.0.1 để chứng minh request tới nơi. Bằng chứng trên Colab với vLLM thật thuộc BR-04.
+
+Lỗi `VLLMServerClient` là ví dụ thứ tư của một lỗi mà dự án đã dính bốn lần: một lớp trông như đã có mà thực ra chưa nối. Ba lần trước là `API_TOKEN` so với `API_AUTH_TOKEN`, `arguments_schema()` lọc trường nhưng không đóng object, và trần token benchmark rộng hơn production. Không test đơn vị nào bắt được cả bốn. Cả bốn lộ ra khi chạy thật qua HTTP hoặc khi đọc tay đầu ra.
 
 ### Năm bài tập làm quen
 
 Làm theo thứ tự. Bài 1 và 2 mất khoảng một giờ, bài 5 mất khoảng nửa ngày.
 
-1. **Chạy được hệ thống.** Dựng môi trường, `pytest -q` ra 1003 passed, bật uvicorn, `GET /health` trả `auth_enabled: false`. Rồi đặt `API_AUTH_TOKEN` và xác nhận nó đổi thành `true`, và `GET /tools` không có token trả 401.
+1. **Chạy được hệ thống.** Dựng môi trường, `pytest -q` ra kết quả như 2.5, bật uvicorn, `GET /health` trả `auth_enabled: false`. Rồi đặt `API_AUTH_TOKEN` và xác nhận nó đổi thành `true`, và `GET /tools` không có token trả 401.
 2. **Soi một file có lỗi gieo sẵn.** Sinh `ton_kho_mau.xlsx`, nạp qua `/tools/inventory-import`, đối chiếu 8 phát hiện trên 7 mã với bảng ở 2.8. Mở file Excel ra và kiểm tay một phát hiện bằng `evidence` của nó.
 3. **Đọc một phát hiện ngược về mã.** Chọn một `kind` trong đầu ra của bài 2, tìm hàm `_check_*` sinh ra nó trong `inventory.py`, và viết một dòng dữ liệu mới làm nó bắn. Rồi viết một dòng gần giống mà **không** làm nó bắn.
 4. **Thêm một luật chọn tool.** Nghĩ một câu hỏi tiếng Việt mà `plan_tools` hiện trả về rỗng nhưng đáng lẽ phải khớp một tool. Thêm luật, thêm hai ca test: một ca khớp, một ca gần giống mà không được khớp. Chạy `pytest tests/test_tool_planner.py -q`.

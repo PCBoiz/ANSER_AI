@@ -137,9 +137,10 @@ ngoài nên **không cổng nào mở vào**.
 | Việc | Vì sao chưa làm | Chặn cái gì |
 |---|---|---|
 | `TASK_REGISTRY` vẫn là dict trong RAM | Redis đã dựng sẵn trong compose, chưa nối code | **`--workers 1`** — nhiều worker sẽ trả lời sai về trạng thái tác vụ |
-| `VLLMServerClient` chưa thay đường in-process | Cần GPU thật để đối chiếu output hai đường | Continuous batching chưa thực sự bật |
-| `config.py` để `max_model_len=4096` | Lệch với lúc train (8192) | Prompt dài bị cắt âm thầm |
-| `text_model_id` mặc định trỏ `anser-retail-v2-awq` | Còn sót từ đời v2 | Quên set env → chạy nhầm **model cũ** mà không báo gì |
+| Vision tắt ở `ENV: SERVER` | Chưa có client HTTP cho `vllm-vision` (chu kỳ 02) | Đọc ảnh hoá đơn qua compose. `/health` khai `vision_backend: "none"` |
+| Dockerfile vẫn cài `vllm` + `torch` | `requirements.txt` chưa tách phần CPU và phần GPU | Image Brain nặng hơn chú thích "không CUDA" của nó |
 
-Ba dòng cuối là **bẫy im lặng** — không có cái nào ném lỗi. Set env tường minh
-trong `.env` là cách chắc chắn nhất để không dính.
+Đã sửa ngày 26/10/2026 (BR-03), bỏ khỏi bảng: Brain nay gọi `vllm-text` qua
+`VLLMServerClient` khi có `VLLM_BASE_URL`; `max_model_len` mặc định 8192 từ
+15/08; `TEXT_MODEL_ID` không còn mặc định trỏ vào model v2, thiếu biến khi nạp
+trong tiến trình là báo lỗi ngay. Bằng chứng trên GPU thật thuộc BR-04.

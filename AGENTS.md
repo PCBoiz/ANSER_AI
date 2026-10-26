@@ -101,8 +101,11 @@ VLLM_BASE_URL          # http://127.0.0.1:8001/v1
 GPU_MEMORY_UTILIZATION
 MAX_MODEL_LEN
 QUANTIZATION
-ENV                    # LOCAL | GPU
+ENV                    # LOCAL | GPU | COLAB | SERVER
+VLLM_MODEL             # khớp --served-model-name của vLLM server
 ```
+
+Cặp `ENV` + `VLLM_BASE_URL` chọn backend ở đúng một chỗ, `engine.py::chon_backend()`. Có `VLLM_BASE_URL` thì text đi vLLM server ở mọi `ENV`. `SERVER` nghĩa là Brain không nạp model nào: bắt buộc có `VLLM_BASE_URL`, vision tắt có tuyên bố. Giá trị `ENV` lạ là lỗi cấu hình, không lặng lẽ nạp CUDA. Bảng đầy đủ ở [SO_TAY_NGUOI_MOI.md §2.4](SO_TAY_NGUOI_MOI.md).
 
 Tiêu chí nghiệm thu: **chuyển từ GPU thuê sang máy tự sở hữu chỉ đổi `.env`, không sửa dòng code nào.**
 
@@ -124,7 +127,7 @@ Chế độ `LOCAL` không phải "chế độ giả vờ" — nó là thứ cho
 
 ### 3.1b. Kiểm thử GPU chạy trên Google Colab
 
-Chốt 27/07/2026: test có GPU thật chạy trên **Colab** (không phải máy dev). Notebook test sẽ soạn **khi chủ dự án yêu cầu** — không tự tạo sớm; cải tiến xong mới test. (Colab chỉ cho thử nghiệm rời rạc — production vẫn bị cấm theo §3.1.)
+Chốt 27/07/2026: test có GPU thật chạy trên **Colab** (không phải máy dev). Người làm Brain được tạo script hoặc notebook đo khi việc cần, ví dụ `offline_training/do_ngan_sach_ctx.py` cho BR-04. (Bản trước ghi "chỉ soạn khi chủ dự án yêu cầu, không tự tạo sớm" — câu đó sai, đã sửa 26/10/2026.) (Colab chỉ cho thử nghiệm rời rạc — production vẫn bị cấm theo §3.1.)
 
 ### 3.1c. Dữ liệu giá phải sát thời gian thực
 

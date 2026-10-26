@@ -269,6 +269,8 @@ Model v2 (`anser-retail-v2-awq`, LoRA r=64 trên Qwen2.5-7B, distill DeepSeek-R1
 
 **Kiến trúc mục tiêu:** vLLM chạy **process riêng** ở chế độ OpenAI-compatible server; Brain gọi qua HTTP nội bộ.
 
+> **Trạng thái 26/10/2026: đường text đã nối (BR-02, BR-03).** Có `VLLM_BASE_URL` thì `ModelEngine` gọi `VLLMServerClient.chat()` tới `/v1/chat/completions`; không có thì giữ đường `vllm.LLM` trong tiến trình ở trên. Backend chọn ở một chỗ, [`engine.py::chon_backend()`](src/core/engine.py), và `/health` khai `text_backend`, `vision_backend`, `vllm_server`. Ba cái bẫy riêng của đường server đều có phép thử: server áp chat template, `chat_template_kwargs.enable_thinking=false`, và `repetition_penalty=1.0` khi có grammar. Vision vẫn nạp trong tiến trình; qua HTTP thuộc chu kỳ 02. Số đo trên L4 thật (KV cache, p95) thuộc BR-04 và sẽ ghi vào §5.1 khi có.
+
 | Lợi ích | Chi tiết |
 |---|---|
 | Continuous batching thật | Throughput tăng nhiều lần ở cùng phần cứng |
