@@ -97,11 +97,29 @@ async def health():
         if guard is not None:
             load[name.replace("_guard", "")] = guard.snapshot()
 
+    # Backend đang dùng (BR-03 yêu cầu 4, NFR-04). Chỉ THÊM trường: năm trường
+    # Body đọc — status, degraded, engine_ready, vision_ready, load — giữ nguyên
+    # tên và kiểu (PHAN_VIEC_CHU_KY_01 §6.2).
+    backend: dict = {
+        "text_backend": getattr(engine, "text_backend", None),
+        "vision_backend": getattr(engine, "vision_backend", None),
+    }
+    server_down = False
+    server = getattr(engine, "server", None)
+    if server is not None:
+        # `health()` không bao giờ ném: vLLM chết thì Brain vẫn trả lời được.
+        backend["vllm_server"] = await server.health()
+        server_down = not backend["vllm_server"].get("ok", False)
+
     return JSONResponse(
         {
             "status": "ok",
             "runtime_profile": RUNTIME_PROFILE,
-            "degraded": bool(runtime.engine_error or runtime.kb_error or runtime.vision_error),
+            "degraded": bool(
+                runtime.engine_error or runtime.kb_error or runtime.vision_error
+                or server_down
+            ),
+            **backend,
             "engine_ready": runtime.engine is not None,
             "kb_ready": runtime.kb is not None,
             "vision_ready": runtime.vision is not None,

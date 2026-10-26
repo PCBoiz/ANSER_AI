@@ -47,15 +47,15 @@ class Config:
         #  TỔNG ~18.3GB < 19.5GB ✓
         # =================================================================
 
-        # --- Brain: Text reasoning (chạy qua vLLM) ---
-        # Dùng env var TEXT_MODEL_ID để linh hoạt mọi môi trường:
-        #   Colab : export TEXT_MODEL_ID=/content/drive/MyDrive/ANSER_data/anser-qwen-distill-awq
-        #   Server: export TEXT_MODEL_ID=/app/models/anser-qwen-distill-awq
-        #   Mặc định fallback về HuggingFace Hub nếu không set.
-        self.text_model_id = os.getenv(
-            "TEXT_MODEL_ID",
-            "/content/drive/MyDrive/ANSER_data/anser-retail-v2-awq"
-        )
+        # --- Brain: Text reasoning (chạy qua vLLM TRONG tiến trình) ---
+        # Đường dẫn hoặc HF id của model AWQ, ví dụ thư mục `anser-v3-awq`.
+        # Chỉ cần khi text_backend == "in_process"; đường server dùng VLLM_MODEL.
+        #
+        # KHÔNG có mặc định, cố ý (NFR-06, chu kỳ 01). Mặc định cũ là một đường
+        # dẫn Google Drive tới `anser-retail-v2-awq`: vừa vi phạm R5, vừa là model
+        # đã nghỉ hưu mà phiên đo 15/08 kết luận không dùng lại. Quên đặt biến
+        # thì `ModelEngine` báo lỗi rõ ràng, không lặng lẽ nạp nhầm model.
+        self.text_model_id = os.getenv("TEXT_MODEL_ID", "").strip()
 
         # --- Eye: Vision/VLM (load riêng qua transformers, ngoài vLLM) ---
         # Qwen2.5-VL-3B thay cho Qwen2-VL-2B (03/08/2026): đọc tài liệu và OCR

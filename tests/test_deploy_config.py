@@ -38,8 +38,9 @@ CHUA_NOI: dict[str, str] = {
     ),
     "VLLM_VISION_BASE_URL": (
         "Chưa có client HTTP cho vision — serving.py mới chỉ có đường text. "
-        "Vision hiện nạp thẳng trong tiến trình qua transformers, tức là Brain "
-        "vẫn cần GPU, ngược với thiết kế 'brain CPU only' của compose."
+        "Từ BR-03, ENV=SERVER nghĩa là vision TẮT CÓ TUYÊN BỐ (vision_backend "
+        "= 'none', generate_vision ném BackendUnavailable), thay vì nạp CUDA "
+        "trong container Brain. Nối qua HTTP thuộc chu kỳ 02."
     ),
     "VLLM_VISION_MODEL": "Cùng lý do với VLLM_VISION_BASE_URL.",
 }
@@ -154,6 +155,45 @@ def test_bien_khai_bao_chua_noi_thi_dung_la_chua_noi(ten):
         f"'{ten}' nay đã được code đọc — xoá khỏi CHUA_NOI trong file test này."
     )
     assert CHUA_NOI[ten].strip(), f"'{ten}' phải kèm lý do vì sao chưa nối"
+
+
+# Biến mà phép quét regex ở trên KHÔNG đủ để tin. Chúng nằm trong `getenv` của
+# `serving.py` từ lâu, trong khi không caller nào gọi `VLLMServerClient`: đọc
+# khác dùng (SRS chu kỳ 01 §BR-03). Mỗi biến trỏ tới phép thử chứng minh nó
+# THỰC SỰ được dùng — server giả trên socket thật phải nhận được request.
+NOI_CO_PHEP_THU: dict[str, str] = {
+    "VLLM_BASE_URL": "tests/test_engine_backend.py::test_generate_chat_thuc_su_goi_toi_vllm_server",
+    "VLLM_MODEL": "tests/test_engine_backend.py::test_generate_chat_thuc_su_goi_toi_vllm_server",
+}
+
+
+@pytest.mark.parametrize("ten", sorted(NOI_CO_PHEP_THU))
+def test_bien_vllm_da_noi_co_phep_thu_thi_hanh(ten):
+    """Phép thử được trỏ tới phải còn tồn tại và còn nhắc tới đúng biến đó."""
+    duong, ten_test = NOI_CO_PHEP_THU[ten].split("::")
+    noi_dung = (GOC / duong).read_text(encoding="utf-8")
+    assert f"def {ten_test}(" in noi_dung, f"{NOI_CO_PHEP_THU[ten]} không còn"
+    assert ten in noi_dung, f"{duong} không còn đặt {ten}"
+    assert ten not in CHUA_NOI
+
+
+def test_cau_hinh_compose_that_ra_dung_backend():
+    """
+    BR-03 yêu cầu 7. Trước đây `ENV: SERVER` rơi vào nhánh nạp model lên CUDA
+    trong container Brain, vì mã chỉ rẽ ở `== "LOCAL"`. Đọc CHÍNH giá trị trong
+    compose rồi cho qua `chon_backend`: text phải đi server, vision tắt có
+    tuyên bố, và không có gì nạp trong tiến trình.
+    """
+    from src.core.engine import chon_backend
+
+    text = COMPOSE.read_text(encoding="utf-8")
+
+    def gia_tri(ten: str) -> str:
+        m = re.search(rf"^\s{{6}}{ten}:\s*(\S+)", text, re.M)
+        assert m, f"compose không đặt {ten} cho brain"
+        return m.group(1)
+
+    assert chon_backend(gia_tri("ENV"), gia_tri("VLLM_BASE_URL")) == ("server", "none")
 
 
 def test_redis_chay_nhung_task_registry_van_trong_RAM():

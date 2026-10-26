@@ -6,9 +6,79 @@ import time
 from collections import OrderedDict
 
 from src.core.config import Config
-from src.core.serving import guard_from_env
+from src.core.serving import (
+    REPETITION_PENALTY_TU_DO,
+    BackendUnavailable,
+    ChatRequest,
+    CompletionRequest,
+    VLLMServerClient,
+    guard_from_env,
+)
 
 logger = logging.getLogger("projecta.engine")
+
+
+# ---------------------------------------------------------------------------
+# Chọn backend — MỘT chỗ quyết định (SRS chu kỳ 01, BR-03 yêu cầu 1, 2, 7)
+# ---------------------------------------------------------------------------
+
+ENV_NAP_TRONG_TIEN_TRINH = frozenset({"GPU", "COLAB"})
+ENV_HOP_LE = frozenset({"LOCAL", "SERVER"}) | ENV_NAP_TRONG_TIEN_TRINH
+
+
+class CauHinhSai(ValueError):
+    """`ENV` / `VLLM_BASE_URL` không ghép thành một cấu hình chạy được."""
+
+
+def chon_backend(env: str, vllm_base_url: str) -> tuple[str, str]:
+    """
+    -> (text_backend, vision_backend). Hàm thuần, không đọc env, không nạp gì.
+
+    | ENV        | VLLM_BASE_URL | text       | vision     |
+    |------------|---------------|------------|------------|
+    | LOCAL      | rỗng          | mock       | mock       |
+    | LOCAL      | có            | server     | mock       |
+    | GPU, COLAB | rỗng          | in_process | in_process |
+    | GPU, COLAB | có            | server     | in_process |
+    | SERVER     | có            | server     | none       |
+    | SERVER     | rỗng          | lỗi        |            |
+    | khác       |               | lỗi        |            |
+
+    Rẽ theo BACKEND, không theo tên môi trường: có `VLLM_BASE_URL` thì text đi
+    server ở MỌI môi trường. Nhờ vậy phép thử server giả chạy được dưới
+    `ENV=LOCAL` mà không phải import torch/vllm, và máy dev gọi được vLLM ở xa.
+
+    `GPU`/`COLAB` + `VLLM_BASE_URL` là cấu hình của BR-04: vLLM server cộng
+    vision nạp trong tiến trình (chủ dự án chốt 24/10: thiếu chỗ thì hạ ctx,
+    không tách vision sang tiến trình riêng).
+
+    `SERVER` nghĩa là "Brain không nạp model nào": text qua HTTP, vision tắt có
+    tuyên bố, vì `vllm-vision` qua HTTP thuộc chu kỳ 02. Trước đây `SERVER` rơi
+    vào nhánh nạp CUDA ngay trong container Brain (`env == "LOCAL"` là phép rẽ
+    duy nhất). Giá trị lạ ném lỗi luôn: gõ nhầm `LCOAL` mà lặng lẽ nạp CUDA là
+    đúng loại hỏng im lặng SRS §3.3 cảnh báo.
+    """
+    env = (env or "").strip().upper()
+    co_server = bool((vllm_base_url or "").strip())
+
+    if env not in ENV_HOP_LE:
+        raise CauHinhSai(
+            f"ENV={env!r} không hợp lệ. Chọn một trong {sorted(ENV_HOP_LE)}."
+        )
+    if env == "SERVER" and not co_server:
+        raise CauHinhSai(
+            "ENV=SERVER nghĩa là Brain không nạp model nào, nên PHẢI có "
+            "VLLM_BASE_URL. Muốn nạp model trong tiến trình thì đặt ENV=GPU."
+        )
+
+    text = "server" if co_server else ("mock" if env == "LOCAL" else "in_process")
+    if env == "LOCAL":
+        vision = "mock"
+    elif env == "SERVER":
+        vision = "none"
+    else:
+        vision = "in_process"
+    return text, vision
 
 
 class TaskRegistry:
@@ -128,9 +198,12 @@ def _prefix_allowed_fn(tokenizer, json_schema: dict):
 
 class ModelEngine:
     """
-    Singleton quản lý 2 model trên 1 GPU L4 22.5GB:
-      - Text reasoning: Qwen2.5-7B-Instruct-AWQ qua vLLM.
-      - Vision/VLM:    Qwen2-VL-2B-Instruct qua transformers (NẰM NGOÀI pool vLLM).
+    Singleton quản lý hai đường sinh, backend chọn bởi `chon_backend()`:
+      - Text: vLLM server qua HTTP (`VLLM_BASE_URL`), hoặc `vllm.LLM` trong
+        tiến trình (đường cũ cho Colab), hoặc mock (ENV=LOCAL).
+      - Vision: transformers trong tiến trình (NẰM NGOÀI pool vLLM), mock, hoặc
+        tắt có tuyên bố (ENV=SERVER).
+    Model cụ thể đọc từ env (R5), không ghi ở đây.
 
     LƯU Ý KIẾN TRÚC: đây là NGUỒN VISION DUY NHẤT. VisionAgent (vision.py) PHẢI
     gọi engine.generate_vision(...) thay vì tự load Florence-2 riêng — nếu không sẽ
@@ -169,27 +242,55 @@ class ModelEngine:
         im suốt thời gian nạp: /health câm và mọi request đang bay đông cứng.
         """
         self.env = os.getenv("ENV", "LOCAL").upper()
+        # Quyết định MỘT lần ở đây. Các phương thức bên dưới chỉ đọc hai thuộc
+        # tính này, không đọc lại ENV hay VLLM_BASE_URL (BR-03 yêu cầu 2).
+        self.text_backend, self.vision_backend = chon_backend(
+            self.env, os.getenv("VLLM_BASE_URL", "")
+        )
         self.config = Config()
 
         # Điều tiết tải. Trước đây KHÔNG có giới hạn nào: `run_in_executor(None, …)`
         # dùng thread pool mặc định (~32 luồng), nên tới 32 lệnh `llm.generate()`
         # có thể chồng lên nhau trên cùng một đối tượng LLM. Đó chính là hiện
         # tượng "quá tải rồi treo" — xem src/core/serving.py.
+        #
+        # Guard giữ nguyên ở đường server: nó bảo vệ BRAIN khỏi ôm nhiều request
+        # hơn số nó chuyển tiếp nổi, và là chỗ ra 503 + Retry-After.
         self.text_guard = guard_from_env("text")
         self.vision_guard = guard_from_env("vision")
 
-        if self.env == "LOCAL":
-            logger.info("Booting LOCAL mock engine (không load model thật)")
-            self.llm = None
-            self.vision_model = None
-            self.vision_processor = None
-            logger.info("Mock engine online")
-            return
+        self.llm = None
+        self.server: VLLMServerClient | None = None
+        self.vision_model = None
+        self.vision_processor = None
 
-        logger.info("Booting COLAB engine — target GPU L4 22.5GB")
+        logger.info(
+            "Engine ENV=%s — text=%s, vision=%s",
+            self.env, self.text_backend, self.vision_backend,
+        )
+        if self.text_backend == "server":
+            self.server = VLLMServerClient()
+            logger.info(
+                "Text qua vLLM server %s (model=%s)",
+                self.server.base_url, self.server.model or "<mặc định của server>",
+            )
+        elif self.text_backend == "in_process":
+            self._nap_text_trong_tien_trinh()
 
-        import torch
-        from transformers import AutoModelForVision2Seq, AutoProcessor
+        if self.vision_backend == "in_process":
+            self._nap_vision_trong_tien_trinh()
+
+        logger.info("Engine online")
+
+    def _nap_text_trong_tien_trinh(self) -> None:
+        """Đường cũ cho Colab: `vllm.LLM` ngay trong tiến trình Brain."""
+        # Kiểm TRƯỚC import vllm: báo đúng nguyên nhân, không phải lỗi import.
+        if not self.config.text_model_id:
+            raise CauHinhSai(
+                "Nạp text trong tiến trình cần TEXT_MODEL_ID (đường dẫn hoặc HF id "
+                "của model AWQ, ví dụ thư mục anser-v3-awq). Hoặc đặt VLLM_BASE_URL "
+                "để gọi vLLM server thay vì nạp trong tiến trình."
+            )
         from vllm import LLM
 
         # 1) Text brain — vLLM.
@@ -214,6 +315,11 @@ class ModelEngine:
             trust_remote_code=True,
         )
 
+    def _nap_vision_trong_tien_trinh(self) -> None:
+        """Vision qua transformers, nạp trong tiến trình. Dùng cả khi text đi server."""
+        import torch
+        from transformers import AutoModelForVision2Seq, AutoProcessor
+
         # 2) Vision eye — transformers, load vào phần VRAM CÒN LẠI ngoài pool vLLM.
         #
         #    `AutoModelForVision2Seq` thay cho `Qwen2VLForConditionalGeneration`
@@ -235,16 +341,24 @@ class ModelEngine:
         self.vision_model.eval()
         self.vision_processor = AutoProcessor.from_pretrained(self.config.vision_model_id)
 
-        logger.info("Unified engine online (text + vision)")
-
     # ------------------------------------------------------------------
     # TEXT
     # ------------------------------------------------------------------
     async def generate_text(self, prompt, max_tokens=1024, temperature=0.1):
-        """Sinh text bất đồng bộ. LOCAL trả mock không block ASGI loop."""
-        if self.env == "LOCAL":
+        """Sinh text từ prompt THÔ. Cùng hình dạng trả về (`str`) ở cả ba backend."""
+        if self.text_backend == "mock":
             await asyncio.sleep(0.05)
             return '{"mock_response": "LOCAL mock text response."}'
+
+        if self.text_backend == "server":
+            assert self.server is not None
+            async with self.text_guard.slot():
+                return await self.server.complete(CompletionRequest(
+                    prompt=prompt,
+                    max_tokens=max_tokens,
+                    temperature=temperature,
+                    repetition_penalty=REPETITION_PENALTY_TU_DO,
+                ))
 
         from vllm import SamplingParams
 
@@ -267,6 +381,14 @@ class ModelEngine:
         # thay vì để mọi request cùng chậm dần đều cho tới lúc hết giờ.
         async with self.text_guard.slot():
             return await loop.run_in_executor(None, _blocking_generate)
+
+    @staticmethod
+    def _messages(system: str, user: str, history: list[dict] | None) -> list[dict]:
+        """[system, ...lịch sử đã lọc, user] — dùng chung cho đường server và trong tiến trình."""
+        messages = [{"role": "system", "content": system}]
+        messages.extend(sanitize_history(history))
+        messages.append({"role": "user", "content": user})
+        return messages
 
     @staticmethod
     def _build_guided_decoding(json_schema: dict):
@@ -314,10 +436,27 @@ class ModelEngine:
         sao?" không thể hiểu được. Lịch sử đi vào ĐÚNG khe hội thoại của chat
         template, KHÔNG nối vào system prompt (nối tay khiến model coi lời của
         chính nó là chỉ thị hệ thống).
+
+        Đường server (BR-03): `messages` gửi nguyên cho `/v1/chat/completions`,
+        server áp chat template. `enable_thinking=False` và
+        `repetition_penalty=1.0` khi có grammar do `ChatRequest` đảm bảo — hai
+        đường cùng một hợp đồng, xem SRS §3.3.
         """
-        if self.env == "LOCAL":
+        if self.text_backend == "mock":
             await asyncio.sleep(0.05)
             return '{"mock_response": "LOCAL mock chat response."}'
+
+        messages = self._messages(system, user, history)
+
+        if self.text_backend == "server":
+            assert self.server is not None
+            async with self.text_guard.slot():
+                return await self.server.chat(ChatRequest(
+                    messages=messages,
+                    max_tokens=max_tokens,
+                    temperature=temperature,
+                    guided_json=json_schema or None,
+                ))
 
         from vllm import SamplingParams
 
@@ -341,9 +480,6 @@ class ModelEngine:
             sampling_kwargs["repetition_penalty"] = 1.0
 
         params = SamplingParams(**sampling_kwargs)
-        messages = [{"role": "system", "content": system}]
-        messages.extend(sanitize_history(history))
-        messages.append({"role": "user", "content": user})
 
         def _blocking_generate():
             tokenizer = self.llm.get_tokenizer()
@@ -381,9 +517,14 @@ class ModelEngine:
         Thiếu `lm-format-enforcer` thì chạy KHÔNG ràng buộc kèm cảnh báo, chứ
         không chết: đọc được mà JSON lệch vẫn hơn không đọc gì.
         """
-        if self.env == "LOCAL":
+        if self.vision_backend == "mock":
             await asyncio.sleep(0.05)
             return '{"mock_vision": "LOCAL mock OCR/caption result."}'
+        if self.vision_backend == "none":
+            raise BackendUnavailable(
+                "Vision chưa có ở cấu hình ENV=SERVER: vllm-vision qua HTTP thuộc "
+                "chu kỳ 02. Cần vision thì đặt ENV=GPU để nạp trong tiến trình."
+            )
 
         loop = asyncio.get_running_loop()
 
