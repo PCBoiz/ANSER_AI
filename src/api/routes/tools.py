@@ -31,7 +31,7 @@ from dataclasses import asdict
 from typing import Any, Optional
 
 from fastapi import APIRouter, File, Form, Header, HTTPException, Request, UploadFile
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from src.api.dependencies import MAX_UPLOAD_BYTES, require_api_token
 from src.core import carrier_selection as cs
@@ -143,13 +143,39 @@ class ForecastRequest(BaseModel):
     review_periods: float = Field(0.0, ge=0)
 
 
+class VatItem(BaseModel):
+    """Một dòng hàng của /tools/vat.
+
+    `extra="forbid"` là phần làm nên BR-01. Bản cũ khai `items: list[dict]`
+    nên pydantic không kiểm gì bên trong: gửi `unit_price` thay cho `price`
+    thì `MCPServer` đọc `price` khuyết thành 0, tính ra `calculated_total=0`
+    rồi kết luận hoá đơn "lệch 5.400.000đ" — một lời buộc tội sổ sách chính
+    xác tới từng đồng, và sai (đo 24/10/2026, SRS chu kỳ 01 §BR-01).
+
+    `price` và `qty` bắt buộc: thiếu thì trả 422, không mặc định 0 (R1,
+    NFR-07). `documents.py` gọi thẳng `MCPServer` với dòng do VLM đọc ra nên
+    không đi qua model này — hành vi của đường đó giữ nguyên.
+
+    Model này cũng đi vào `GET /tools` qua `$defs`, nên grammar của vòng
+    agentic đóng luôn object dòng hàng: model không sinh nổi `unit_price`.
+    """
+    model_config = ConfigDict(extra="forbid")
+
+    name: str = "Unknown"
+    price: float = Field(..., description="Đơn giá TRƯỚC thuế (VND)")
+    qty: float = Field(..., description="Số lượng. Cho phép số lẻ (lít, kg)")
+    is_reduced_vat: Optional[bool] = Field(
+        None, description="True = diện giảm 8%. Bỏ trống = dùng default_is_reduced"
+    )
+
+
 class VatRequest(BaseModel):
     """POST /tools/vat — tính lại tổng hoá đơn, bọc MCPServer sẵn có.
 
     `is_reduced_vat` là đầu vào của tool này. Muốn biết một mã hàng có thuộc
     diện giảm không thì hỏi `vat_catalog_audit` — nơi giữ bảng tra kèm căn cứ.
     """
-    items: list[dict]
+    items: list[VatItem]
     stated_total: float
     default_is_reduced: bool = False
 
@@ -342,7 +368,9 @@ async def tool_forecast_reorder(
 async def tool_vat(req: VatRequest, x_api_token: Optional[str] = Header(None)):
     require_api_token(x_api_token)
     return MCPServer.validate_invoice_total(
-        req.items, req.stated_total, default_is_reduced=req.default_is_reduced
+        [it.model_dump() for it in req.items],
+        req.stated_total,
+        default_is_reduced=req.default_is_reduced,
     )
 
 
