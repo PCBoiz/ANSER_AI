@@ -225,6 +225,26 @@ def test_biet_hoi_lai_van_duoc_tinh_dung():
     assert kq["ask_back_rate"] == 1.0
 
 
+def test_hoi_lai_qua_hoi_lai_cung_duoc_tinh_dung():
+    """
+    Khi đã có kế hoạch tool, production khoá `answer` (`bat_buoc_tool=True`) và
+    model hỏi lại bằng `hoi_lai`. Chỉ đọc `answer` là chấm trượt oan.
+    """
+    rows = [{"_id": "AG0012", "ask_back": True, "expected_tool": None}]
+    kq = score_agent(rows, ['{"thought": "thiếu điểm đến", "hoi_lai": "Anh đi đâu ạ?"}'])
+    assert kq["ask_back_rate"] == 1.0
+    assert kq["failures"] == []
+
+
+def test_bo_do_agentic_khoa_answer_nhu_production():
+    """Bộ đo PHẢI dựng lược đồ có kế hoạch với `bat_buoc_tool=True`, như `AgenticLoop`."""
+    from pathlib import Path
+
+    src = (Path(__file__).resolve().parents[1]
+           / "offline_training" / "benchmark_v3.py").read_text(encoding="utf-8")
+    assert "bat_buoc_tool=True" in src
+
+
 # ---------------------------------------------------------------------------
 # Narration: CẮT CỤT khác BỊA SỐ
 # ---------------------------------------------------------------------------

@@ -470,7 +470,10 @@ def score_agent(rows: list[dict], outputs: list[str]) -> dict:
     decisions, tk_parse = parse_outputs(outputs, "agentic")
     for row, decision, raw in zip(rows, decisions, outputs):
         chose = decision.get("tool")
-        answered = bool(decision.get("answer"))
+        # `hoi_lai` là kênh hỏi lại của production khi đã có kế hoạch tool
+        # (`bat_buoc_tool=True`): ở bước đó lược đồ KHÔNG có `answer`. Chỉ đọc
+        # `answer` là chấm trượt oan mọi lần model hỏi lại đúng cách.
+        answered = bool(decision.get("answer") or decision.get("hoi_lai"))
 
         # JSON cắt cụt -> dict rỗng -> "chọn None". Nhưng `tool` nằm trước
         # `arguments` nên tên tool đã sinh xong; moi lại để đo ĐÚNG cái đang đo.
@@ -1054,8 +1057,14 @@ def main() -> None:
             finishes: list[str] = [""] * len(rows)
             for ten, idxs in nhom.items():
                 if ten:
+                    # `bat_buoc_tool=True` ĐÚNG như `AgenticLoop.run` khi còn kế
+                    # hoạch: nhánh `answer` bị khoá, chỉ còn gọi tool hoặc
+                    # `hoi_lai`. Bản trước để ngỏ `answer`, nên "không gọi tool
+                    # nào dù đủ dữ kiện" đo đúng cái cửa khách không đi qua
+                    # (BR-05, 27/10/2026: 6/19 ca).
                     schema = build_decision_schema(
-                        [ten], arguments_schema(theo_ten[ten], system_data_fields(ten))
+                        [ten], arguments_schema(theo_ten[ten], system_data_fields(ten)),
+                        bat_buoc_tool=True,
                     )
                 else:
                     schema = build_decision_schema(names)
