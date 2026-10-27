@@ -137,16 +137,23 @@ def payload_openai(model: str, chat: Chat, json_schema: dict | None,
     khác sẽ bỏ qua nó trong im lặng — lúc đó `rang_buoc` mà bản dựng này khai báo
     thành sai. Chốt chặn `smoke_test_guided` trong `benchmark_v3.py` bắt đúng
     trường hợp ấy: lược đồ đồ chơi trả về thứ không đọc được thì dừng ngay.
+
+    DỰNG BẰNG CHÍNH `ChatRequest` CỦA PRODUCTION (27/10/2026, trước BR-05). Bản
+    trước tự dựng payload và thiếu cả hai bất biến của BR-02: không gửi
+    `chat_template_kwargs.enable_thinking=False` (Qwen3 mặc định BẬT thinking) và
+    không gửi `repetition_penalty` (server dùng 1,0 trong khi production sinh
+    tự do ở 1,25). Đo bản fine-tune qua đường đó là đo một thứ khách không
+    nhận — đúng loại lệch hai-nguồn mà SRS BR-05 yêu cầu 4 cấm. Một nguồn (R4):
+    bất biến nào thêm vào `ChatRequest` sau này thì bộ đo tự có theo.
     """
-    p: dict[str, Any] = {
-        "model": model,
-        "messages": chat,
-        "max_tokens": max_tokens,
-        "temperature": temperature,
-    }
-    if json_schema is not None:
-        p["guided_json"] = json_schema
-    return p
+    from src.core.serving import ChatRequest
+
+    return ChatRequest(
+        messages=chat,
+        max_tokens=max_tokens,
+        temperature=temperature,
+        guided_json=json_schema,
+    ).to_payload(model)
 
 
 # Khoá KIỂM TRA mà structured output của Anthropic không đỡ. Bỏ đi KHÔNG làm

@@ -186,6 +186,24 @@ def test_payload_openai_khong_luoc_do_thi_khong_guided_json():
     assert "guided_json" not in payload_openai("anser-v3", CHAT, None, 1100, 0.2)
 
 
+@pytest.mark.parametrize("luoc_do,rp", [(LUOC_DO, 1.0), (None, 1.25)], ids=["grammar", "tu-do"])
+def test_payload_openai_trung_production_tung_byte(luoc_do, rp):
+    """
+    Bộ đo PHẢI gửi đúng thứ production gửi (SRS BR-05 yêu cầu 4). Bản trước tự
+    dựng payload: thiếu `enable_thinking=False` và `repetition_penalty`, nên nhánh
+    narration đo model ở thinking BẬT, phạt lặp 1,0 — khách nhận thinking tắt,
+    phạt lặp 1,25.
+    """
+    from src.core.serving import ChatRequest
+
+    p = payload_openai("anser-v3", CHAT, luoc_do, 512, 0.0)
+    assert p == ChatRequest(
+        messages=CHAT, max_tokens=512, temperature=0.0, guided_json=luoc_do
+    ).to_payload("anser-v3")
+    assert p["chat_template_kwargs"]["enable_thinking"] is False
+    assert p["repetition_penalty"] == rp
+
+
 # ---------------------------------------------------------------------------
 # Lý do dừng
 # ---------------------------------------------------------------------------
