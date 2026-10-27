@@ -496,6 +496,24 @@ async def test_chat_rp_tuong_minh_cung_grammar_van_bi_ha_ve_1():
     await c.aclose()
 
 
+@pytest.mark.parametrize("rp,phai_canh_bao", [(None, False), (1.0, False), (1.25, True)],
+                         ids=["de-trong", "dat-1.0", "dat-1.25"])
+async def test_canh_bao_ha_phat_lap_chi_khi_nguoi_goi_chu_dong_dat(caplog, rp, phai_canh_bao):
+    """
+    Phiên BR-05 27/10/2026 in "repetition_penalty=1.25 bị hạ về 1.0" hơn trăm
+    lần — cho một con số không ai đặt. Cảnh báo phải nói về lựa chọn của người
+    gọi, không về mặc định của chính lớp này. Payload thì ba ca đều 1.0.
+    """
+    import logging
+
+    with caplog.at_level(logging.WARNING, logger="anser.serving"):
+        p = ChatRequest(
+            messages=_MSGS, repetition_penalty=rp, guided_json={"type": "object"},
+        ).to_payload("m")
+    assert p["repetition_penalty"] == 1.0
+    assert ("bị hạ về" in caplog.text) is phai_canh_bao, caplog.text
+
+
 async def test_extra_khong_de_duoc_hai_bat_bien():
     """`extra` là lối thoát cho tham số vLLM lạ, không phải cửa sau để bật lại bẫy."""
     seen: dict = {}

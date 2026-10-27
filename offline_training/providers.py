@@ -284,6 +284,10 @@ def _bao_cat_cut(finishes: list[str], max_tokens: int) -> None:
     n = sum(1 for f in finishes if f == "length")
     if n:
         print(f"  ⚠ {n}/{len(finishes)} đầu ra bị CẮT CỤT vì chạm trần {max_tokens} token.")
+    qua_gio = sum(1 for f in finishes if f == "timeout")
+    if qua_gio:
+        print(f"  ⚠ {qua_gio}/{len(finishes)} câu QUÁ GIỜ (BENCH_TIMEOUT_S) — KHÔNG đo "
+              f"được, chấm thành trượt nhưng lỗi thuộc khung đo/server, không phải model.")
     tu_choi = sum(1 for f in finishes if f == "refusal")
     if tu_choi:
         print(f"  ⚠ {tu_choi}/{len(finishes)} câu bị model TỪ CHỐI trả lời "
@@ -418,12 +422,20 @@ class OpenAITuongThich:
         if self._api_key:
             headers["Authorization"] = f"Bearer {self._api_key}"
 
-        resp = httpx.post(
-            f"{self.base_url}/chat/completions",
-            json=payload_openai(self.model, chat, json_schema, max_tokens, temperature),
-            headers=headers,
-            timeout=httpx.Timeout(300.0, connect=10.0),
-        )
+        # Quá giờ là MỘT câu không đo được, không phải cả phiên đổ. Phiên BR-05
+        # 27/10/2026 đổ ở nhánh agentic sau ~30 phút vì một request quá 300s.
+        # Trả lý do dừng riêng "timeout" — khác "length" (cắt cụt) và khác đầu ra
+        # sai — để tầng chấm không đổ tội cho model và `_bao_cat_cut` đếm riêng.
+        gio = float(os.getenv("BENCH_TIMEOUT_S", "300"))
+        try:
+            resp = httpx.post(
+                f"{self.base_url}/chat/completions",
+                json=payload_openai(self.model, chat, json_schema, max_tokens, temperature),
+                headers=headers,
+                timeout=httpx.Timeout(gio, connect=10.0),
+            )
+        except httpx.TimeoutException:
+            return "", "timeout"
         if resp.status_code >= 400:
             raise RuntimeError(f"endpoint trả {resp.status_code}: {resp.text[:400]}")
         lua_chon = resp.json()["choices"][0]

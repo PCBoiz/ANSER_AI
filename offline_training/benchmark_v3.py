@@ -793,6 +793,10 @@ def main() -> None:
     parser.add_argument("--json", dest="json_out", default="",
                         help="ghi kết quả TỪNG CÂU ra file JSON, để so hai bản "
                              "theo cặp bằng compare_runs.py")
+    parser.add_argument("--tho", default="",
+                        help="ghi NGUYÊN VĂN đầu ra từng câu (JSONL: nhánh, _id, "
+                             "lý do dừng, lý do trượt, đầu ra) — đầu vào của bảng "
+                             "phân loại lỗi (SRS BR-05 yêu cầu 5)")
     args = parser.parse_args()
 
     _stage_catalog_dir()          # catalog node cho validate_workflow
@@ -834,6 +838,44 @@ def main() -> None:
     # câu nào trước đó vốn đúng.
     ket_qua_chay: dict[str, Any] = {}
 
+    # GHI SAU MỖI NHÁNH, không đợi tới cuối. Phiên BR-05 ngày 27/10/2026 đổ ở
+    # nhánh agentic (một request quá giờ) sau ~30 phút, và vì file chỉ ghi ở
+    # cuối nên mất sạch kết quả từng câu của bốn nhánh đã chạy xong.
+    def ghi_json() -> None:
+        if not args.json_out:
+            return
+        kiem_ket_qua(ket_qua_chay)
+        # Bỏ `failures`/`parse` khỏi file: chúng là chuỗi để người đọc, còn file
+        # này để MÁY so hai lần chạy. Giữ lại chỉ làm file phình và làm `diff`
+        # giữa hai bản đầy nhiễu. Nguyên văn để người đọc nằm ở `--tho`.
+        gon = {
+            muc: {k: v for k, v in kq.items() if k not in ("failures", "parse")}
+            for muc, kq in ket_qua_chay.items()
+        }
+        Path(args.json_out).write_text(
+            json.dumps({"model": nha.ten, "rang_buoc": nha.rang_buoc,
+                        "sections": gon},
+                       ensure_ascii=False, indent=1),
+            encoding="utf-8",
+        )
+
+    # `per_row` chỉ có đúng/sai. Bảng phân loại lỗi đòi MỘT VÍ DỤ NGUYÊN VĂN cho
+    # mỗi loại, nên đầu ra thô phải nằm đâu đó — không thì phải chạy lại GPU.
+    if args.tho:
+        Path(args.tho).write_text("", encoding="utf-8")
+
+    def ghi_tho(nhanh: str, rows: list, outputs: list, finishes: list,
+                failures: Any = ()) -> None:
+        if not args.tho:
+            return
+        ly_do = {str(i): why for i, why in failures}
+        with open(args.tho, "a", encoding="utf-8") as f:
+            for r, o, fin in zip(rows, outputs, finishes):
+                ma = str(r.get("_id", "?"))
+                f.write(json.dumps({"nhanh": nhanh, "_id": ma, "finish": fin,
+                                    "loi": ly_do.get(ma), "output": o},
+                                   ensure_ascii=False) + "\n")
+
     # ---- 1. extraction -----------------------------------------------------
     if "extraction" not in args.skip:
         rows = cap(load_jsonl(GENERATED_DIR / "eval_extraction.jsonl"))
@@ -842,6 +884,7 @@ def main() -> None:
             outputs, _finish = nha.sinh(chats, QuoteExtraction.model_json_schema(),
                                         max_tokens=256, temperature=0.0)
             result = score_extraction(rows, outputs)
+            ghi_tho("extraction", rows, outputs, _finish, result.get("failures", ()))
             print(f"\n[extraction] n={result['n']}")
             in_thong_ke_parse(result["parse"])
             for field, acc in result["per_field"].items():
@@ -866,6 +909,7 @@ def main() -> None:
             chan(gate_fail, "sẵn sàng báo giá", result["n_ready"], result["n"], ready_min,
                  them="  (3 trường bắt buộc đều đúng)")
             ket_qua_chay["extraction"] = result
+            ghi_json()
         else:
             print("\n[extraction] ⚠ thiếu eval_extraction.jsonl — bỏ qua")
             khong_do_duoc.append("extraction — thiếu eval_extraction.jsonl")
@@ -887,6 +931,7 @@ def main() -> None:
                 max_tokens=tran_token("BENCH_N8N_MAX_TOKENS", MAX_WORKFLOW_TOKENS),
                 temperature=0.0)
             result = score_n8n(rows, outputs, finishes)
+            ghi_tho("n8n", rows, outputs, finishes, result.get("failures", ()))
             print(f"\n[n8n] hợp lệ {result['n_valid']}/{result['n']}"
                   f" ({result['valid_rate'] * 100:.0f}%)")
             if result["n_cat_cut"]:
@@ -895,6 +940,7 @@ def main() -> None:
             for _id, why in result["failures"][:10]:
                 print(f"  ✗ {_id}: {why}")
             ket_qua_chay["n8n"] = result
+            ghi_json()
             n8n_min = float(os.getenv("N8N_VALID_MIN", "0.90"))
             chan(gate_fail, "n8n hợp lệ", result["n_valid"], result["n"], n8n_min,
                  yeu=mau_qua_it)
@@ -927,6 +973,7 @@ def main() -> None:
                 max_tokens=tran_token("BENCH_NARR_MAX_TOKENS", MAX_REPORT_TOKENS),
                 temperature=0.2)
             result = score_narration(rows, outputs, finishes)
+            ghi_tho("narration", rows, outputs, finishes, result.get("failures", ()))
             print(f"\n[narration] đạt {result['pass_rate'] * 100:.0f}% (n={result['n']})")
             if result["n_cat_cut"]:
                 print(f"    trong đó {result['n_cat_cut']} ca CẮT CỤT (chạm trần token)"
@@ -939,6 +986,7 @@ def main() -> None:
             for _id, reason in result["failures"][:10]:
                 print(f"  ✗ {_id}: {reason}")
             ket_qua_chay["narration"] = result
+            ghi_json()
             narr_min = float(os.getenv("NARR_MIN", "0.90"))
             if result["pass_rate"] < narr_min:
                 gate_fail.append(f"narration pass_rate {result['pass_rate']:.4f} < {narr_min}")
@@ -980,6 +1028,7 @@ def main() -> None:
                 print(f"  ✗ {_id}: {reason}")
 
             ket_qua_chay["bang_luat"] = kh
+            ghi_json()
             plan_min = float(os.getenv("PLANNER_TOOL_MIN", "0.90"))
             if kh["tool_rate"] is not None and kh["tool_rate"] < plan_min:
                 gate_fail.append(
@@ -1024,6 +1073,7 @@ def main() -> None:
 
             n_cut = sum(1 for f in finishes if f == "length")
             result = score_agent(rows, outputs)
+            ghi_tho("agentic", rows, outputs, finishes, result.get("failures", ()))
             print(f"\n[agentic — phần của model] n={result['n']}")
             in_thong_ke_parse(result["parse"])
             if n_cut:
@@ -1043,6 +1093,7 @@ def main() -> None:
                 print(f"  ✗ {_id}: {reason}")
 
             ket_qua_chay["agentic"] = result
+            ghi_json()
             ask_min = float(os.getenv("AGENT_ASKBACK_MIN", "0.75"))
             arg_min = float(os.getenv("AGENT_ARG_MIN", "0.80"))
             if result["ask_back_rate"] is not None and result["ask_back_rate"] < ask_min:
@@ -1058,21 +1109,10 @@ def main() -> None:
 
     # ---- Ghi kết quả từng câu ----------------------------------------------
     if args.json_out:
-        kiem_ket_qua(ket_qua_chay)
-        # Bỏ `failures`/`parse` khỏi file: chúng là chuỗi để người đọc, còn file
-        # này để MÁY so hai lần chạy. Giữ lại chỉ làm file phình và làm `diff`
-        # giữa hai bản đầy nhiễu.
-        gon = {
-            muc: {k: v for k, v in kq.items() if k not in ("failures", "parse")}
-            for muc, kq in ket_qua_chay.items()
-        }
-        Path(args.json_out).write_text(
-            json.dumps({"model": nha.ten, "rang_buoc": nha.rang_buoc,
-                        "sections": gon},
-                       ensure_ascii=False, indent=1),
-            encoding="utf-8",
-        )
+        ghi_json()
         print(f"\nĐã ghi kết quả từng câu: {args.json_out}")
+    if args.tho:
+        print(f"Đã ghi nguyên văn đầu ra: {args.tho}")
         print("  So hai bản:  python -m offline_training.compare_runs "
               "baseline.json tuned.json")
 

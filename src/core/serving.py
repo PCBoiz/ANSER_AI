@@ -286,9 +286,16 @@ class ChatRequest:
                 raise ValueError(f"message sai hình dạng {{role, content}}: {m!r}")
 
     def repetition_penalty_hieu_luc(self) -> float:
-        # Có grammar thì `_ap_bat_bien` hạ về 1.0 (và cảnh báo nếu bị hạ).
+        # `None` = người gọi không chọn -> chọn theo việc có grammar hay không.
+        # Bản trước luôn trả 1,25 cho `None`, rồi `_ap_bat_bien` hạ về 1.0 KÈM
+        # CẢNH BÁO — tức cảnh báo về một con số không ai đặt. Phiên BR-05
+        # 27/10/2026 in dòng đó hơn trăm lần, và production in ở mọi bước của
+        # vòng agentic. Cảnh báo chỉ còn khi người gọi CHỦ ĐỘNG đặt số khác 1.0.
         if self.repetition_penalty is None:
-            return REPETITION_PENALTY_TU_DO
+            co_grammar = bool(self.guided_json) or any(
+                self.extra.get(k) for k in KHOA_GRAMMAR
+            )
+            return REPETITION_PENALTY_GRAMMAR if co_grammar else REPETITION_PENALTY_TU_DO
         return self.repetition_penalty
 
     def to_payload(self, model: str) -> dict[str, Any]:
