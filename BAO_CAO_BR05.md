@@ -16,7 +16,7 @@
 ## 1. Tóm tắt
 
 1. **Ba dòng chốt chặn đều đạt** — `[chốt chặn] ràng buộc JSON: ✓ CHẠY`, lược đồ agentic dựng được 8/8 tool, trường bị cấm không sinh ra được. Treo #2 của TIEN_TRINH **đóng**.
-2. **Lỗi lớn nhất của nhánh agentic không nằm ở model.** Bảng luật chọn tool (`tool_planner.py`) đẩy **6/6** câu cần `quote` sang `report`; grammar chỉ cho một tên tool, nên model — dù `thought` ghi đúng *"cần gọi công cụ 'quote'"* — bị ép gọi `report`. Hai nguyên nhân chồng nhau: luật `report` bắt chữ trần `lợi nhuận` (**mã**), và bộ đề đòi `quote` qua vòng agentic trong khi production **cố ý** đưa câu báo giá sang nhánh LOGISTICS → n8n (**bộ đề lệch thiết kế**). Không cái nào sửa bằng train lại.
+2. **Lỗi lớn nhất của nhánh agentic không nằm ở model.** Bảng luật chọn tool (`tool_planner.py`) đẩy **6/6** câu cần `quote` sang `report`; grammar chỉ cho một tên tool, nên model — dù `thought` ghi đúng *"cần gọi công cụ 'quote'"* — bị ép gọi `report`. Nguyên nhân: luật `report` bắt chữ trần `lợi nhuận`, và thiết kế **thiếu đường** cho ý định "tính giá bán từ giá nhà xe đã có" (**mã**). Không sửa bằng train lại. **Đã sửa 28/10** bằng cách tách "báo giá" thành ba ý định — bảng luật 40% → 100%, điền tham số 60% → 100% (§6b).
 3. **Extraction hổng ở kỷ luật null.** 63 trường bị điền khi đáng lẽ để trống; **~53 là lỗi model** (xưng hô thành tên, mặc định `dau_keo`/`Hà Nội`, chép điểm đến sang điểm đi), **~10 là nhãn bộ đề sai**. Thêm ~21 ca **tính sai ngày tương đối** — LLM đang làm phép tính ngày, trái R1.
 4. **Narration có một ca bịa số nghiêm trọng:** `12.709.000` thành **`127.090.000 đồng`** (gấp 10) trong email báo giá cho khách. Và 12/27 câu cắt cụt vì viết quá dài, 2 trong đó lặp vòng.
 5. **Bộ đo có bốn chỗ sai đã sửa trong phiên** (mục 4) và ba chỗ còn lệch (mục 5) — con số tổng ở mục 2 phải đọc kèm hai mục đó.
@@ -48,7 +48,7 @@ Nguyên nhân quy về một trong ba: **dữ liệu** (huấn luyện hoặc b�
 
 | Loại lỗi | Số ca | Ví dụ nguyên văn | Nguyên nhân |
 |---|---|---|---|
-| **Bảng luật chọn sai tool**, model bị ép gọi `report` | **6** (mọi câu cần `quote`) | AG0014 — `"thought": "…Tôi sẽ gọi công cụ 'quote'…"`, `"tool": "report"` | **mã** (luật `report` bắt chữ trần `lợi nhuận`) + **bộ đề** (đòi `quote` qua agentic; bảng luật không có luật `quote` nào, vì production đưa câu báo giá sang nhánh LOGISTICS → n8n) |
+| **Bảng luật chọn sai tool**, model bị ép gọi `report` | **6** (mọi câu cần `quote`) | AG0014 — `"thought": "…Tôi sẽ gọi công cụ 'quote'…"`, `"tool": "report"` | **mã** — luật `report` bắt chữ trần `lợi nhuận`, và thiết kế thiếu đường cho ý định "tính giá bán từ giá nhà xe". **Đã sửa 28/10, xem §6b** |
 | Luật `carrier_selection` không khớp câu chào giá; model tự chọn sai tool hoặc hỏi lại | 3 | AG0003 — đáp án `carrier_selection`, model gọi `quote` | **mã** (luật chỉ bắt "nhà xe nào", "so sánh nhà xe"…) + model |
 | Bịa tên trường trong `pricing_rule` | 2 | AG0003 — `"pricing_rule": {"discount_rate": 8, "credit_days": 30}` → 3 lỗi `QuoteRequest` | **lược đồ** — `arguments_schema` chỉ đóng tầng ngoài, `$defs` để mở |
 | Điền `0` cho giá dầu chưa biết | 2 | AG0003, AG0013 — `"current_fuel_price": 0` | **lược đồ/prompt** — giá dầu phải do hệ thống cấp (AGENTS §3.1c); "chưa biết" ≠ 0 |
@@ -101,7 +101,7 @@ Cả hai là lỗi R1. Ca NA0006 cho thấy: kể cả khi mọi con số có s�
 
 | Loại lỗi | Số ca | Ví dụ | Nguyên nhân |
 |---|---|---|---|
-| Câu báo giá vận tải bị bắt thành `report` | 6 | AG0001 *"Nhà xe vừa chào 12.500.000 đồng…, biên lợi nhuận họ tính 8%"* → `["report"]` | **mã** — luật `report` có chữ trần `lợi nhuận` ([`tool_planner.py:157`](src/core/tool_planner.py#L157)). Bảng luật không có luật `quote`: ở production câu báo giá đi nhánh LOGISTICS → n8n, nên **bộ đề đòi `quote` qua agentic là lệch thiết kế** — cần chốt câu báo giá nên đi đường nào |
+| Câu báo giá vận tải bị bắt thành `report` | 6 | AG0001 *"Nhà xe vừa chào 12.500.000 đồng…, biên lợi nhuận họ tính 8%"* → `["report"]` | **mã** — luật `report` có chữ trần `lợi nhuận` ([`tool_planner.py:157`](src/core/tool_planner.py#L157)). Bảng luật không có luật `quote`, vì thiết kế cũ dồn mọi câu "báo giá" về LOGISTICS → n8n — kể cả câu đã có sẵn giá nhà xe. **Đã sửa 28/10 (§6b)** |
 | Luật `carrier_selection` không khớp | 3 | AG0002 *"…Đại An chào 9.400.000 đồng chiết khấu 5%…"* | **mã** — luật chỉ bắt "nhà xe nào", "chọn/so sánh nhà xe"; câu liệt kê nhiều lời chào giá không khớp |
 
 ---
@@ -137,6 +137,29 @@ Cả hai là lỗi R1. Ca NA0006 cho thấy: kể cả khi mọi con số có s�
 | Dữ liệu huấn luyện: tách xưng hô khỏi tên; thêm ca để trống trường; giới hạn độ dài narration | dữ liệu huấn luyện | extraction null (~53 ca), narration cắt cụt | thuộc quyết định huấn luyện lại |
 
 **Kết luận chẩn đoán:** phần lớn lỗi *rẻ nhất để sửa* nằm ở **mã và lược đồ**, không ở model. Nên sửa các dòng "mã" và "lược đồ" trước rồi đo lại, *sau đó* mới quyết có huấn luyện lại không — đúng bài học ba lần trước của dự án: con số xấu đến từ mã trước khi đến từ model.
+
+---
+
+## 6b. Đo lại sau khi tách "báo giá" thành ba ý định (28/10/2026)
+
+Chủ dự án chốt giữ cả hai đường, tách theo ý định bằng luật từ khoá (`b4091f7`): khách xin báo giá → LOGISTICS/n8n; **tính giá bán từ giá nhà xe + biên** → agentic `quote`; **so ≥ 2 lời chào giá** → agentic `carrier_selection`. Luật `report` và luật REPORT của router thôi bắt "**biên** lợi nhuận". Đo lại riêng bảng luật và agentic (`4911302`; ba nhánh kia không đổi mã):
+
+| Chỉ số | BR-05 (27/10) | Sau tách ý định |
+|---|---|---|
+| Bảng luật chọn đúng tool | 40% (6/15) | **100% (15/15)** |
+| Agentic — chịu gọi tool khi đủ dữ kiện | 93,3% | **100%** |
+| Agentic — điền tham số đúng kiểu | 60% (n=5) | **100% (n=9)** |
+| Agentic — biết hỏi lại khi thiếu dữ kiện | 25% (n=4) | 25% (n=4) |
+
+Đọc số:
+
+- **Luật được viết SAU khi thấy bộ đề**, nên 15/15 là cận trên. Đối trọng: 13 câu viết mới không lấy từ bộ đề (gồm ca không được khớp, câu không dấu) đều đúng, và 249 chuỗi trong 4 file test chỉ đổi kế hoạch ở 1 câu chú thích — đúng hướng.
+- **Tham số `quote` đúng kiểu ở cả 6 câu** khi được đưa đúng tool. Hai ca bịa `pricing_rule.discount_rate` ở §3.1 phần lớn là hệ quả của việc bị đưa sai tool.
+- **"Biết hỏi lại" 25% không phải lỗi model ở đường production.** AG0010, AG0018 (có biên, chưa có giá nhà xe) cố ý không có kế hoạch — và production chỉ vào vòng agentic khi CÓ kế hoạch, nên hai câu này không tới đó. Bộ đo vẫn cho model tự chọn giữa 8 tool; nó chọn `quote`, tức sẽ phải bịa giá nhà xe — đáng ghi nhận, nhưng đó là đường không tồn tại. AG0009 gọi `report` khi "chưa có số liệu": ở production `report` lấy số liệu hệ thống và tự báo thiếu, nên hành vi chấp nhận được; nhãn "phải hỏi lại" có thể tranh cãi.
+- **Khung đo còn lệch thêm một chỗ:** câu không có kế hoạch được chấm qua vòng agentic với lược đồ tự do, trong khi production đưa chúng sang nhánh router. Sửa: bộ đo bỏ qua (hoặc chấm riêng) các câu không có kế hoạch.
+- **Khoảng trống còn mở:** `carrier_selection` định tuyến đúng nhưng vẫn lấy nhà xe/lời chào từ hệ thống (chưa có nguồn), không đọc lời chào trong câu — người dùng nhận câu hỏi lại danh sách nhà xe. Có test ghi nhận (`test_so_chao_gia_vao_carrier_selection_va_noi_ro_con_thieu_gi`). Bóc lời chào từ câu là việc riêng.
+
+Dữ liệu thô: Drive `ANSER_AI_Logistics/br05b_*`.
 
 ---
 
