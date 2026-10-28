@@ -6,7 +6,7 @@ Kiến trúc chia bốn tầng, mũi tên chỉ đi xuống:
     T4  src/api/      HTTP
     T3  src/agents/, core/engine.py, core/knowledge.py     điều phối
     T2  src/core/     nghiệp vụ thuần
-    T1  core/config.py, serving.py, schemas.py, prompts.py, utils.py, chunking.py
+    T1  core/config.py, nguong_p95.py, serving.py, schemas.py, prompts.py, utils.py, chunking.py
 
 Đó là lý do test nghiệp vụ chạy không cần GPU, không cần DB, không cần mạng.
 
@@ -38,6 +38,9 @@ TANG = {
     "core/knowledge.py": 3,
     "core/memory.py": 3,
     "core/config.py": 1,
+    # Ngưỡng p95 đọc từ env, chỉ thư viện chuẩn — cùng loại với config.py,
+    # và config.py đọc nó (28/10/2026).
+    "core/nguong_p95.py": 1,
     "core/serving.py": 1,
     "core/schemas.py": 1,
     "core/prompts.py": 1,
