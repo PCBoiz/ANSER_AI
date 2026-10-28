@@ -112,7 +112,20 @@ mảng dài → tràn trần token → JSON cắt cụt → vòng lặp gãy.
 
 **Đã sửa trong mã, chưa có số chứng minh nó kéo agentic lên.** Cần một phiên đo.
 
-### 🟡 Việc treo #2 — phiên đo lại sau khi có `providers.py`
+> **BR-05 (27/10/2026): VẪN MỞ.** Phiên đo chạy được, nhưng nhánh agentic bị một
+> lỗi khác che mất: bảng luật đẩy 6/6 câu báo giá sang `report` (chữ trần
+> `lợi nhuận` trong luật `report`), và bộ đề đòi `quote` qua vòng agentic trong
+> khi production đưa câu báo giá sang nhánh LOGISTICS. Đo lại sau khi chốt câu
+> báo giá đi đường nào. Xem [BAO_CAO_BR05.md](BAO_CAO_BR05.md) §3.1, §3.5.
+
+### ✅ Việc treo #2 — phiên đo lại sau khi có `providers.py` — ĐÓNG 27/10/2026
+
+> **BR-05 đóng việc này.** Đo qua đường vLLM server: `[chốt chặn] ràng buộc
+> JSON: ✓ CHẠY`, lược đồ agentic dựng được 8/8 tool, trường bị cấm không sinh
+> ra được; thêm `test_xgrammar_THAT_*` đo bằng xgrammar thật. Kèm bốn lỗi khung
+> đo đã sửa trong phiên (payload lệch production, đổ cả phiên vì một câu quá
+> giờ, agentic để ngỏ `answer`, cảnh báo thừa). Bảng phân loại lỗi:
+> [BAO_CAO_BR05.md](BAO_CAO_BR05.md).
 
 Nhánh benchmark thêm lớp `NhaCungCap` với `nha.rang_buoc` — ghi lại **chế độ ràng
 buộc** vào file kết quả. Tôi đắp phép thử của mình lên: `rang_buoc` nói bộ đo
