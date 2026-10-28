@@ -97,7 +97,11 @@ _KEYWORD_RULES = [
     ("REPORT", re.compile(
         r"(báo cáo|bao cao|phân tích|phan tich|tổng kết|tong ket)"
         r".{0,30}(quý|quy \d|nửa năm|nua nam|cả năm|ca nam|năm nay|năm ngoái|kỳ)"
-        r"|(lãi|lỗ|lợi nhuận|loi nhuan|lai lo)"
+        # "BIÊN lợi nhuận" là tham số của phép tính giá bán (ý định 2 trong
+        # tool_planner.py), không phải yêu cầu báo cáo. Bắt nó ở đây thì câu
+        # "nhà xe chào 12,5 triệu, biên lợi nhuận 8%" bị trả về báo cáo lãi lỗ
+        # (BR-05, 28/10/2026: 6/6 câu như vậy).
+        r"|(lãi|lỗ|(?<!biên )lợi nhuận|(?<!bien )loi nhuan|lai lo)"
         r"|(doanh thu|chi phí|chi phi).{0,25}(quý|nửa năm|cả năm|theo (kỳ|quý|năm))"
         r"|mặt hàng nào (lãi|lời|có lãi|sinh lời)"
         r"|(so sánh|so sanh).{0,20}(quý|kỳ|năm)",

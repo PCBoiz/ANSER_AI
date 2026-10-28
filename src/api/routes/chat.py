@@ -39,7 +39,12 @@ from src.core.engine import TASK_REGISTRY
 from src.core.grounding import guard_answer
 from src.core.retrieval_policy import KHONG_CO_TAI_LIEU, decide_web_fallback
 from src.core.schemas import RetailChatResponse
-from src.core.tool_planner import la_cau_soat_hoa_don, plan_tools
+from src.core.tool_planner import (
+    la_cau_so_chao_gia,
+    la_cau_soat_hoa_don,
+    la_cau_tinh_gia_ban,
+    plan_tools,
+)
 from src.core.utils import extract_json_block
 from src.core.workflow_schema import validate_workflow
 
@@ -535,10 +540,21 @@ async def chat_endpoint(
         # cùng một hàm mà `plan_tools` dùng để cộng `vat`, hai nơi không lệch
         # nhau được). Câu báo giá thật ("báo giá xe 5 tấn đi Hải Phòng") không
         # thoả vế nào nên vẫn đi nguyên luồng n8n. TECHNICAL giữ nguyên.
-        soat_hoa_don_logistics = (
-            cat == "LOGISTICS" and "vat" in plan and la_cau_soat_hoa_don(user_msg)
+        #
+        # Cùng hình dạng, hai ý định nữa (chủ dự án chốt 28/10/2026, sau
+        # BR-05): câu TÍNH GIÁ BÁN từ giá nhà xe đã có ("nhà xe chào 12,5 triệu,
+        # biên 8%") và câu SO NHIỀU LỜI CHÀO GIÁ. Cả hai hay chứa "báo giá" nên
+        # router xếp LOGISTICS, nhưng luồng n8n chỉ nhận tuyến/xe/ngày — nó vứt
+        # đúng con số người dùng vừa đưa. Mỗi ngoại lệ cần CẢ tool trong kế
+        # hoạch LẪN hàm nhận diện của chính tool_planner, nên "nhà xe nào rẻ
+        # nhất" (chưa có giá) và "báo giá xe 5 tấn đi HP" vẫn đi n8n.
+        y_dinh_agentic_trong_logistics = cat == "LOGISTICS" and (
+            ("vat" in plan and la_cau_soat_hoa_don(user_msg))
+            or ("quote" in plan and la_cau_tinh_gia_ban(user_msg))
+            or ("carrier_selection" in plan and la_cau_so_chao_gia(user_msg))
         )
-        if plan and (cat not in ("LOGISTICS", "TECHNICAL") or soat_hoa_don_logistics):
+        if plan and (cat not in ("LOGISTICS", "TECHNICAL")
+                     or y_dinh_agentic_trong_logistics):
             resp, grounding_ctx = await _run_agentic(
                 user_msg, plan, store_id, history, request_id, metric
             )

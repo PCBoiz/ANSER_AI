@@ -6,10 +6,14 @@ sai thì cái thay thế còn tệ hơn cái bị thay, nên mỗi luật phải
 khớp và một ca KHÔNG được khớp.
 """
 
+import pytest
+
 from src.core.tool_planner import (
     MAX_PLAN,
     NEEDS_SYSTEM_DATA,
+    la_cau_so_chao_gia,
     la_cau_soat_hoa_don,
+    la_cau_tinh_gia_ban,
     needs_system_data,
     plan_tools,
 )
@@ -219,6 +223,73 @@ def test_cau_chao_hoi_khong_kich_hoat_gi():
 def test_cau_bao_gia_van_tai_khong_bi_keo_vao():
     """LOGISTICS có luồng struct riêng — bảng luật không được giành lấy."""
     assert ke_hoach("báo giá xe 5 tấn từ Hà Nội đi Hải Phòng") == []
+
+
+# --------------------------------------------------------------------------
+# "Báo giá" là BA ý định (chốt 28/10/2026, sau BR-05)
+#
+# Câu đánh dấu [viết mới] KHÔNG lấy từ eval_agent.jsonl: luật được viết sau khi
+# đã thấy bộ đề, nên điểm trên bộ đề đẹp hơn thực tế. Các câu này canh việc luật
+# bắt theo CỤM NGHIỆP VỤ chứ không theo đúng chữ của bộ đề.
+# --------------------------------------------------------------------------
+
+@pytest.mark.parametrize("cau", [
+    # từ bộ đề (BR-05 đo được 6/6 câu kiểu này bị trả về báo cáo lãi lỗ)
+    "Nhà xe vừa chào 12.500.000 đồng cho chuyến cảng Đình Vũ đi Bắc Giang, biên "
+    "lợi nhuận họ tính 8% nhưng giá dầu giờ lên 28.500 đồng/lít",
+    "Chú mới nhận báo giá từ nhà xe: họ chào 11.450.000 đồng cho chuyến kho Long "
+    "Biên đi Nam Định, nhưng biên lợi nhuận chỉ 12%",
+    # [viết mới]
+    "Hãng xe báo 7,2 triệu tuyến Bắc Ninh – Hải Phòng, mình giữ biên lãi 10% thì "
+    "chào khách bao nhiêu?",
+    "Bên xe chốt 15tr chuyến đi Lạng Sơn, biên lợi nhuận 12%. Tính giá bán giúp em",
+    "Nha xe chao 6.500.000d, bien loi nhuan 8%, tinh gia ban cho khach",
+])
+def test_y_dinh_2_tinh_gia_ban_ra_quote_khong_ra_report(cau):
+    assert la_cau_tinh_gia_ban(cau)
+    assert ke_hoach(cau) == ["quote"]
+
+
+@pytest.mark.parametrize("cau", [
+    # từ bộ đề
+    "Anh có chuyến Nội Bài đi Lạng Sơn bằng xe 3T rồi, Đại An chào 9.400.000 đồng "
+    "chiết khấu 5% công nợ 15 ngày, Tân Cảng Bắc chào 10.950.000 đồng chiết khấu 8% "
+    "công nợ 15 ngày. Em xem giúp anh bên nào ổn nhất nhé?",
+    # [viết mới]
+    "Có ba nhà xe: Minh Phát chào 8.000.000đ công nợ 30 ngày; Tuấn Hưng chào "
+    "7.600.000đ công nợ 15 ngày; Hòa Bình chào 8.300.000đ công nợ 45 ngày. Chọn bên nào?",
+    "Anh A báo 5 triệu chiết khấu 3%, anh B báo 5,4 triệu chiết khấu 6% — nên lấy ai?",
+])
+def test_y_dinh_3_so_nhieu_loi_chao_ra_carrier_selection(cau):
+    assert la_cau_so_chao_gia(cau)
+    assert not la_cau_tinh_gia_ban(cau), "ý định 3 phải thắng ý định 2"
+    assert ke_hoach(cau) == ["carrier_selection"]
+
+
+@pytest.mark.parametrize("cau,mong", [
+    # ý định 1: khách xin báo giá — vẫn đi n8n
+    ("Báo giá xe 5 tấn từ Hữu Nghị đi Hải Phòng ngày mai", []),
+    # chọn nhà xe nhưng CHƯA có giá — luật cũ, không phải ý định 3
+    ("nhà xe nào rẻ nhất cho chuyến này", ["carrier_selection"]),
+    # có biên nhưng THIẾU giá nhà xe: không ép `quote` (sẽ phải bịa carrier_cost)
+    ("Biên lợi nhuận 12%, giá dầu lên 26.000 thì mình có bị lỗ không?", []),
+    # có giá nhưng THIẾU biên
+    ("Nhà xe chào 9 triệu cho chuyến Đình Vũ, anh thấy được không?", []),
+    # câu hỏi kiến thức, chữ "chào" là lời chào
+    ("Chào em, anh muốn hỏi biên lợi nhuận ngành vận tải thường bao nhiêu %?", []),
+])
+def test_khong_du_dau_hieu_thi_khong_ep_quote_hay_carrier(cau, mong):
+    assert ke_hoach(cau) == mong
+
+
+@pytest.mark.parametrize("cau", [
+    "Báo cáo lợi nhuận quý này giúp anh",
+    "tháng này lợi nhuận bao nhiêu",
+    "Em tính giúp anh lợi nhuận từng tuyến và tổng lãi lỗ quý nhé?",
+])
+def test_bao_cao_loi_nhuan_that_van_ra_report(cau):
+    """Chỉ "BIÊN lợi nhuận" bị gỡ khỏi luật report, "lợi nhuận" trần thì vẫn."""
+    assert ke_hoach(cau) == ["report"]
 
 
 # --------------------------------------------------------------------------

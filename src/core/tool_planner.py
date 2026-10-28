@@ -121,6 +121,79 @@ def la_cau_soat_hoa_don(cau: str) -> bool:
     q = (cau or "").strip()
     return bool(q) and bool(_HOA_DON_KIEM.search(q)) and _co_dau_hieu_dan_kem(q)
 
+
+# ---------------------------------------------------------------------------
+# "BÁO GIÁ" LÀ BA Ý ĐỊNH KHÁC NHAU (chủ dự án chốt 28/10/2026, sau BR-05)
+#
+#   1. Khách XIN báo giá ("báo giá xe 5 tấn HN đi HP")      -> nhánh LOGISTICS/n8n
+#   2. TÍNH GIÁ BÁN từ giá nhà xe đã có, kèm biên lợi nhuận -> agentic `quote`
+#   3. SO NHIỀU LỜI CHÀO GIÁ của các nhà xe                -> agentic `carrier_selection`
+#
+# Ý định 1 thiếu giá nhà xe — phải tra bảng giá trong Sheet, nên đi n8n. Ý định
+# 2 có sẵn mọi đầu vào của `/tools/quote` ngay trong câu; đưa nó qua n8n là vứt
+# đi đúng con số người dùng vừa đưa. Trước bản này, ý định 2 và 3 không có
+# đường nào: luật `report` bắt chữ trần "lợi nhuận" trong "BIÊN lợi nhuận", nên
+# BR-05 đo được 6/6 câu tính giá bán bị trả về BÁO CÁO LÃI LỖ.
+#
+# Luật viết theo CỤM NGHIỆP VỤ ("nhà xe … chào … X đồng", "biên lợi nhuận"),
+# không theo chữ của từng câu trong bộ đề — xem tests/test_tool_planner.py, phần
+# câu viết mới không lấy từ bộ đề.
+# ---------------------------------------------------------------------------
+
+# Số tiền kèm đơn vị hoặc có dấu phân cách hàng nghìn. Hẹp hơn `_SO_TIEN` có chủ
+# đích: không nhận số trần 5 chữ số (mã, số lượng) làm giá chào.
+_TIEN = (
+    r"(\d[\d.,]*\s*(triệu|tr\b|nghìn|ngàn|đồng|đ\b|vnđ|vnd|k\b)"
+    r"|\d{1,3}([.,]\d{3}){1,3}\b)"
+)
+
+# Giá NHÀ XE đưa ra: chủ thể là bên vận chuyển, động từ chào/báo/chốt, rồi một
+# số tiền — trong cùng một mệnh đề (không vượt dấu chấm câu). "nhà xe nào rẻ
+# nhất" không có số tiền nên không khớp: đó là câu chọn nhà xe chưa có giá.
+_GIA_NHA_XE = re.compile(
+    r"(nhà xe|nha xe|hãng xe|nhà thầu|bên xe|đơn vị vận chuyển|\bhọ\b)"
+    r"[^.;?!\n]{0,60}?\b(chào|chao|báo chốt|chốt|báo)\b[^.;?!\n]{0,60}?" + _TIEN,
+    re.IGNORECASE,
+)
+
+# Biên lợi nhuận là THAM SỐ của phép tính giá bán, không phải yêu cầu báo cáo.
+_BIEN = re.compile(r"biên\s+(lợi nhuận|lãi)|bien\s+(loi nhuan|lai)\b|\bmargin\b",
+                   re.IGNORECASE)
+
+# Một LỜI CHÀO trong câu liệt kê nhiều nhà xe: số tiền đi kèm điều khoản
+# (chiết khấu / công nợ) trong cùng vế, hoặc "chào" + số tiền.
+_LOI_CHAO_KEM_DIEU_KHOAN = re.compile(
+    _TIEN + r"[^;\n]{0,40}?(chiết khấu|chiet khau|công nợ|cong no)",
+    re.IGNORECASE,
+)
+_CHAO_SO_TIEN = re.compile(r"\b(chào|chao)\s+(giá\s+)?" + _TIEN, re.IGNORECASE)
+
+
+def la_cau_so_chao_gia(cau: str) -> bool:
+    """
+    Ý định 3: câu đưa ra TỪ HAI LỜI CHÀO GIÁ trở lên để so.
+
+    Hợp đồng công khai cho `chat.py` (cùng nếp `la_cau_soat_hoa_don`): câu này
+    có chữ "báo giá" thì router xếp LOGISTICS, nhưng nó phải vào vòng agentic.
+    """
+    q = cau or ""
+    return max(len(_LOI_CHAO_KEM_DIEU_KHOAN.findall(q)),
+               len(_CHAO_SO_TIEN.findall(q))) >= 2
+
+
+def la_cau_tinh_gia_ban(cau: str) -> bool:
+    """
+    Ý định 2: có GIÁ NHÀ XE và BIÊN LỢI NHUẬN, và không phải câu so nhiều lời chào.
+
+    Thiếu giá nhà xe ("biên 12%, giá dầu lên 26.000 thì sao") là KHÔNG: không có
+    `carrier_cost` thì `quote` không chạy được, ép tool vào chỉ mời model bịa giá.
+    Câu đó để trống kế hoạch, model hỏi lại.
+    """
+    q = cau or ""
+    return (not la_cau_so_chao_gia(q)
+            and bool(_GIA_NHA_XE.search(q)) and bool(_BIEN.search(q)))
+
+
 # Mẫu SOI KHO tách ra thành hằng riêng vì được dùng ở HAI chỗ: trong `_RULES`
 # (chọn tool) và trong `plan_tools` (kiểm lại trên phần câu ĐÃ BỎ khối dán kèm
 # — xem chú thích phủ quyết ở đó). Hai chỗ phải cùng một mẫu, viết hai lần thì
@@ -154,7 +227,9 @@ _RULES: list[tuple[str, re.Pattern[str], bool]] = [
         "report",
         re.compile(
             r"báo cáo\s+(tài chính|kinh doanh|lãi|lỗ|lợi nhuận|doanh thu chi phí)"
-            r"|lãi (gộp|ròng|hay lỗ)|lỗ hay lãi|lợi nhuận"
+            # "BIÊN lợi nhuận" là tham số giá bán, không phải yêu cầu báo cáo
+            # — xem khối "BA Ý ĐỊNH" ở trên.
+            r"|lãi (gộp|ròng|hay lỗ)|lỗ hay lãi|(?<!biên )lợi nhuận"
             r"|tổng kết (kinh doanh|quý|năm|tháng)"
             r"|(quý|tháng|năm|nửa năm) (này|trước|vừa rồi|qua).{0,20}(lãi|lỗ)"
             r"|mặt hàng nào (lãi|lời) nhất|tuyến nào (lỗ|lãi)"
@@ -240,7 +315,7 @@ _RULES: list[tuple[str, re.Pattern[str], bool]] = [
 # không, tháng này lãi bao nhiêu" phải chạy `report` trước `forecast_reorder`
 # giống hệt câu hỏi ngược lại — cùng một ý định thì cùng một đường đi.
 _PIPELINE = ["inventory_audit", "partner_audit", "vat_catalog_audit", "report",
-             "forecast_reorder", "carrier_selection", "vat"]
+             "forecast_reorder", "carrier_selection", "quote", "vat"]
 
 # Trần số tool một câu hỏi được kích hoạt. `DEFAULT_MAX_STEPS` là 4 và bước cuối
 # phải dành cho việc viết câu trả lời.
@@ -314,6 +389,17 @@ def plan_tools(question: str, available: list[str] | None = None) -> list[str]:
         if not van_doi_soi_kho:
             khop.discard("inventory_audit")
 
+    # Ba ý định "báo giá" — xem khối "BA Ý ĐỊNH". Ý định 3 xét TRƯỚC: câu so
+    # nhiều nhà xe cũng có chữ "chào". Cả hai gạt `report`: "biên lợi nhuận"
+    # trong câu là tham số, và một câu hỏi giá bán không được nhận về báo cáo
+    # lãi lỗ.
+    if la_cau_so_chao_gia(q):
+        khop.add("carrier_selection")
+        khop -= {"report", "quote"}
+    elif la_cau_tinh_gia_ban(q):
+        khop.add("quote")
+        khop.discard("report")
+
     if available is not None:
         khop &= set(available)
 
@@ -327,6 +413,8 @@ def needs_system_data(tool: str) -> bool:
 
 __all__ = [
     "la_cau_soat_hoa_don",
+    "la_cau_so_chao_gia",
+    "la_cau_tinh_gia_ban",
     "plan_tools",
     "needs_system_data",
     "system_data_fields",

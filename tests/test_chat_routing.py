@@ -444,3 +444,93 @@ def test_cau_bao_gia_that_van_di_luong_logistics(moi_truong, monkeypatch):
 
     assert len(da_trich_xuat) == 1, "câu báo giá thật phải đi đường trích xuất"
     assert "tôi cần thêm" in tra_loi.lower()
+
+
+# ---------------------------------------------------------------------------
+# Ý định 2 và 3 của "báo giá" (chốt 28/10/2026, sau BR-05)
+# ---------------------------------------------------------------------------
+
+_TINH_GIA_BAN = (
+    "Chú mới nhận báo giá từ nhà xe: họ chào 11.450.000 đồng cho chuyến kho Long "
+    "Biên đi Nam Định, biên lợi nhuận 12%, giá dầu hiện tại 25.000 đồng/lít."
+)
+_SO_CHAO_GIA = (
+    "Anh vừa nhận báo giá chuyến KCN Quế Võ đi Hà Nội xe 5T: Trường Thịnh "
+    "9.100.000 đồng, chiết khấu 8%, công nợ 30 ngày; Đại An 10.700.000 đồng, "
+    "chiết khấu 8%, công nợ 45 ngày. Em chọn giúp anh phương án nào tối ưu?"
+)
+
+
+def test_router_khong_xep_bien_loi_nhuan_vao_report():
+    """BR-05: 6/6 câu tính giá bán bị router đưa vào REPORT vì "biên lợi nhuận"."""
+    from src.agents.manager import SemanticRouter
+
+    router = SemanticRouter(tu_nap_embedder=False)
+    assert router.route(_TINH_GIA_BAN) != "REPORT"
+    assert router.route("báo cáo lợi nhuận quý này") == "REPORT"
+
+
+def _theo_doi_trich_xuat(moi_truong) -> list:
+    da = []
+
+    async def trich_xuat(*a, **kw):
+        da.append(a)
+        return '{"origin": null}'
+
+    moi_truong.extract_quote_request = trich_xuat
+    return da
+
+
+def test_tinh_gia_ban_xep_logistics_van_vao_vong_agentic_goi_quote(moi_truong, monkeypatch):
+    """
+    Có chữ "báo giá" nên router xếp LOGISTICS — nhưng luồng n8n chỉ nhận
+    tuyến/xe/ngày, nó vứt đúng con số 11.450.000 người dùng vừa đưa.
+    """
+    from src.api import dependencies as deps
+    from src.core.tool_planner import plan_tools
+
+    monkeypatch.setattr(deps.runtime, "kb", None, raising=False)
+    assert plan_tools(_TINH_GIA_BAN) == ["quote"], "tiền đề: kế hoạch phải là quote"
+
+    moi_truong.category = "LOGISTICS"
+    moi_truong.decisions = [
+        {"thought": "đủ dữ kiện", "tool": "quote",
+         "arguments": {"carrier_cost": 11450000,
+                       "pricing_rule": {"base_margin_pct": 12},
+                       "current_fuel_price": 25000}},
+        {"thought": "đã có số", "answer": "Tôi đã tính giá bán từ giá nhà xe giúp bạn."},
+    ]
+    da_trich_xuat = _theo_doi_trich_xuat(moi_truong)
+
+    tra_loi = _hoi(_TINH_GIA_BAN)
+
+    assert moi_truong.decisions == [], "vòng agentic phải thực sự chạy"
+    assert da_trich_xuat == [], "KHÔNG được rơi vào luồng báo giá n8n"
+    assert tra_loi == "Tôi đã tính giá bán từ giá nhà xe giúp bạn."
+
+
+def test_so_chao_gia_vao_carrier_selection_va_noi_ro_con_thieu_gi(moi_truong, monkeypatch):
+    """
+    Định tuyến ĐÚNG, nhưng ghi nhận một khoảng trống chưa lấp: `carrier_selection`
+    lấy nhà xe/lời chào từ HỆ THỐNG (chưa có nguồn), không đọc lời chào trong câu.
+    Người dùng nhận câu hỏi lại danh sách nhà xe dù đã liệt kê — đỡ hơn bị đẩy
+    sang n8n, nhưng chưa phải xong. Bóc lời chào từ câu là việc riêng (kiểu cách
+    B, BAO_CAO_BR04 §5.2). Test này ĐỎ khi việc đó xong: sửa nó cùng lúc.
+    """
+    from src.api import dependencies as deps
+    from src.core.tool_planner import plan_tools
+
+    monkeypatch.setattr(deps.runtime, "kb", None, raising=False)
+    assert plan_tools(_SO_CHAO_GIA) == ["carrier_selection"]
+
+    moi_truong.category = "LOGISTICS"
+    moi_truong.decisions = [
+        {"thought": "so lời chào", "tool": "carrier_selection", "arguments": {}},
+    ]
+    da_trich_xuat = _theo_doi_trich_xuat(moi_truong)
+
+    tra_loi = _hoi(_SO_CHAO_GIA)
+
+    assert moi_truong.decisions == [], "vòng agentic phải thực sự chạy"
+    assert da_trich_xuat == [], "KHÔNG được rơi vào luồng báo giá n8n"
+    assert "chưa có danh sách nhà xe" in tra_loi.lower()
