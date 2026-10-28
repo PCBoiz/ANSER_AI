@@ -159,6 +159,8 @@ Chủ dự án chốt giữ cả hai đường, tách theo ý định bằng lu�
 - **Khung đo còn lệch thêm một chỗ:** câu không có kế hoạch được chấm qua vòng agentic với lược đồ tự do, trong khi production đưa chúng sang nhánh router. Sửa: bộ đo bỏ qua (hoặc chấm riêng) các câu không có kế hoạch.
 - **Khoảng trống còn mở:** `carrier_selection` định tuyến đúng nhưng vẫn lấy nhà xe/lời chào từ hệ thống (chưa có nguồn), không đọc lời chào trong câu — người dùng nhận câu hỏi lại danh sách nhà xe. Có test ghi nhận (`test_so_chao_gia_vao_carrier_selection_va_noi_ro_con_thieu_gi`). Bóc lời chào từ câu là việc riêng.
 
+**pytest trên đúng mã đã đo (`4911302`, Colab, 28/10):** `1067 passed, 4 skipped`; riêng hai file luật định tuyến `59 passed`.
+
 Dữ liệu thô: Drive `ANSER_AI_Logistics/br05b_*`.
 
 ---
