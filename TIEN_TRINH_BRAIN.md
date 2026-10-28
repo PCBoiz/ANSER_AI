@@ -1,6 +1,6 @@
 # TIẾN TRÌNH BRAIN — bản kiểm soát lộ trình
 
-**Cập nhật 25/08/2026**, bổ sung 26/10/2026 (BR-01 đến BR-04: P1 đính chính, việc treo #3 và #5). File này trả lời bốn câu cho người tiếp quản:
+**Cập nhật 25/08/2026**, bổ sung 26–28/10/2026 (BR-01 đến BR-05: P1 đính chính, việc treo #2, #3 và #5). File này trả lời bốn câu cho người tiếp quản:
 *đang ở đâu, cái gì đã chắc, cái gì đang dở, và đụng vào đâu thì gãy.*
 
 Khác với [BAN_GIAO_VAN_TAI.md](BAN_GIAO_VAN_TAI.md) — bản đó chỉ nói phần **vận
@@ -160,7 +160,7 @@ Ba thứ này **không chặn phần kế toán** — phần đó không cần m
 571 dòng mã, 70 test đơn vị, **không một chỉ số recall/MRR/faithfulness nào**.
 Phương án chi tiết ở [BAN_GIAO_VAN_TAI.md](BAN_GIAO_VAN_TAI.md) mục E.3.
 
-### 🔴 Việc treo #5 — model chép thiếu đầu vào cho tool (mở 26/10/2026)
+### ✅ Việc treo #5 — model chép thiếu đầu vào cho tool — ĐÓNG 28/10/2026
 
 Câu soát hoá đơn hai dòng (5.000.000 + 500.000, ghi tổng 6.500.000): model gọi
 `vat` với **một** dòng, tool tính đúng trên một dòng đó, Brain trả lời hai con
@@ -170,8 +170,16 @@ số tiền sai mà trông có nguồn. Chốt neo câu trả lời không bắt
 Hai cách sửa — **A: chốt neo đầu vào** (mã đối chiếu mọi số tiền trong câu với
 tham số model gửi, thiếu thì hỏi lại) và **B: tách hoá đơn bằng mã** (hoá đơn
 dán có cấu trúc thì mã bóc `items`, model không điền) — viết đủ chỗ sửa, phép
-thử nghiệm thu và công ở [BAO_CAO_BR04.md](BAO_CAO_BR04.md) §5.2. **Chờ chủ dự
-án chọn.**
+thử nghiệm thu và công ở [BAO_CAO_BR04.md](BAO_CAO_BR04.md) §5.2.
+
+**Đóng 28/10 (`7da7a9f`):** chủ dự án chọn cả hai, áp theo trường hợp — `vat`
+dán có cấu trúc thì B ghi đè rồi A đối chiếu; `vat` câu tự do và `quote` dùng A;
+`carrier_selection` bóc lời chào từ câu. Mã ở `src/core/doc_dau_vao.py`. Cùng
+câu hoá đơn qua Brain + vLLM thật nay ra **6.050.000, chênh 450.000**.
+
+Còn hở (ghi để người sau không tưởng đã kín): A chưa bắt chiều **bịa thêm** số;
+số viết bằng chữ không đọc được; câu hỏi giá trước thuế hay đã gồm VAT vẫn là
+câu hỏi nghiệp vụ chưa ai trả lời.
 
 ---
 
@@ -199,9 +207,10 @@ hoạch thì `answer` **không có trong lược đồ**, chỉ còn `tool` và 
 > `82e9e9c` (`anyOf` hai nhánh đóng), kiểm bằng xgrammar thật; sau sửa
 > `tool_calls=1`. Xem [BAO_CAO_BR04.md](BAO_CAO_BR04.md) §5.1.
 >
-> **Lỗ tiếp theo, đang mở:** gọi được tool rồi thì model **chép thiếu dòng hàng**
-> vào `items` — Brain báo "tổng thực tế 5.500.000" thay vì 6.050.000, kèm câu
-> "kết quả từ công cụ VAT". Xem việc treo #5.
+> **Lỗ tiếp theo, đã đóng 28/10:** gọi được tool rồi thì model **chép thiếu dòng
+> hàng** vào `items` — Brain báo "tổng thực tế 5.500.000" thay vì 6.050.000, kèm
+> câu "kết quả từ công cụ VAT". Nay mã đọc đầu vào từ câu người dùng (`7da7a9f`).
+> Xem việc treo #5.
 
 > Vì sao không cấm tiệt cả hai: "tính thuế giúp tôi" không kèm số tiền mà bị ép
 > gọi `vat` thì model phải **bịa** `stated_total`. Đổi một lỗi R1 lấy một lỗi R1

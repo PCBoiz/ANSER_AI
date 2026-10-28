@@ -1,7 +1,7 @@
 # BÁO CÁO BR-04 — vLLM server trên Colab L4, ngân sách ngữ cảnh
 
 **Ngày đo:** Thứ Hai 26/10/2026 · **Người làm:** Thành · **Đặc tả:** [SRS_CHU_KY_01.md §BR-04](SRS_CHU_KY_01.md)
-**Trạng thái:** số đo xong; **quyết định ctx chờ chủ dự án chốt** (mục 6); một lỗi mới **đang mở, chờ quyết định** (mục 5.2)
+**Trạng thái:** số đo xong; ctx **đã chốt 32768** (mục 6), ngưỡng p95 còn mở; lỗi chép thiếu đầu vào **đã sửa và kiểm trên vLLM thật 28/10** (mục 5.2)
 
 | | |
 |---|---|
@@ -23,7 +23,7 @@
 4. **p95 ≈ 8,6–9,2 giây, vượt ngưỡng 5.000ms** — nhưng đó là thời gian sinh ~217 token ở ~25 token/giây, không phải hàng đợi. Ngưỡng cần định nghĩa lại (mục 6).
 5. **Brain gọi được vLLM thật qua `VLLM_BASE_URL`** — log vLLM ghi `POST /v1/chat/completions 200`. Nghiệm thu BR-03 trên Colab.
 6. **Lộ ra bẫy hỏng-im-lặng thứ tư, đã sửa**: grammar quyết định của vòng agentic **không được thi hành** trên đường server (mục 5.1).
-7. **Lộ ra một lỗi R1 còn mở**: model **chép thiếu dòng hàng** vào tool `vat`, Brain báo hai con số tiền sai mà trông như có nguồn (mục 5.2). Hai cách sửa A và B đã viết sẵn, **chờ chủ dự án chọn**.
+7. **Lộ ra một lỗi R1, đã sửa**: model **chép thiếu dòng hàng** vào tool `vat`, Brain báo hai con số tiền sai mà trông như có nguồn (mục 5.2). Chủ dự án chọn **cả A và B** (`7da7a9f`); chạy lại cùng câu qua Brain + vLLM thật ra **6.050.000, chênh 450.000** — đúng.
 
 ---
 
@@ -53,7 +53,7 @@ Cách đọc từng cột:
 | # | Yêu cầu | Trạng thái |
 |---|---|---|
 | 1 | `vllm serve` Qwen3-8B AWQ trên L4, trong khoảng ghim | **Đạt** — 0.11.2. Script chặn ngay nếu lệch khoảng ghim |
-| 2 | Brain gọi qua `VLLM_BASE_URL`, trả lời **đúng** một câu thật đi hết vòng agentic | **Một phần.** Gọi được, đi hết vòng (2 lượt model, 1 tool). Nhưng câu trả lời có **số tiền sai** — mục 5.2 |
+| 2 | Brain gọi qua `VLLM_BASE_URL`, trả lời **đúng** một câu thật đi hết vòng agentic | **Đạt** (28/10, `7da7a9f`). Gọi được, đi hết vòng (2 lượt model, 1 tool), câu trả lời đúng số: 6.050.000, chênh 450.000. Lần đo 26/10 ra số sai — mục 5.2 |
 | 3 | Đo **với vision đang nạp** | **Đạt** — 7.874 MiB ở mọi mức; script cảnh báo nếu dưới 4.000 MiB |
 | 4 | Ba mức 8192 / 16384 / 32768: dựng được, VRAM đỉnh, KV cache | **Đạt** — mục 2 |
 | 5 | Quy KV ra số request 32k song song | **Đạt** — 1,1 |
@@ -107,7 +107,7 @@ Lược đồ cũ đặt `properties` + `additionalProperties: false` ở gốc,
 - Cả bộ trên Colab: **1041 passed, 4 skipped**.
 - Câu hoá đơn qua Brain + vLLM thật: `tool_calls: 1`, log vLLM ghi **2** request của Brain (trước sửa: 1).
 
-### 5.2. Model chép thiếu dòng hàng vào tool — **MỞ, chờ quyết định**
+### 5.2. Model chép thiếu dòng hàng vào tool — **đã sửa** (`7da7a9f`, kiểm trên vLLM thật 28/10)
 
 Sau bản sửa 5.1, tool `vat` có chạy, nhưng **đầu vào model điền bị thiếu**:
 
@@ -130,7 +130,31 @@ Tool tính đúng trên thứ nó nhận (5.000.000 + VAT 10% = 5.500.000), và 
 
 Thêm: trường `thought` của bước gọi tool ghi *"không cần gọi công cụ"* trong khi vẫn gọi. Không dùng `thought` làm bằng chứng cho bất cứ điều gì.
 
-**Hai cách sửa, chờ chủ dự án chọn.** Cả hai nằm ngoài phạm vi SRS chu kỳ 01 (BR-01 ghi "không sửa tool khác"), nên cần quyết định trước khi làm. Chọn một, chọn cả hai, hoặc hoãn sang chu kỳ 02 — trong lúc chờ, câu soát hoá đơn qua Brain **vẫn có thể ra số tiền sai**.
+**Kết quả (28/10/2026).** Chủ dự án chọn **cả hai, áp theo trường hợp**. Mã ở [`src/core/doc_dau_vao.py`](src/core/doc_dau_vao.py) (chỉ thư viện chuẩn), nối vào `_provide_tool_data` của [`chat.py`](src/api/routes/chat.py):
+
+| Tool | Cách | Hành vi |
+|---|---|---|
+| `vat` | B rồi A | Hoá đơn dán có cấu trúc (JSON `{"tên": số}`, mảng `items` kiểu OCR, hoặc ≥ 2 dòng `tên: số`) → mã bóc dòng hàng, **ghi đè** `items` của model; bỏ qua dòng tổng / thuế / chiết khấu. Sau đó A đối chiếu như mọi ca khác |
+| `vat` (câu tự do), `quote` | A | Số tiền nào trong câu không có trong tham số (kể cả dạng `price × qty`) → **không chạy tool**, hỏi lại nêu đích danh khoản đó |
+| `carrier_selection` | bóc lời chào | Câu liệt kê ≥ 2 lời chào (tên + giá, kèm chiết khấu / công nợ nếu có) → mã dựng `carriers` và `offers`; model chỉ điền tuyến. Ít hơn 2 → hỏi lại như cũ |
+
+**Kiểm:** 102 ca trong ba file test liên quan; toàn bộ `1110 passed, 4 skipped` (Colab, `7da7a9f`). Chạy lại đúng câu hoá đơn của mục này qua Brain + vLLM thật (`do_ngan_sach_ctx.py --muc 32768`), 81 giây gồm nạp vision:
+
+> *"Số tiền ghi trên hóa đơn là 6.500.000 đồng, nhưng số tiền tính toán lại là 6.050.000 đồng. Sự chênh lệch này là 450.000 đồng, vượt quá mức dung sai 6.500 đồng. Do đó, hóa đơn này không hợp lệ."*
+
+Cả hai số đều đúng. Log vLLM ghi 2 request của Brain. Số đo của mức 32768 lặp lại gần như y hệt lần 26/10 (KV 36.176 token, VRAM đỉnh 21.144 MiB, p95 8.497 / 9.074 ms ở 1× / 4×).
+
+**Giới hạn của bản cài, khác với phương án viết bên dưới:**
+
+- A chỉ bắt **chiều thiếu** (số trong câu không có trong tham số). Chiều ngược — model bịa thêm số không có trong câu — **chưa cài**.
+- Bộ đọc số không hiểu số viết bằng chữ ("năm triệu rưỡi"): số đó không được đối chiếu, nên chép sai kiểu này vẫn lọt.
+- A có thể hỏi lại thừa khi câu nhắc số tiền không phải đầu vào (ví dụ giá tháng trước để so).
+- `carrier_selection` chỉ xếp hạng theo giá / chiết khấu / công nợ có trong câu; tiêu chí không có (khoảng cách bãi, tỷ lệ đúng hẹn) tool tự bỏ.
+- Câu hỏi trước thuế hay đã gồm VAT (cuối mục) **vẫn mở**.
+
+Phần dưới giữ nguyên phương án đã trình để chủ dự án chọn ngày 26/10.
+
+**Hai cách sửa (phương án 26/10).** Cả hai nằm ngoài phạm vi SRS chu kỳ 01 (BR-01 ghi "không sửa tool khác"), nên cần quyết định trước khi làm. Chọn một, chọn cả hai, hoặc hoãn sang chu kỳ 02 — trong lúc chờ, câu soát hoá đơn qua Brain **vẫn có thể ra số tiền sai**.
 
 Cả hai cách đặt cùng một chỗ: `provider` trong `_run_agentic` ([`chat.py`](src/api/routes/chat.py)), chạy **sau** khi model điền tham số và **trước** khi tool chạy. Chỗ đó đã có sẵn cho `report` (`_provide_tool_data` ghi đè dữ liệu hệ thống), và nó thấy được câu gốc của người dùng.
 

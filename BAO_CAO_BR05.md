@@ -157,9 +157,9 @@ Chủ dự án chốt giữ cả hai đường, tách theo ý định bằng lu�
 - **Tham số `quote` đúng kiểu ở cả 6 câu** khi được đưa đúng tool. Hai ca bịa `pricing_rule.discount_rate` ở §3.1 phần lớn là hệ quả của việc bị đưa sai tool.
 - **"Biết hỏi lại" 25% không phải lỗi model ở đường production.** AG0010, AG0018 (có biên, chưa có giá nhà xe) cố ý không có kế hoạch — và production chỉ vào vòng agentic khi CÓ kế hoạch, nên hai câu này không tới đó. Bộ đo vẫn cho model tự chọn giữa 8 tool; nó chọn `quote`, tức sẽ phải bịa giá nhà xe — đáng ghi nhận, nhưng đó là đường không tồn tại. AG0009 gọi `report` khi "chưa có số liệu": ở production `report` lấy số liệu hệ thống và tự báo thiếu, nên hành vi chấp nhận được; nhãn "phải hỏi lại" có thể tranh cãi.
 - **Khung đo còn lệch thêm một chỗ:** câu không có kế hoạch được chấm qua vòng agentic với lược đồ tự do, trong khi production đưa chúng sang nhánh router. Sửa: bộ đo bỏ qua (hoặc chấm riêng) các câu không có kế hoạch.
-- **Khoảng trống còn mở:** `carrier_selection` định tuyến đúng nhưng vẫn lấy nhà xe/lời chào từ hệ thống (chưa có nguồn), không đọc lời chào trong câu — người dùng nhận câu hỏi lại danh sách nhà xe. Có test ghi nhận (`test_so_chao_gia_vao_carrier_selection_va_noi_ro_con_thieu_gi`). Bóc lời chào từ câu là việc riêng.
+- **Khoảng trống `carrier_selection` — đã đóng 28/10 (`7da7a9f`).** Trước đó tool định tuyến đúng nhưng lấy nhà xe/lời chào từ hệ thống (chưa có nguồn), nên người dùng liệt kê lời chào vẫn nhận câu hỏi lại. Nay mã bóc ≥ 2 lời chào từ câu (tên, giá, chiết khấu, công nợ) thành `carriers`/`offers`; model chỉ điền tuyến. Giới hạn: chỉ đọc dạng "tên + số tiền"; tiêu chí không có trong câu tool tự bỏ. Cùng commit, `vat`/`quote` có chốt neo đầu vào (BAO_CAO_BR04 §5.2); bộ benchmark agentic **chưa đo lại** sau thay đổi này (benchmark gọi model trực tiếp, không qua `_provide_tool_data`).
 
-**pytest trên đúng mã đã đo (`4911302`, Colab, 28/10):** `1067 passed, 4 skipped`; riêng hai file luật định tuyến `59 passed`.
+**pytest trên đúng mã đã đo (`4911302`, Colab, 28/10):** `1067 passed, 4 skipped`; riêng hai file luật định tuyến `59 passed`. Sau `7da7a9f`: `1110 passed, 4 skipped`.
 
 Dữ liệu thô: Drive `ANSER_AI_Logistics/br05b_*`.
 
