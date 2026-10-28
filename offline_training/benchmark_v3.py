@@ -446,6 +446,66 @@ def _kiem_tham_so(ten_tool: str, args: dict) -> str | None:
         return str(exc).splitlines()[0][:110]
 
 
+def score_he_thong(rows: list[dict], outputs: list[str]) -> dict:
+    """
+    Cùng đầu ra model, nhưng cho đi qua `doc_dau_vao.chot_dau_vao` — ĐÚNG hàm
+    production đặt giữa model và tool (`chat._provide_tool_data`, 28/10/2026).
+    `score_agent` chấm model trần; bảng này chấm thứ khách thực sự nhận.
+
+    Chỉ chấm dòng model GỌI một tool đọc đầu vào từ câu (vat/quote/
+    carrier_selection). Mỗi dòng rơi vào một ô:
+      chay_dung     đủ dữ kiện, chốt cho qua, tham số qua pydantic
+      chan_dau_vao  đủ dữ kiện nhưng tham số model lệch câu (thiếu/bịa số) ->
+                    chốt hỏi lại. AN TOÀN (không ra số sai) nhưng khách mất một
+                    lượt. Không có đáp án tham số nên KHÔNG tự phân biệt được
+                    "model chép sai" với "bộ đọc số báo nhầm" — in ra để soát.
+      hoi_lai_dung  dòng ask_back: model lỡ gọi tool nhưng chốt chặn lại
+      hoi_thue      vat: câu không nói giá gồm VAT chưa -> hỏi lại THEO THIẾT
+                    KẾ (chủ dự án chốt 28/10), không tính vào tỷ lệ
+      lot           dòng ask_back mà chốt vẫn cho tool chạy
+      tham_so_hong  chốt cho qua nhưng pydantic của endpoint từ chối
+
+    Hai tỷ lệ: `an_toan` = không dòng nào ra số từ đầu vào sai; `tra_loi_ngay`
+    = dòng đủ dữ kiện được tính luôn, không phải hỏi lại.
+    """
+    from src.core.doc_dau_vao import TOOL_DOC_TU_CAU, chot_dau_vao
+
+    o = {k: 0 for k in ("chay_dung", "chan_dau_vao", "hoi_lai_dung", "hoi_thue",
+                        "lot", "tham_so_hong")}
+    failures = []
+    decisions, _ = parse_outputs(outputs, "he_thong")
+    for row, decision in zip(rows, decisions):
+        ten = decision.get("tool")
+        if ten not in TOOL_DOC_TU_CAU:
+            continue
+        args, hoi_lai, ly_do = chot_dau_vao(ten, decision.get("arguments") or {},
+                                            row.get("question", ""))
+        if ly_do == "thue":
+            o["hoi_thue"] += 1
+        elif row.get("ask_back"):
+            if hoi_lai:
+                o["hoi_lai_dung"] += 1
+            else:
+                o["lot"] += 1
+                failures.append((row["_id"], f"thiếu dữ kiện mà {ten} vẫn chạy"))
+        elif hoi_lai:
+            o["chan_dau_vao"] += 1
+            failures.append((row["_id"], f"chốt hỏi lại ({ly_do}): {hoi_lai[:90]}"))
+        else:
+            loi = _kiem_tham_so(ten, args)
+            if loi is None:
+                o["chay_dung"] += 1
+            else:
+                o["tham_so_hong"] += 1
+                failures.append((row["_id"], f"tham số {ten} sau chốt không hợp lệ: {loi}"))
+    n_cham = sum(o.values()) - o["hoi_thue"]
+    n_du = o["chay_dung"] + o["chan_dau_vao"] + o["tham_so_hong"]
+    return {**o, "n_cham": n_cham,
+            "an_toan": (n_cham - o["lot"] - o["tham_so_hong"]) / n_cham if n_cham else None,
+            "tra_loi_ngay": o["chay_dung"] / n_du if n_du else None,
+            "failures": failures}
+
+
 def score_agent(rows: list[dict], outputs: list[str]) -> dict:
     """
     Đo hai việc CÒN LẠI của model sau khi bảng luật đã chọn tool:
@@ -1117,6 +1177,24 @@ def main() -> None:
                 print(f"  ✗ {_id}: {reason}")
 
             ket_qua_chay["agentic"] = result
+            ghi_json()
+
+            # ---- 4c. HỆ THỐNG: đầu ra model qua chốt đầu vào như production --
+            ht = score_he_thong(rows, outputs)
+            print(f"\n[agentic — qua chốt đầu vào, như production] chấm {ht['n_cham']} dòng")
+            if ht["an_toan"] is not None:
+                print(f"  an toàn         {ht['an_toan'] * 100:5.1f}%"
+                      "  (không dòng nào tính trên đầu vào sai)")
+            if ht["tra_loi_ngay"] is not None:
+                print(f"  trả lời ngay    {ht['tra_loi_ngay'] * 100:5.1f}%"
+                      "  (đủ dữ kiện thì tính luôn, không phải hỏi lại)")
+            print(f"  chạy đúng {ht['chay_dung']} · chặn đầu vào lệch {ht['chan_dau_vao']}"
+                  f" · chặn ca thiếu dữ kiện {ht['hoi_lai_dung']} · lọt {ht['lot']}"
+                  f" · tham số hỏng {ht['tham_so_hong']}"
+                  f" · hỏi VAT theo thiết kế {ht['hoi_thue']}")
+            for _id, reason in ht["failures"][:10]:
+                print(f"  ✗ {_id}: {reason}")
+            ket_qua_chay["agentic_he_thong"] = ht
             ghi_json()
             ask_min = float(os.getenv("AGENT_ASKBACK_MIN", "0.75"))
             arg_min = float(os.getenv("AGENT_ARG_MIN", "0.80"))

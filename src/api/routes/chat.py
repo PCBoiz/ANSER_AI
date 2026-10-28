@@ -35,6 +35,7 @@ from src.api.dependencies import (
 )
 from src.core import metrics
 from src.core.config import Config
+from src.core.doc_dau_vao import noi_tra_loi_hoi_thue
 from src.core.engine import TASK_REGISTRY
 from src.core.grounding import guard_answer
 from src.core.retrieval_policy import KHONG_CO_TAI_LIEU, decide_web_fallback
@@ -263,8 +264,10 @@ async def _provide_tool_data(
     Với tool lấy số từ CHÍNH CÂU NGƯỜI DÙNG (`vat`, `quote`, `carrier_selection`),
     nguồn thật là câu đó — xem `src/core/doc_dau_vao.py` (chốt 28/10/2026):
       - `vat`: hoá đơn dán có cấu trúc thì mã bóc dòng hàng, ghi đè `items` (B);
-        rồi mọi số tiền trong câu phải có trong tham số (A).
-      - `quote`: A.
+        rồi A hai chiều: mọi số tiền trong câu phải có trong tham số, và mọi số
+        tiền model điền phải có trong câu; cuối cùng giá đã gồm VAT hay chưa do
+        mã đọc từ câu — không nói rõ thì hỏi lại.
+      - `quote`: A hai chiều.
       - `carrier_selection`: mã bóc các lời chào giá trong câu thành
         `carriers`/`offers`; không bóc được >= 2 lời chào thì hỏi lại như cũ.
     """
@@ -276,49 +279,25 @@ async def _provide_tool_data(
             return args, err
         return {**args, "sales": sales, "expenses": expenses}, None
 
-    if name == "carrier_selection" and user_msg:
-        tu_cau = ddv.tham_so_chon_nha_xe(user_msg)
-        if tu_cau:
-            logger.info(
-                "carrier_selection: bóc %d lời chào từ câu người dùng",
-                len(tu_cau["offers"]), extra={"request_id": request_id},
-            )
-            return {**args, **tu_cau}, None
+    # vat / quote / carrier_selection: đầu vào lấy từ câu người dùng. Logic nằm
+    # ở `doc_dau_vao.chot_dau_vao` — benchmark gọi đúng hàm này.
+    args, hoi_lai, ly_do = ddv.chot_dau_vao(name, args, user_msg)
+    if ly_do == "boc_loi_chao":
+        logger.info(
+            "carrier_selection: bóc %d lời chào từ câu người dùng",
+            len(args["offers"]), extra={"request_id": request_id},
+        )
+        return args, None
+    if hoi_lai:
+        logger.warning(
+            "%s: chốt đầu vào hỏi lại (%s)", name, ly_do,
+            extra={"request_id": request_id},
+        )
+        return args, hoi_lai
 
     thieu = _CHUA_CO_NGUON.get(name)
     if thieu:
         return args, thieu
-
-    if name in ("vat", "quote") and user_msg:
-        if name == "vat":
-            dong = ddv.tach_hoa_don(user_msg)
-            if dong:
-                if dong != args.get("items"):
-                    logger.info(
-                        "vat: ghi đè %d dòng hàng model điền bằng %d dòng bóc từ "
-                        "hoá đơn dán kèm", len(args.get("items") or []), len(dong),
-                        extra={"request_id": request_id},
-                    )
-                args = {**args, "items": dong}
-        bo_sot = ddv.so_tien_bi_bo_sot(user_msg, args)
-        if bo_sot:
-            ds = ", ".join(ddv.dinh_dang_vnd(v) for v in bo_sot)
-            logger.warning(
-                "%s: tham số model điền bỏ sót số tiền người dùng đưa: %s",
-                name, ds, extra={"request_id": request_id},
-            )
-            cach_viet = (
-                "Bạn liệt kê lại giúp tôi từng khoản (tên: số tiền), mỗi khoản một "
-                "dòng, kèm tổng ghi trên hoá đơn nếu có nhé."
-                if name == "vat" else
-                "Bạn cho tôi biết rõ khoản đó là giá nhà xe chào, giá dầu hiện tại, "
-                "giá dầu lúc chốt bảng giá, hay một phụ phí nhé."
-            )
-            return args, (
-                f"Tôi chưa đưa được khoản {ds} đồng trong tin nhắn của bạn vào phép "
-                "tính, nên chưa dám trả lời — tính thiếu một khoản là ra con số sai. "
-                + cach_viet
-            )
 
     return args, None
 
@@ -603,8 +582,16 @@ async def chat_endpoint(
             or ("quote" in plan and la_cau_tinh_gia_ban(user_msg))
             or ("carrier_selection" in plan and la_cau_so_chao_gia(user_msg))
         )
-        if plan and (cat not in ("LOGISTICS", "TECHNICAL")
-                     or y_dinh_agentic_trong_logistics):
+        # Lượt trước Brain hỏi "giá đã gồm VAT chưa", lượt này người dùng trả
+        # lời: ghép với tin nhắn hoá đơn trước đó và chạy lại `vat` — câu trả
+        # lời trơn "chưa gồm VAT" tự nó không có kế hoạch nào.
+        cau_noi_thue = noi_tra_loi_hoi_thue(user_msg, history)
+        if cau_noi_thue:
+            resp, grounding_ctx = await _run_agentic(
+                cau_noi_thue, ["vat"], store_id, history, request_id, metric
+            )
+        elif plan and (cat not in ("LOGISTICS", "TECHNICAL")
+                       or y_dinh_agentic_trong_logistics):
             resp, grounding_ctx = await _run_agentic(
                 user_msg, plan, store_id, history, request_id, metric
             )

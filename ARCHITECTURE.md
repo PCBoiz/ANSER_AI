@@ -271,7 +271,7 @@ Model v2 (`anser-retail-v2-awq`, LoRA r=64 trên Qwen2.5-7B, distill DeepSeek-R1
 
 > **Trạng thái 26/10/2026: đường text đã nối (BR-02, BR-03).** Có `VLLM_BASE_URL` thì `ModelEngine` gọi `VLLMServerClient.chat()` tới `/v1/chat/completions`; không có thì giữ đường `vllm.LLM` trong tiến trình ở trên. Backend chọn ở một chỗ, [`engine.py::chon_backend()`](src/core/engine.py), và `/health` khai `text_backend`, `vision_backend`, `vllm_server`. Ba cái bẫy riêng của đường server đều có phép thử: server áp chat template, `chat_template_kwargs.enable_thinking=false`, và `repetition_penalty=1.0` khi có grammar. Vision vẫn nạp trong tiến trình; qua HTTP thuộc chu kỳ 02.
 
-> **Ngân sách ngữ cảnh, BR-04 — ĐÃ CHỐT 28/10/2026** (`TEXT_MAX_MODEL_LEN` 32768 là mặc định trong `config.py`, compose, `.env.example`). Ngưỡng p95 vẫn mở. Số đo và lý do đầy đủ ở [BAO_CAO_BR04.md](BAO_CAO_BR04.md) §6.
+> **Ngân sách ngữ cảnh, BR-04 — ĐÃ CHỐT 28/10/2026** (`TEXT_MAX_MODEL_LEN` 32768 là mặc định trong `config.py`, compose, `.env.example`). Ngưỡng p95 chốt hai ngưỡng (ms/token + tổng ms). Số đo và lý do đầy đủ ở [BAO_CAO_BR04.md](BAO_CAO_BR04.md) §6.
 >
 > | Tham số | Đề xuất | Căn cứ đo |
 > |---|---|---|
@@ -830,7 +830,7 @@ Ghi log từ request đầu tiên. Không có số đo thì mọi tranh luận v
 
 | Nhóm | Chỉ số | Ngưỡng |
 |---|---|---|
-| **Hạ tầng** | `inference_latency_p95` | ≤ 5.000ms — **cần định nghĩa lại**: đo 26/10 trên L4 ra 8,6–9,2 giây cho câu trả lời ~217 token (~25 token/giây), tức ngưỡng này chỉ đạt với câu dưới ~125 token. Đề xuất tách p95 bước quyết định JSON và token/giây, xem [BAO_CAO_BR04.md](BAO_CAO_BR04.md) §6 |
+| **Hạ tầng** | `inference_latency_p95` | **Hai ngưỡng, chốt 28/10/2026**, đổi qua env: ≤ **60 ms/token** (`P95_MS_MOI_TOKEN`, sức khoẻ server — đo được ~40) và ≤ **5.000 ms** tổng (`P95_NGUONG_MS`, thứ người dùng cảm thấy; câu ~217 token trên L4 mất 8,6–9,2 giây nên vượt — đã biết). Xem `src/core/nguong_p95.py`, [BAO_CAO_BR04.md](BAO_CAO_BR04.md) §6 |
 | | `vram_utilization_pct` | > 90% cảnh báo |
 | | `gpu_hours_per_month` | ≤ ngân sách bậc hiện tại |
 | | `oom_incident_count` | 0 |

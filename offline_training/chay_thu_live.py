@@ -44,8 +44,13 @@ if TOKEN:
 # Hoá đơn cố ý SAI: 5.000.000 + 500.000 = 5.500.000. Kể cả VAT 10% cũng chỉ
 # 6.050.000. Ghi 6.500.000 là sai ở MỌI thuế suất — không còn đường nào để một
 # câu trả lời đúng bỏ qua được, nên ca này không thể "đạt" nhờ may.
+#
+# "Giá chưa gồm VAT" thêm 28/10/2026: từ đó câu không nói rõ thì `vat` HỎI LẠI
+# thay vì tính (BAO_CAO_BR04 §5.2), và ca này đo đường tool chạy, không đo câu
+# hỏi lại. Số đo p95 trước ngày này dùng câu cũ, ngắn hơn ~6 token.
 HOA_DON = ('Kiểm tra hoá đơn này giúp tôi: {"Cước vận chuyển HN-HP": 5000000, '
-           '"Phụ phí xăng dầu": 500000}, tổng ghi 6.500.000đ có đúng không?')
+           '"Phụ phí xăng dầu": 500000}, tổng ghi 6.500.000đ có đúng không? '
+           'Giá chưa gồm VAT.')
 
 CAU = [
     ("Xin chào, bạn giúp được gì cho công việc kho vận?", "chat thường", None),

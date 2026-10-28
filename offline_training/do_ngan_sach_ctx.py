@@ -40,7 +40,9 @@ import httpx
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(REPO, "offline_training"))
+sys.path.insert(0, REPO)
 from chay_thu_live import HOA_DON  # noqa: E402  — cùng câu hoá đơn cố ý sai
+from src.core.nguong_p95 import danh_gia  # noqa: E402  — chỉ thư viện chuẩn
 
 AWQ_MAC_DINH = "/content/drive/MyDrive/ANSER_AI_Logistics/anser-v3-awq"
 TEN_MODEL = "anser-v3"                     # trùng --served-model-name của compose
@@ -286,16 +288,28 @@ def _p95(url: str, dong_thoi: int, so_request: int) -> dict:
     def mot(_):
         t0 = time.perf_counter()
         r = httpx.post(f"{url}/v1/chat/completions", json=body, timeout=300)
-        return (time.perf_counter() - t0) * 1000, r.status_code
+        ms = (time.perf_counter() - t0) * 1000
+        tok = None
+        if r.status_code == 200:
+            tok = ((r.json().get("usage") or {}).get("completion_tokens")) or None
+        return ms, r.status_code, tok
+
+    def p(xs: list[float], q: float) -> float:
+        return xs[min(len(xs) - 1, int(q * len(xs)))]
 
     with ThreadPoolExecutor(dong_thoi) as ex:
         kq = list(ex.map(mot, range(so_request)))
-    ms = sorted(t for t, ma in kq if ma == 200)
+    ms = sorted(t for t, ma, _ in kq if ma == 200)
     if not ms:
         return {"dong_thoi": dong_thoi, "loi": so_request}
+    # Hai ngưỡng (src/core/nguong_p95.py): ms/token đo sức khoẻ server, không
+    # phụ thuộc câu trả lời dài hay ngắn; tổng ms là thứ người dùng cảm thấy.
+    ms_tok = sorted(t / n for t, ma, n in kq if ma == 200 and n)
+    p95_ms = round(p(ms, 0.95))
+    p95_tok = round(p(ms_tok, 0.95), 1) if ms_tok else None
     return {"dong_thoi": dong_thoi, "n": len(ms), "loi": so_request - len(ms),
-            "p50_ms": round(ms[len(ms) // 2]),
-            "p95_ms": round(ms[min(len(ms) - 1, int(0.95 * len(ms)))])}
+            "p50_ms": round(p(ms, 0.5)), "p95_ms": p95_ms,
+            "p95_ms_moi_token": p95_tok, **danh_gia(p95_ms, p95_tok)}
 
 
 # ---------------------------------------------------------------------------
@@ -390,11 +404,20 @@ def do_mot_muc(muc: int, gmu: float, awq: str, gio_cau_dau: float) -> dict:
 
 def _bang(ket_qua: list[dict]) -> str:
     dau = ("| max_model_len | gmu | dựng được | VRAM đỉnh (MiB) | GPU KV cache (token) "
-           "| request 32k song song | vision (MiB) | guided_json | p95 (ms) |\n"
+           "| request 32k song song | vision (MiB) | guided_json | p95 (ms; ms/token) |\n"
            "|---|---|---|---|---|---|---|---|---|")
+
+    def o(p: dict) -> str:
+        if "p95_ms" not in p:
+            return f"{p['dong_thoi']}× → lỗi"
+        dau_tong = "✓" if p.get("tong_dat") else "✗"
+        dau_tok = {True: "✓", False: "✗"}.get(p.get("moi_token_dat"), "?")
+        return (f"{p['dong_thoi']}× → {p['p95_ms']} {dau_tong}; "
+                f"{p.get('p95_ms_moi_token')} {dau_tok}")
+
     dong = []
     for k in ket_qua:
-        p95 = "; ".join(f"{p['dong_thoi']}× → {p.get('p95_ms', 'lỗi')}" for p in k.get("p95", []))
+        p95 = " · ".join(o(p) for p in k.get("p95", []))
         dong.append(
             f"| {k['max_model_len']} | {k['gpu_memory_utilization']} "
             f"| {'có' if k['dung_duoc'] else 'không: ' + k.get('ly_do', '?')} "
@@ -453,7 +476,10 @@ def main() -> int:
 
     print(f"\n{'=' * 74}\n  BẢNG NGHIỆM THU BR-04 (dán vào PR)\n{'=' * 74}")
     print(_bang(ket_qua))
-    print(f"\n  JSON: {DUONG_KQ} · log: {THU_MUC_LOG}/")
+    ng = danh_gia(None, None)
+    print(f"\n  Ngưỡng p95: tổng ≤ {ng['nguong_ms']:.0f} ms (P95_NGUONG_MS) · "
+          f"≤ {ng['nguong_ms_moi_token']:.0f} ms/token (P95_MS_MOI_TOKEN)")
+    print(f"  JSON: {DUONG_KQ} · log: {THU_MUC_LOG}/")
     ok = all(k["dung_duoc"] and k.get("log_vllm_ghi_nhan") for k in ket_qua)
     return 0 if ok else 1
 

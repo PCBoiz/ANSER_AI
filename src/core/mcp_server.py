@@ -55,6 +55,7 @@ class MCPServer:
         default_is_reduced: bool = False,
         rel_tol: float = 0.001,
         abs_tol: float = 10.0,
+        prices_include_vat: bool = False,
     ) -> dict:
         """
         Tính lại tổng hóa đơn từ danh sách item rồi đối chiếu với tổng ghi trên hóa đơn.
@@ -70,6 +71,9 @@ class MCPServer:
           - abs_tol=10 VND bỏ qua nhiễu làm tròn từng dòng.
         2 ngưỡng này nên tinh chỉnh theo quy mô hóa đơn (xem spec Phụ lục, câu hỏi mở #4 —
         hóa đơn sản xuất giá trị lớn có thể cần rel_tol khác hóa đơn bán lẻ).
+
+        prices_include_vat=True: `price` là giá ĐÃ GỒM thuế. Thành tiền dòng là
+        price × qty, không cộng thêm; phần thuế tách ngược = thành tiền × r/(1+r).
 
         items RỖNG -> trả {"error": ..., "is_valid": False}, KHÔNG có
         calculated_total/difference — xem chú thích đầu hàm.
@@ -116,7 +120,14 @@ class MCPServer:
             if is_reduced is None:
                 is_reduced = default_is_reduced
 
-            vat = MCPServer.calculate_vat(base, bool(is_reduced))
+            if prices_include_vat:
+                rate = VAT_REDUCED if is_reduced else VAT_STANDARD
+                total = _round_vnd(base)
+                truoc_thue = _round_vnd(base / (1 + rate))
+                vat = {"base_price": truoc_thue, "tax_rate": rate,
+                       "total_price": total}
+            else:
+                vat = MCPServer.calculate_vat(base, bool(is_reduced))
             calculated_total += vat["total_price"]
             line_breakdown.append({
                 "name": item.get("name", "Unknown"),
@@ -136,5 +147,6 @@ class MCPServer:
             "difference": _round_vnd(difference),
             "tolerance": _round_vnd(tolerance),
             "is_valid": is_valid,
+            "prices_include_vat": prices_include_vat,
             "lines": line_breakdown,
         }

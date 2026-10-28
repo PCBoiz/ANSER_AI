@@ -366,8 +366,10 @@ def test_nhanh_logistics_khong_bi_vong_agentic_giành_mat(moi_truong, monkeypatc
 # Hoá đơn thật của khách: TÊN DÒNG HÀNG là dịch vụ vận chuyển, nên luật từ khoá
 # LOGISTICS của SemanticRouter khớp ngay (method=keyword, score=1.0) dù ý định
 # của người hỏi là SOÁT LẠI TỔNG TIỀN.
+# "đơn giá chưa gồm VAT": từ 28/10/2026 câu không nói rõ thì `vat` hỏi lại
+# trước khi tính — test này về ĐỊNH TUYẾN nên câu phải đủ để tool chạy.
 _HOA_DON_VAN_TAI = (
-    "Kiểm tra giúp tôi hoá đơn này có đúng không: "
+    "Kiểm tra giúp tôi hoá đơn này có đúng không, đơn giá chưa gồm VAT: "
     '{"items": [{"name": "Cước vận chuyển HN-HP", "quantity": 2, '
     '"unit_price": 1500000}], "total_amount": 3300000}'
 )
@@ -550,3 +552,51 @@ def test_so_chao_gia_vao_carrier_selection_va_xep_hang_tu_loi_chao_trong_cau(
     assert [c["name"] for c in da_chay[0]["args"]["carriers"]] == ["Trường Thịnh", "Đại An"]
     assert [o["price"] for o in da_chay[0]["args"]["offers"]] == [9_100_000, 10_700_000]
     assert tra_loi == "Tôi đã xếp hạng hai nhà xe giúp anh."
+
+
+def test_tra_loi_cau_hoi_vat_o_luot_sau_thi_tinh_tren_hoa_don_luot_truoc(
+    moi_truong, monkeypatch
+):
+    """
+    Lượt 1: hoá đơn không nói giá đã gồm VAT chưa -> Brain hỏi lại. Lượt 2:
+    người dùng chỉ gõ "chưa gồm VAT" — câu đó tự nó không có kế hoạch nào, nên
+    phải được ghép với hoá đơn của lượt 1 rồi chạy `vat` thật.
+    """
+    from src.api import dependencies as deps
+    from src.api.routes import chat as chat_mod
+    from src.api.routes import tools as tools_mod
+    from src.core.doc_dau_vao import CAU_HOI_THUE
+
+    monkeypatch.setattr(deps.runtime, "kb", None, raising=False)
+    hoa_don = ('Kiểm tra hoá đơn này giúp tôi: {"Cước vận chuyển HN-HP": 5000000, '
+               '"Phụ phí xăng dầu": 500000}, tổng ghi 6.500.000đ có đúng không?')
+    monkeypatch.setattr(chat_mod, "_load_history", lambda uid: [
+        {"role": "user", "content": hoa_don},
+        {"role": "assistant", "content": CAU_HOI_THUE},
+    ])
+
+    da_chay: list[dict] = []
+    goc = tools_mod.run_tool
+
+    async def ghi_lai(ten, args):
+        kq = await goc(ten, args)
+        da_chay.append({"ten": ten, "args": args, "kq": kq})
+        return kq
+
+    monkeypatch.setattr(tools_mod, "run_tool", ghi_lai)
+    moi_truong.category = "GENERAL"
+    moi_truong.decisions = [
+        {"thought": "tính lại", "tool": "vat",
+         "arguments": {"items": [{"name": "Cước", "price": 5000000, "qty": 1}],
+                       "stated_total": 6500000}},
+        {"thought": "đã có số", "answer": "Tổng đúng là 6.050.000đ, lệch 450.000đ."},
+    ]
+
+    tra_loi = _hoi("chưa gồm VAT")
+
+    assert moi_truong.decisions == [], "vòng agentic phải thực sự chạy"
+    assert da_chay and da_chay[0]["ten"] == "vat"
+    assert len(da_chay[0]["args"]["items"]) == 2, "B bóc đủ hai dòng từ hoá đơn lượt trước"
+    assert da_chay[0]["args"]["prices_include_vat"] is False
+    assert da_chay[0]["kq"]["calculated_total"] == 6_050_000
+    assert "6.050.000" in tra_loi

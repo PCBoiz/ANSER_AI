@@ -202,6 +202,13 @@ class VatRequest(BaseModel):
     items: list[VatItem]
     stated_total: float = Field(..., allow_inf_nan=False, ge=-_TRAN_TIEN, le=_TRAN_TIEN)
     default_is_reduced: bool = False
+    # Chốt 28/10/2026: người dùng phải nói rõ. Qua /chat, giá trị này do MÃ đọc
+    # từ câu (`doc_dau_vao.co_so_thue`) và ghi đè thứ model điền; câu không nói
+    # thì Brain hỏi lại thay vì đoán. Mặc định False giữ hành vi cũ cho caller
+    # REST và cho `documents.py` (VLM đọc đơn giá trước thuế).
+    prices_include_vat: bool = Field(
+        False, description="True = price là giá ĐÃ GỒM VAT; False = giá trước thuế"
+    )
 
 
 class SaleLineIn(BaseModel):
@@ -395,6 +402,7 @@ async def tool_vat(req: VatRequest, x_api_token: Optional[str] = Header(None)):
         [it.model_dump() for it in req.items],
         req.stated_total,
         default_is_reduced=req.default_is_reduced,
+        prices_include_vat=req.prices_include_vat,
     )
 
 

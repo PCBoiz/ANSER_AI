@@ -553,3 +553,43 @@ def test_mau_it_van_IN_con_so_ra_de_doc(capsys):
     ra = capsys.readouterr().out
     assert "n8n hợp lệ" in ra
     assert "KHÔNG dùng làm cổng chặn" in ra
+
+
+def test_he_thong_cham_qua_chot_dau_vao_nhu_production():
+    """
+    28/10/2026: benchmark agentic chấm tham số model THÔ, trong khi production
+    cho chúng đi qua `chot_dau_vao` trước khi tool chạy. Bảng hệ thống phải
+    phân loại đúng: chép thiếu bị chặn, đủ thì chạy, hoá đơn không nói VAT thì
+    hỏi lại theo thiết kế.
+    """
+    from offline_training.benchmark_v3 import score_he_thong
+
+    hoa_don = ('Kiểm tra hoá đơn: {"Cước": 5000000, "Phụ phí": 500000}, '
+               "tổng ghi 6.500.000đ")
+    rows = [
+        {"_id": "q_du", "ask_back": False,
+         "question": "Nhà xe chào 12.500.000 đồng, biên lợi nhuận 8%"},
+        {"_id": "q_thieu", "ask_back": False,
+         "question": "Nhà xe chào 12.500.000 đồng, biên 8%, giá dầu lúc chốt 26.500 đồng/lít"},
+        {"_id": "vat_chua_noi", "ask_back": False, "question": hoa_don},
+        {"_id": "vat_du", "ask_back": False, "question": hoa_don + ", giá chưa gồm VAT"},
+        {"_id": "bia", "ask_back": True, "question": "Biên 8%, tính giá bán giúp tôi"},
+    ]
+    quote = lambda **a: json.dumps({"thought": "x", "tool": "quote", "arguments": a})  # noqa: E731
+    vat = json.dumps({"thought": "x", "tool": "vat", "arguments": {
+        "items": [{"name": "Cước", "price": 5000000, "qty": 1}], "stated_total": 6500000}})
+    outputs = [
+        quote(carrier_cost=12500000, pricing_rule={"base_margin_pct": 8}),
+        quote(carrier_cost=12500000, pricing_rule={"base_margin_pct": 8}),
+        vat,
+        vat,
+        quote(carrier_cost=10000000, pricing_rule={"base_margin_pct": 8}),
+    ]
+    kq = score_he_thong(rows, outputs)
+    assert kq["chay_dung"] == 2            # q_du, vat_du (B bóc đủ hai dòng)
+    assert kq["chan_dau_vao"] == 1         # q_thieu: model bỏ 26.500, chốt hỏi lại
+    assert kq["hoi_thue"] == 1             # vat_chua_noi — không tính vào tỷ lệ
+    assert kq["hoi_lai_dung"] == 1         # bia: 10.000.000 không có trong câu
+    assert kq["lot"] == 0
+    assert kq["an_toan"] == 1.0
+    assert kq["tra_loi_ngay"] == pytest.approx(2 / 3)

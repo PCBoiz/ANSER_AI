@@ -1,7 +1,7 @@
 # BÁO CÁO BR-04 — vLLM server trên Colab L4, ngân sách ngữ cảnh
 
 **Ngày đo:** Thứ Hai 26/10/2026 · **Người làm:** Thành · **Đặc tả:** [SRS_CHU_KY_01.md §BR-04](SRS_CHU_KY_01.md)
-**Trạng thái:** số đo xong; ctx **đã chốt 32768** (mục 6), ngưỡng p95 còn mở; lỗi chép thiếu đầu vào **đã sửa và kiểm trên vLLM thật 28/10** (mục 5.2)
+**Trạng thái:** số đo xong; ctx **đã chốt 32768**, ngưỡng p95 **đã chốt hai ngưỡng** (mục 6); lỗi chép thiếu đầu vào **đã sửa và kiểm trên vLLM thật 28/10** (mục 5.2)
 
 | | |
 |---|---|
@@ -144,13 +144,20 @@ Thêm: trường `thought` của bước gọi tool ghi *"không cần gọi cô
 
 Cả hai số đều đúng. Log vLLM ghi 2 request của Brain. Số đo của mức 32768 lặp lại gần như y hệt lần 26/10 (KV 36.176 token, VRAM đỉnh 21.144 MiB, p95 8.497 / 9.074 ms ở 1× / 4×).
 
-**Giới hạn của bản cài, khác với phương án viết bên dưới:**
+**Hoàn thiện cùng ngày (28/10, sau lần chạy thật):**
 
-- A chỉ bắt **chiều thiếu** (số trong câu không có trong tham số). Chiều ngược — model bịa thêm số không có trong câu — **chưa cài**.
-- Bộ đọc số không hiểu số viết bằng chữ ("năm triệu rưỡi"): số đó không được đối chiếu, nên chép sai kiểu này vẫn lọt.
-- A có thể hỏi lại thừa khi câu nhắc số tiền không phải đầu vào (ví dụ giá tháng trước để so).
+| Lỗ còn hở ở bản đầu | Đã làm |
+|---|---|
+| A chỉ bắt chiều thiếu | A soát **hai chiều**: thêm `so_tien_khong_co_trong_cau` — số tiền model điền (`price`, `stated_total`, `carrier_cost`, giá dầu, phụ phí…) mà câu không có thì không chạy tool, hỏi lại. Đơn giá được chấp nhận nếu thành tiền (đơn giá × số lượng) có trong câu |
+| Không đọc số viết bằng chữ | Đọc "năm triệu rưỡi", "hai trăm nghìn", "ba trăm linh năm nghìn", "một tỷ hai trăm triệu", có dấu và không dấu; cả kiểu nói tắt "5 triệu rưỡi", "12tr5", "5 triệu 200 nghìn". Chữ số chỉ thành tiền khi có đơn vị nghìn/triệu/tỷ |
+| Giá trước thuế hay đã gồm VAT | Chủ dự án chốt: **hỏi lại khi câu không nói rõ**. Mã đọc "chưa gồm VAT / trước thuế / dòng VAT riêng" hoặc "đã gồm VAT / sau thuế", ghi đè cờ `prices_include_vat` của tool; không nói thì Brain hỏi, và câu trả lời trơn "chưa gồm VAT" ở lượt sau được ghép với hoá đơn lượt trước rồi tính. Tool `vat` có thêm chế độ giá đã gồm thuế (tách ngược phần thuế) |
+| Benchmark không đi qua chốt | Logic chốt gom thành **một hàm** `chot_dau_vao` — `chat.py` và `benchmark_v3.py` cùng gọi. Benchmark agentic có thêm bảng "qua chốt đầu vào, như production": tỷ lệ an toàn và tỷ lệ trả lời ngay. **Chưa chạy trên Colab** |
+
+**Giới hạn còn lại:**
+
+- A có thể hỏi lại thừa khi câu nhắc số tiền không phải đầu vào (ví dụ giá tháng trước để so). Bảng benchmark mới in từng ca bị chặn để soát bằng mắt — không có đáp án tham số thì mã không tự phân biệt được "model chép sai" với "bộ đọc số báo nhầm".
 - `carrier_selection` chỉ xếp hạng theo giá / chiết khấu / công nợ có trong câu; tiêu chí không có (khoảng cách bãi, tỷ lệ đúng hẹn) tool tự bỏ.
-- Câu hỏi trước thuế hay đã gồm VAT (cuối mục) **vẫn mở**.
+- Hoá đơn không nói VAT nay luôn tốn thêm một lượt hỏi. Câu kiểm của `chay_thu_live.py` / `do_ngan_sach_ctx.py` vì thế thêm "Giá chưa gồm VAT." — dài hơn câu đo 26/10 khoảng 6 token.
 
 Phần dưới giữ nguyên phương án đã trình để chủ dự án chọn ngày 26/10.
 
@@ -214,14 +221,16 @@ Khi đo `finish_reason`, cùng câu hoá đơn gửi thẳng cho model (không v
 
 ## 6. Quyết định ctx (SRS §8.5 câu 1)
 
-> **Chốt 28/10/2026:** `TEXT_MAX_MODEL_LEN` 32768, `ANSER_TEXT_MAX_CONCURRENT` 4 — đã thành mặc định trong `config.py`, compose, `.env.example`. `gpu_memory_utilization` giữ nguyên ở mỗi đường (0.55 trong tiến trình như đã đo; compose 0.62 vì ở đó vision là service riêng). **Ngưỡng p95: vẫn mở.**
+> **Chốt 28/10/2026:** `TEXT_MAX_MODEL_LEN` 32768, `ANSER_TEXT_MAX_CONCURRENT` 4 — đã thành mặc định trong `config.py`, compose, `.env.example`. `gpu_memory_utilization` giữ nguyên ở mỗi đường (0.55 trong tiến trình như đã đo; compose 0.62 vì ở đó vision là service riêng).
+>
+> **Ngưỡng p95 — chốt hai ngưỡng, cấu hình qua env** ([`src/core/nguong_p95.py`](src/core/nguong_p95.py), `Config.p95_*`, `.env.example`): `P95_MS_MOI_TOKEN` = **60** đo sức khoẻ server (đo được ~40, không phụ thuộc câu dài hay ngắn); `P95_NGUONG_MS` = **5000** giữ để thấy thứ người dùng cảm thấy — câu trả lời dài vượt nó là đã biết, không phải sự cố. `do_ngan_sach_ctx.py` nay đọc `usage.completion_tokens`, in p95 ms/token và ✓/✗ cho từng ngưỡng. Với số 28/10: 1× → 8.497 ms ✗ / ~39 ms/token ✓; 4× → 9.074 ms ✗ / ~42 ms/token ✓ (ms/token suy từ 217 token, lần đo sau sẽ ra số thật).
 
 | Tham số | Đề xuất | Lý do |
 |---|---|---|
 | `TEXT_MAX_MODEL_LEN` | **32768** | Đạt ctx 32k của S2; dựng được cùng vision; không làm request ngắn chạy kém song song (mục 4) |
 | `gpu_memory_utilization` | **0.55** | Đủ chỗ cho 32k + vision, dư ~1,9 GB. Nâng lên 0.60 thêm ~7.800 token KV nhưng còn dư <1 GB — chưa đo, không đề xuất |
 | `ANSER_TEXT_MAX_CONCURRENT` | **4** | Đã đo ở 4: chỉ +6% độ trễ. Bốn request cùng dài trọn 32k thì vượt bể, vLLM tự xếp hàng — chậm, không sập |
-| Ngưỡng `inference_latency_p95` | **cần định nghĩa lại** | Đề xuất tách hai chỉ số: (a) p95 một **bước quyết định JSON** của vòng agentic (ngắn, ≤ 5.000ms khả thi), (b) **token/giây** cho câu trả lời dài (hiện ~25/request). Giữ một ngưỡng 5.000ms cho mọi câu trả lời là không đạt được trên L4 |
+| Ngưỡng `inference_latency_p95` | **đã chốt: 60 ms/token + 5.000 ms tổng** | Đề xuất gốc (26/10) tách hai chỉ số: (a) p95 một **bước quyết định JSON** của vòng agentic (ngắn, ≤ 5.000ms khả thi), (b) **token/giây** cho câu trả lời dài (hiện ~25/request). Giữ một ngưỡng 5.000ms cho mọi câu trả lời là không đạt được trên L4 |
 
 **Chưa trả lời được yêu cầu 8** (ctx đủ cho kế hoạch 3 tool + RAG đo bằng ca thật). Đề xuất 32768 dựa trên việc nó **dựng được** và **không tốn gì thêm**, chưa dựa trên một ca dài thật.
 

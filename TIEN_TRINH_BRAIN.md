@@ -177,9 +177,13 @@ dán có cấu trúc thì B ghi đè rồi A đối chiếu; `vat` câu tự do 
 `carrier_selection` bóc lời chào từ câu. Mã ở `src/core/doc_dau_vao.py`. Cùng
 câu hoá đơn qua Brain + vLLM thật nay ra **6.050.000, chênh 450.000**.
 
-Còn hở (ghi để người sau không tưởng đã kín): A chưa bắt chiều **bịa thêm** số;
-số viết bằng chữ không đọc được; câu hỏi giá trước thuế hay đã gồm VAT vẫn là
-câu hỏi nghiệp vụ chưa ai trả lời.
+Hoàn thiện cùng ngày: A soát **hai chiều** (thiếu số và bịa số); đọc được số
+viết bằng chữ ("năm triệu rưỡi"); giá đã gồm VAT hay chưa do mã đọc từ câu,
+không nói rõ thì **hỏi lại** (chủ dự án chốt), lượt trả lời được ghép với hoá
+đơn lượt trước. Logic gom thành `chot_dau_vao` — benchmark gọi cùng hàm.
+
+Còn hở: A có thể hỏi lại thừa khi câu nhắc số tiền không phải đầu vào; bảng
+benchmark "qua chốt đầu vào" **chưa chạy trên Colab**.
 
 ---
 

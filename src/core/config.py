@@ -139,3 +139,8 @@ class Config:
             "quantization":           forced_quant,
             "enforce_eager":          True,   # fix vLLM + Qwen CUDA graph bug
         }
+
+        # Ngưỡng p95 (NFR-03): hai ngưỡng, chốt 28/10/2026 — ms/token đo sức
+        # khoẻ server, tổng ms đo thứ người dùng cảm thấy. Xem nguong_p95.py.
+        from src.core.nguong_p95 import doc_nguong
+        self.p95_nguong_ms, self.p95_ms_moi_token = doc_nguong()

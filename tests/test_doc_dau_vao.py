@@ -14,6 +14,7 @@ import pytest
 from src.core.doc_dau_vao import (
     doc_so_tien,
     so_tien_bi_bo_sot,
+    so_tien_khong_co_trong_cau,
     tach_hoa_don,
     tach_loi_chao,
     tham_so_chon_nha_xe,
@@ -76,6 +77,80 @@ def test_A_bat_chep_sai_chu_so():
     cau = "Nhà xe chào 12.500.000 đồng, biên lợi nhuận 8%"
     args = {"carrier_cost": 1_250_000, "pricing_rule": {"base_margin_pct": 8}}
     assert so_tien_bi_bo_sot(cau, args) == [12_500_000]
+
+
+@pytest.mark.parametrize("cau,mong", [
+    ("năm triệu rưỡi", [5_500_000]),
+    ("hai trăm nghìn", [200_000]),
+    ("hai mươi lăm nghìn", [25_000]),
+    ("ba trăm linh năm nghìn đồng", [305_000]),
+    ("một tỷ hai trăm triệu", [1_200_000_000]),
+    ("mười hai triệu rưỡi", [12_500_000]),
+    ("năm triệu hai", [5_200_000]),
+    ("hai triệu năm trăm", [2_500_000]),
+    ("nam trieu ruoi", [5_500_000]),
+    ("5 triệu rưỡi", [5_500_000]),
+    ("12tr5", [12_500_000]),
+    ("5 triệu 200 nghìn", [5_200_000]),
+    ("Nhà xe chào 12 triệu 5, biên 8%", [12_500_000]),
+    ("cước năm triệu, phụ phí năm trăm nghìn", [5_000_000, 500_000]),
+])
+def test_doc_so_viet_bang_chu_va_noi_tat(cau, mong):
+    assert doc_so_tien(cau) == mong
+
+
+@pytest.mark.parametrize("cau,mong", [
+    ("năm 2026", []), ("năm nay", []), ("mười ngày", []), ("hai chuyến", []),
+    ("5 triệu 2 chuyến", [5_000_000]),   # "2" là số chuyến, không phải 5,2 triệu
+])
+def test_so_khong_co_don_vi_tien_khong_bi_doc_nham(cau, mong):
+    assert doc_so_tien(cau) == mong
+
+
+def test_A_chieu_nguoc_bat_so_model_bia():
+    cau = "Nhà xe chào 12.500.000 đồng, biên 8%"
+    args = {"carrier_cost": 12_500_000,
+            "pricing_rule": {"base_margin_pct": 8, "fuel_baseline_price": 26_500,
+                             "min_margin_amount": 0}}
+    assert so_tien_khong_co_trong_cau(cau, args) == [26_500]
+
+
+def test_A_chieu_nguoc_chap_nhan_don_gia_tu_thanh_tien():
+    cau = "Mặt hàng A 4 cái thành tiền 2.400.000 đồng, tổng ghi 2.640.000 đồng"
+    args = {"items": [{"name": "A", "price": 600_000, "qty": 4}], "stated_total": 2_640_000}
+    assert so_tien_khong_co_trong_cau(cau, args) == []
+
+
+def test_A_chieu_nguoc_bo_qua_khoa_do_ma_dien():
+    args = {"items": [{"name": "A", "price": 2_000, "qty": 1}], "stated_total": 6_500_000}
+    assert so_tien_khong_co_trong_cau("tổng 6.500.000đ", args, bo_qua=("items",)) == []
+
+
+@pytest.mark.parametrize("cau,mong", [
+    ("giá chưa gồm VAT", "chua_gom"),
+    ("chua co thue", "chua_gom"),
+    ("đơn giá trước thuế", "chua_gom"),
+    ("Cước: 5.000.000\nVAT: 500.000\nTổng: 5.500.000", "chua_gom"),
+    ("giá đã gồm VAT", "da_gom"),
+    ("đã bao gồm thuế GTGT", "da_gom"),
+    ("tổng ghi 6.500.000đ có đúng không", None),
+    ("thuế suất VAT: 10%", None),
+    ("chưa gồm VAT, à mà đã gồm VAT rồi", None),
+])
+def test_co_so_thue(cau, mong):
+    from src.core.doc_dau_vao import co_so_thue
+    assert co_so_thue(cau) == mong
+
+
+def test_noi_tra_loi_hoi_thue_chi_khi_luot_truoc_dung_la_cau_hoi_do():
+    from src.core.doc_dau_vao import CAU_HOI_THUE, noi_tra_loi_hoi_thue
+
+    ls = [{"role": "user", "content": "HOÁ ĐƠN"}, {"role": "assistant", "content": CAU_HOI_THUE}]
+    assert noi_tra_loi_hoi_thue("chưa gồm VAT", ls) == "HOÁ ĐƠN\nchưa gồm VAT"
+    assert noi_tra_loi_hoi_thue("xin chào", ls) is None
+    assert noi_tra_loi_hoi_thue("chưa gồm VAT", ls[:1]) is None
+    assert noi_tra_loi_hoi_thue("chưa gồm VAT", ls + [
+        {"role": "user", "content": "x"}, {"role": "assistant", "content": "khác"}]) is None
 
 
 def test_A_khong_dong_vao_phan_tram_va_ngay():
@@ -169,9 +244,60 @@ def test_vat_B_ghi_de_items_model_chep_thieu():
     args, thieu = _cung_cap("vat", {
         "items": [{"name": "Cước", "price": 5_000_000, "qty": 1}],
         "stated_total": 6_500_000,
-    }, HOA_DON_BR04)
+    }, HOA_DON_BR04 + " Giá chưa gồm VAT.")
     assert thieu is None
     assert len(args["items"]) == 2, "B phải ghi đè bằng hai dòng bóc từ hoá đơn"
+    assert args["prices_include_vat"] is False
+
+
+def test_vat_khong_noi_ro_gom_vat_thi_hoi_lai():
+    from src.core.doc_dau_vao import CAU_HOI_THUE
+
+    _args, thieu = _cung_cap("vat", {
+        "items": [{"name": "Cước", "price": 5_000_000, "qty": 1}],
+        "stated_total": 6_500_000,
+    }, HOA_DON_BR04)
+    assert thieu == CAU_HOI_THUE
+
+
+def test_vat_da_gom_vat_ma_ghi_de_co_cua_model():
+    args, thieu = _cung_cap("vat", {
+        "items": [{"name": "Cước", "price": 5_000_000, "qty": 1}],
+        "stated_total": 6_500_000, "prices_include_vat": False,
+    }, HOA_DON_BR04 + " Giá đã gồm VAT.")
+    assert thieu is None
+    assert args["prices_include_vat"] is True
+
+
+def test_quote_model_bia_gia_dau_luc_chot_thi_hoi_lai():
+    cau = "Nhà xe chào 12.500.000 đồng, biên lợi nhuận 8%, giá dầu 28.500 đồng/lít"
+    _args, thieu = _cung_cap("quote", {
+        "carrier_cost": 12_500_000, "current_fuel_price": 28_500,
+        "pricing_rule": {"base_margin_pct": 8, "fuel_baseline_price": 26_500},
+    }, cau)
+    assert thieu and "26.500" in thieu and "không thấy" in thieu
+
+
+def test_vat_so_viet_bang_chu_bat_duoc_dong_bi_bo():
+    cau = ("Soát hoá đơn: cước năm triệu, phụ phí năm trăm nghìn, tổng ghi sáu triệu "
+           "rưỡi, giá chưa gồm VAT")
+    _args, thieu = _cung_cap("vat", {
+        "items": [{"name": "Cước", "price": 5_000_000, "qty": 1}],
+        "stated_total": 6_500_000,
+    }, cau)
+    assert thieu and "500.000" in thieu
+
+
+def test_vat_gia_da_gom_vat_tinh_dung():
+    from src.core.mcp_server import MCPServer
+
+    kq = MCPServer.validate_invoice_total(
+        [{"name": "Cước", "price": 5_000_000, "qty": 1},
+         {"name": "Phụ phí", "price": 500_000, "qty": 1}],
+        6_500_000, prices_include_vat=True,
+    )
+    assert kq["calculated_total"] == 5_500_000 and kq["difference"] == 1_000_000
+    assert kq["lines"][0]["base"] == 4_545_455, "phần trước thuế tách ngược 5.000.000/1,1"
 
 
 def test_vat_cau_tu_do_A_hoi_lai_dich_danh_so_bi_bo():
