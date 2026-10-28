@@ -637,11 +637,12 @@ def smoke_test_guided(nha: NhaCungCap) -> list[str]:
     # thật thì lồng `anyOf`, `$defs` + `$ref`, và `enum` một phần tử — xgrammar
     # đỡ những thứ đó ở mức khác hẳn. Dựng hỏng thì nó nổ lúc DỰNG grammar, tức
     # là ở phút 20 của phiên Colab chứ không phải bây giờ.
-    from src.agents.agentic import arguments_schema, build_decision_schema
+    from src.agents.agentic import MAX_DECISION_TOKENS, arguments_schema, build_decision_schema
     from src.api.routes.tools import get_tool_defs
     from src.core.tool_planner import system_data_fields
 
     bo_qua: list[str] = []
+    cat_cut: list[str] = []
     for t in get_tool_defs():
         ten = t["name"]
         s = build_decision_schema([ten], arguments_schema(t, system_data_fields(ten)))
@@ -653,10 +654,21 @@ def smoke_test_guided(nha: NhaCungCap) -> list[str]:
             bo_qua.append(ten)
             continue
         try:
-            raw = nha.sinh(
+            # Trần của CHÍNH production (`MAX_DECISION_TOKENS`), không phải số
+            # viết tay. Bản trước để 200: phiên 28/10/2026 model viết `thought`
+            # dài hơn hôm trước, chạm trần ở ký tự 545, JSON dở dang không đọc
+            # được — và chốt này dừng cả phiên với chẩn đoán "`$ref` treo",
+            # trong khi grammar dựng và chạy bình thường.
+            outs, fins = nha.sinh(
                 [[{"role": "user", "content": f"Gọi tool {ten} với tham số bất kỳ."}]],
-                s, max_tokens=200, temperature=0.0,
-            )[0][0]
+                s, max_tokens=MAX_DECISION_TOKENS, temperature=0.0,
+            )
+            raw = outs[0]
+            # Cắt cụt / quá giờ: grammar ĐÃ chạy (có đầu ra theo lược đồ), chỉ
+            # là chưa nói hết. Không đủ để kết luận lược đồ hỏng — ghi lại, đo tiếp.
+            if fins[0] in ("length", "timeout"):
+                cat_cut.append(f"{ten} ({fins[0]})")
+                continue
             json.loads(raw)
         except Exception as exc:
             print(f"    lược đồ {ten} HỎNG: {exc}")
@@ -687,6 +699,9 @@ def smoke_test_guided(nha: NhaCungCap) -> list[str]:
             ) from exc
     da_kiem = len(get_tool_defs()) - len(bo_qua)
     print(f"[chốt chặn] lược đồ agentic: ✓ dựng được {da_kiem}/{len(get_tool_defs())} tool")
+    if cat_cut:
+        print(f"    ⚠ {len(cat_cut)} lược đồ chưa kiểm hết vì đầu ra bị cắt/quá giờ "
+              f"(grammar có chạy): {', '.join(cat_cut)}")
     if bo_qua:
         print(f"    ⚠ bỏ qua {len(bo_qua)}: {', '.join(bo_qua)}")
         print("      Bản dựng này không ép được lược đồ quyết định (xem lý do ở"
