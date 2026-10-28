@@ -123,10 +123,17 @@ class Config:
         #  trên nửa bảng số và không có gì cho thấy nửa kia đã mất.
         #
         #  Cùng tên biến với compose (P4): đổi một chỗ, cả hai đường đi theo.
+        #
+        #  8192 -> 32768, 28/10/2026 (BR-04, chủ dự án chốt). Đo trên L4 với
+        #  vision đang nạp: dựng được ở cả ba mức 8192/16384/32768, bể KV cố
+        #  định 36.176 token ở gpu_memory_utilization 0.55 — nâng max_model_len
+        #  không làm request ngắn chạy kém song song (paged attention), p95 như
+        #  nhau. Chỉ một chuỗi dài trọn 32k mới chiếm gần hết bể (1,1 chuỗi).
+        #  Xem BAO_CAO_BR04.md.
         forced_quant = os.getenv("TEXT_QUANTIZATION", "").strip() or None
         self.vllm_config = {
             "gpu_memory_utilization": 0.55,
-            "max_model_len":          int(os.getenv("TEXT_MAX_MODEL_LEN", "8192")),
+            "max_model_len":          int(os.getenv("TEXT_MAX_MODEL_LEN", "32768")),
             "dtype": os.getenv("TEXT_DTYPE", "").strip()
                      or ("half" if forced_quant == "awq" else "auto"),
             "quantization":           forced_quant,

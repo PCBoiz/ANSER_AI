@@ -271,7 +271,7 @@ Model v2 (`anser-retail-v2-awq`, LoRA r=64 trên Qwen2.5-7B, distill DeepSeek-R1
 
 > **Trạng thái 26/10/2026: đường text đã nối (BR-02, BR-03).** Có `VLLM_BASE_URL` thì `ModelEngine` gọi `VLLMServerClient.chat()` tới `/v1/chat/completions`; không có thì giữ đường `vllm.LLM` trong tiến trình ở trên. Backend chọn ở một chỗ, [`engine.py::chon_backend()`](src/core/engine.py), và `/health` khai `text_backend`, `vision_backend`, `vllm_server`. Ba cái bẫy riêng của đường server đều có phép thử: server áp chat template, `chat_template_kwargs.enable_thinking=false`, và `repetition_penalty=1.0` khi có grammar. Vision vẫn nạp trong tiến trình; qua HTTP thuộc chu kỳ 02.
 
-> **Ngân sách ngữ cảnh, BR-04 (26/10/2026) — ĐỀ XUẤT, chờ chủ dự án chốt.** Số đo và lý do đầy đủ ở [BAO_CAO_BR04.md](BAO_CAO_BR04.md) §6.
+> **Ngân sách ngữ cảnh, BR-04 — ĐÃ CHỐT 28/10/2026** (`TEXT_MAX_MODEL_LEN` 32768 là mặc định trong `config.py`, compose, `.env.example`). Ngưỡng p95 vẫn mở. Số đo và lý do đầy đủ ở [BAO_CAO_BR04.md](BAO_CAO_BR04.md) §6.
 >
 > | Tham số | Đề xuất | Căn cứ đo |
 > |---|---|---|

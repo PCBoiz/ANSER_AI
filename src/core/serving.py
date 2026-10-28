@@ -552,9 +552,11 @@ def guard_from_env(name: str = "text") -> ConcurrencyGuard:
     """
     Dựng guard từ biến môi trường — chỉnh được lúc chạy mà không sửa code.
 
-    Mặc định `max_concurrent=4` là điểm khởi đầu thận trọng cho L4 22,5GB với
-    `max_model_len` 8192. **Phải đo lại trên máy thật**: con số đúng phụ thuộc
-    KV-cache còn trống, mà cái đó phụ thuộc độ dài prompt thực tế.
+    Mặc định `max_concurrent=4` — đã đo ở BR-04 (28/10/2026) trên L4 với
+    `max_model_len` 32768: 4 request đồng thời chỉ chậm hơn 1 request ~6%. Bốn
+    request cùng dài trọn 32k thì vượt bể KV (36.176 token) và vLLM tự xếp
+    hàng — chậm, không sập. Máy khác thì đo lại: con số đúng phụ thuộc KV-cache
+    còn trống, mà cái đó phụ thuộc độ dài prompt thực tế.
     """
     prefix = f"ANSER_{name.upper()}_"
     return ConcurrencyGuard(

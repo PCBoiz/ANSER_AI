@@ -48,7 +48,7 @@ services:
       - --model=/models/${TEXT_MODEL_DIR:?thiếu TEXT_MODEL_DIR trong .env}
       - --served-model-name=anser-v3
       - --quantization=awq
-      - --max-model-len=${TEXT_MAX_MODEL_LEN:-8192}
+      - --max-model-len=${TEXT_MAX_MODEL_LEN:-32768}   # BR-04, chốt 28/10/2026
       - --gpu-memory-utilization=${TEXT_GPU_FRACTION:-0.62}
       - --port=8001
       - --disable-log-requests               # P2: prompt chứa dữ liệu khách

@@ -188,7 +188,9 @@ Khi đo `finish_reason`, cùng câu hoá đơn gửi thẳng cho model (không v
 
 ---
 
-## 6. Đề xuất quyết định — chờ chủ dự án chốt (SRS §8.5 câu 1)
+## 6. Quyết định ctx (SRS §8.5 câu 1)
+
+> **Chốt 28/10/2026:** `TEXT_MAX_MODEL_LEN` 32768, `ANSER_TEXT_MAX_CONCURRENT` 4 — đã thành mặc định trong `config.py`, compose, `.env.example`. `gpu_memory_utilization` giữ nguyên ở mỗi đường (0.55 trong tiến trình như đã đo; compose 0.62 vì ở đó vision là service riêng). **Ngưỡng p95: vẫn mở.**
 
 | Tham số | Đề xuất | Lý do |
 |---|---|---|
