@@ -186,11 +186,19 @@ Từ `4c05171`, tham số model điền cho `vat`/`quote`/`carrier_selection` đ
 | AG0001 | `min_margin_amount: 1000000`, `fuel_sensitivity: 0.05` — câu không nói tới cả hai | chặn khoản 1.000.000 — **model bịa thật**, không phải báo nhầm |
 | AG0015 (lần chạy 2) | bỏ `fuel_baseline_price` dù câu có 26.500; `fuel_sensitivity: 0.05` | hỏi lại 26.500 — đúng |
 
-**Phát hiện mới: `fuel_sensitivity` bị bịa ở cả hai câu đủ dữ kiện.** Mặc định đã hiệu chỉnh là 0,35; model điền 0,05 — phần điều chỉnh theo giá dầu nhỏ đi 7 lần mà vẫn "có nguồn từ tool". Chốt lúc đó chỉ soi số tiền nên **lọt**. Chủ dự án chốt: tham số chính sách giá câu không nói tới thì **mã xoá, tool dùng mặc định, vẫn tính ngay** (`fuel_sensitivity` trừ khi câu nói "độ nhạy / hệ số giá dầu"; `min_margin_amount`, `fuel_baseline_price` khi số không có trong câu). Cùng lớp lỗi, `base_margin_pct` phải có dạng "N%" trong câu, không có thì hỏi lại (trường bắt buộc, không có mặc định để rơi về). Đã cài sau lần đo này; với tham số thô ở trên, AG0001 nay chạy ngay — **chưa đo lại** trên Colab.
+**Phát hiện mới: `fuel_sensitivity` bị bịa ở cả hai câu đủ dữ kiện.** Mặc định đã hiệu chỉnh là 0,35; model điền 0,05 — phần điều chỉnh theo giá dầu nhỏ đi 7 lần mà vẫn "có nguồn từ tool". Chốt lúc đó chỉ soi số tiền nên **lọt**. Chủ dự án chốt: tham số chính sách giá câu không nói tới thì **mã xoá, tool dùng mặc định, vẫn tính ngay** (`fuel_sensitivity` trừ khi câu nói "độ nhạy / hệ số giá dầu"; `min_margin_amount`, `fuel_baseline_price` khi số không có trong câu). Cùng lớp lỗi, `base_margin_pct` phải có dạng "N%" trong câu, không có thì hỏi lại (trường bắt buộc, không có mặc định để rơi về). Cài ở `86a2b2c`, đo lại cùng phiên:
+
+| Qua chốt đầu vào | `d3de025` | `86a2b2c` |
+|---|---|---|
+| An toàn | 100% | **100%** (lọt 0, tham số hỏng 0) |
+| Trả lời ngay | 77,8% (7/9) | **88,9% (8/9)** |
+| Chặn đầu vào lệch | 2 (AG0001, AG0015) | 1 (AG0015) |
+
+Ca còn lại, AG0015: model bỏ giá dầu lúc chốt 26.500 mà câu có — hỏi lại là đúng. Bỏ được lượt hỏi này cần bộ bóc riêng cho câu tính giá (phân biệt giá dầu hiện tại với giá lúc chốt), chưa làm. pytest `86a2b2c`: `1159 passed, 4 skipped`.
 
 **Lưu ý đo:** hai lần chạy cùng `temperature=0` cho AG0015 hai đầu ra khác nhau (lần 1 bịa 1.000.000, lần 2 bỏ 26.500). Batching của vLLM không bảo đảm tất định theo từng câu — số ở bảng trên dao động ±1 ca.
 
-Kết quả: `/content/br05c.json`, đầu ra thô `/content/br05c_tho.jsonl` (phiên Colab, chưa chép lên Drive).
+Kết quả: `br05c.json` / `br05d.json` và đầu ra thô `br05c_tho.jsonl` / `br05d_tho.jsonl`, chép lên Drive `ANSER_AI_Logistics/`.
 
 ---
 

@@ -184,7 +184,7 @@ không nói rõ thì **hỏi lại** (chủ dự án chốt), lượt trả lờ
 
 Còn hở: A có thể hỏi lại thừa khi câu nhắc số tiền không phải đầu vào; bảng
 benchmark "qua chốt đầu vào" đo 28/10: an toàn 100%, lọt 0 (BAO_CAO_BR05 §6c);
-bản xoá tham số chính sách giá bịa (`fuel_sensitivity`…) cài sau lần đo đó, chưa đo lại.
+sau khi mã xoá tham số chính sách giá bịa (`fuel_sensitivity`…), trả lời ngay 77,8% → 88,9%.
 
 ---
 
