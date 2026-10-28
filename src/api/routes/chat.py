@@ -248,7 +248,9 @@ _CHUA_CO_NGUON = {
 }
 
 
-async def _provide_tool_data(name: str, args: dict, store_id, request_id: str):
+async def _provide_tool_data(
+    name: str, args: dict, store_id, request_id: str, user_msg: str = ""
+):
     """
     Bơm dữ liệu hệ thống vào `arguments` TRƯỚC khi tool chạy.
 
@@ -257,19 +259,67 @@ async def _provide_tool_data(name: str, args: dict, store_id, request_id: str):
     model tự nghĩ ra doanh thu rồi đưa vào tool, mọi con số sau đó đều "có
     nguồn" và đi lọt hết. Ghi đè, không hợp nhất — số của model không được
     quyền sống sót cạnh số thật.
+
+    Với tool lấy số từ CHÍNH CÂU NGƯỜI DÙNG (`vat`, `quote`, `carrier_selection`),
+    nguồn thật là câu đó — xem `src/core/doc_dau_vao.py` (chốt 28/10/2026):
+      - `vat`: hoá đơn dán có cấu trúc thì mã bóc dòng hàng, ghi đè `items` (B);
+        rồi mọi số tiền trong câu phải có trong tham số (A).
+      - `quote`: A.
+      - `carrier_selection`: mã bóc các lời chào giá trong câu thành
+        `carriers`/`offers`; không bóc được >= 2 lời chào thì hỏi lại như cũ.
     """
+    from src.core import doc_dau_vao as ddv
+
     if name == "report":
         sales, expenses, err = await _fetch_report_lines(store_id, request_id)
         if err:
             return args, err
         return {**args, "sales": sales, "expenses": expenses}, None
 
+    if name == "carrier_selection" and user_msg:
+        tu_cau = ddv.tham_so_chon_nha_xe(user_msg)
+        if tu_cau:
+            logger.info(
+                "carrier_selection: bóc %d lời chào từ câu người dùng",
+                len(tu_cau["offers"]), extra={"request_id": request_id},
+            )
+            return {**args, **tu_cau}, None
+
     thieu = _CHUA_CO_NGUON.get(name)
     if thieu:
         return args, thieu
 
-    # `vat` và `quote`: tham số đến từ chính lời người dùng ("đơn hàng 3 triệu
-    # rưỡi, thuế 8%"), không có dữ liệu hệ thống nào để bơm vào.
+    if name in ("vat", "quote") and user_msg:
+        if name == "vat":
+            dong = ddv.tach_hoa_don(user_msg)
+            if dong:
+                if dong != args.get("items"):
+                    logger.info(
+                        "vat: ghi đè %d dòng hàng model điền bằng %d dòng bóc từ "
+                        "hoá đơn dán kèm", len(args.get("items") or []), len(dong),
+                        extra={"request_id": request_id},
+                    )
+                args = {**args, "items": dong}
+        bo_sot = ddv.so_tien_bi_bo_sot(user_msg, args)
+        if bo_sot:
+            ds = ", ".join(ddv.dinh_dang_vnd(v) for v in bo_sot)
+            logger.warning(
+                "%s: tham số model điền bỏ sót số tiền người dùng đưa: %s",
+                name, ds, extra={"request_id": request_id},
+            )
+            cach_viet = (
+                "Bạn liệt kê lại giúp tôi từng khoản (tên: số tiền), mỗi khoản một "
+                "dòng, kèm tổng ghi trên hoá đơn nếu có nhé."
+                if name == "vat" else
+                "Bạn cho tôi biết rõ khoản đó là giá nhà xe chào, giá dầu hiện tại, "
+                "giá dầu lúc chốt bảng giá, hay một phụ phí nhé."
+            )
+            return args, (
+                f"Tôi chưa đưa được khoản {ds} đồng trong tin nhắn của bạn vào phép "
+                "tính, nên chưa dám trả lời — tính thiếu một khoản là ra con số sai. "
+                + cach_viet
+            )
+
     return args, None
 
 
@@ -285,7 +335,7 @@ async def _run_agentic(user_msg, plan, store_id, history, request_id, metric):
     from src.api.routes.tools import get_tool_defs, run_tool
 
     async def provider(ten: str, args: dict):
-        return await _provide_tool_data(ten, args, store_id, request_id)
+        return await _provide_tool_data(ten, args, store_id, request_id, user_msg)
 
     out = await AgenticLoop(
         runtime.manager,

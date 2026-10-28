@@ -509,23 +509,37 @@ def test_tinh_gia_ban_xep_logistics_van_vao_vong_agentic_goi_quote(moi_truong, m
     assert tra_loi == "Tôi đã tính giá bán từ giá nhà xe giúp bạn."
 
 
-def test_so_chao_gia_vao_carrier_selection_va_noi_ro_con_thieu_gi(moi_truong, monkeypatch):
+def test_so_chao_gia_vao_carrier_selection_va_xep_hang_tu_loi_chao_trong_cau(
+    moi_truong, monkeypatch
+):
     """
-    Định tuyến ĐÚNG, nhưng ghi nhận một khoảng trống chưa lấp: `carrier_selection`
-    lấy nhà xe/lời chào từ HỆ THỐNG (chưa có nguồn), không đọc lời chào trong câu.
-    Người dùng nhận câu hỏi lại danh sách nhà xe dù đã liệt kê — đỡ hơn bị đẩy
-    sang n8n, nhưng chưa phải xong. Bóc lời chào từ câu là việc riêng (kiểu cách
-    B, BAO_CAO_BR04 §5.2). Test này ĐỎ khi việc đó xong: sửa nó cùng lúc.
+    Trước 28/10/2026 `carrier_selection` chỉ lấy nhà xe/lời chào từ HỆ THỐNG
+    (chưa có nguồn), nên người dùng nhận câu hỏi lại danh sách nhà xe dù đã liệt
+    kê. Nay mã bóc lời chào từ chính câu (`doc_dau_vao.tham_so_chon_nha_xe`),
+    model chỉ điền tuyến — và tool THẬT SỰ chạy.
     """
     from src.api import dependencies as deps
+    from src.api.routes import tools as tools_mod
     from src.core.tool_planner import plan_tools
 
     monkeypatch.setattr(deps.runtime, "kb", None, raising=False)
     assert plan_tools(_SO_CHAO_GIA) == ["carrier_selection"]
 
+    da_chay: list[dict] = []
+    goc = tools_mod.run_tool
+
+    async def ghi_lai(ten, args):
+        da_chay.append({"ten": ten, "args": args})
+        return await goc(ten, args)
+
+    monkeypatch.setattr(tools_mod, "run_tool", ghi_lai)
+
     moi_truong.category = "LOGISTICS"
     moi_truong.decisions = [
-        {"thought": "so lời chào", "tool": "carrier_selection", "arguments": {}},
+        {"thought": "so lời chào", "tool": "carrier_selection",
+         "arguments": {"request": {"origin": "KCN Quế Võ", "destination": "Hà Nội",
+                                   "vehicle_type": "5T"}}},
+        {"thought": "đã xếp hạng", "answer": "Tôi đã xếp hạng hai nhà xe giúp anh."},
     ]
     da_trich_xuat = _theo_doi_trich_xuat(moi_truong)
 
@@ -533,4 +547,6 @@ def test_so_chao_gia_vao_carrier_selection_va_noi_ro_con_thieu_gi(moi_truong, mo
 
     assert moi_truong.decisions == [], "vòng agentic phải thực sự chạy"
     assert da_trich_xuat == [], "KHÔNG được rơi vào luồng báo giá n8n"
-    assert "chưa có danh sách nhà xe" in tra_loi.lower()
+    assert [c["name"] for c in da_chay[0]["args"]["carriers"]] == ["Trường Thịnh", "Đại An"]
+    assert [o["price"] for o in da_chay[0]["args"]["offers"]] == [9_100_000, 10_700_000]
+    assert tra_loi == "Tôi đã xếp hạng hai nhà xe giúp anh."
