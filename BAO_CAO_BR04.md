@@ -151,7 +151,8 @@ Cả hai số đều đúng. Log vLLM ghi 2 request của Brain. Số đo của 
 | A chỉ bắt chiều thiếu | A soát **hai chiều**: thêm `so_tien_khong_co_trong_cau` — số tiền model điền (`price`, `stated_total`, `carrier_cost`, giá dầu, phụ phí…) mà câu không có thì không chạy tool, hỏi lại. Đơn giá được chấp nhận nếu thành tiền (đơn giá × số lượng) có trong câu |
 | Không đọc số viết bằng chữ | Đọc "năm triệu rưỡi", "hai trăm nghìn", "ba trăm linh năm nghìn", "một tỷ hai trăm triệu", có dấu và không dấu; cả kiểu nói tắt "5 triệu rưỡi", "12tr5", "5 triệu 200 nghìn". Chữ số chỉ thành tiền khi có đơn vị nghìn/triệu/tỷ |
 | Giá trước thuế hay đã gồm VAT | Chủ dự án chốt: **hỏi lại khi câu không nói rõ**. Mã đọc "chưa gồm VAT / trước thuế / dòng VAT riêng" hoặc "đã gồm VAT / sau thuế", ghi đè cờ `prices_include_vat` của tool; không nói thì Brain hỏi, và câu trả lời trơn "chưa gồm VAT" ở lượt sau được ghép với hoá đơn lượt trước rồi tính. Tool `vat` có thêm chế độ giá đã gồm thuế (tách ngược phần thuế) |
-| Benchmark không đi qua chốt | Logic chốt gom thành **một hàm** `chot_dau_vao` — `chat.py` và `benchmark_v3.py` cùng gọi. Benchmark agentic có thêm bảng "qua chốt đầu vào, như production": tỷ lệ an toàn và tỷ lệ trả lời ngay. **Chưa chạy trên Colab** |
+| Benchmark không đi qua chốt | Logic chốt gom thành **một hàm** `chot_dau_vao` — `chat.py` và `benchmark_v3.py` cùng gọi. Benchmark agentic có thêm bảng "qua chốt đầu vào, như production": đo 28/10 **an toàn 100%, lọt 0**, trả lời ngay 77,8% — BAO_CAO_BR05 §6c |
+| Model bịa tham số chính sách giá (`fuel_sensitivity` 0,05 thay 0,35; `min_margin_amount`) — lộ ra ở lần đo trên | Mã xoá tham số chính sách câu không nói tới, tool dùng mặc định; `base_margin_pct` phải có "N%" trong câu (chủ dự án chốt) |
 
 **Giới hạn còn lại:**
 

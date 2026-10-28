@@ -41,9 +41,12 @@ GIỚI HẠN, CÓ CHỦ ĐÍCH
 from __future__ import annotations
 
 import json
+import logging
 import re
 import unicodedata
 from typing import Any
+
+logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # Đọc số tiền
@@ -398,6 +401,51 @@ def noi_tra_loi_hoi_thue(cau: str, history: list[dict] | None) -> str | None:
 
 TOOL_DOC_TU_CAU = ("vat", "quote", "carrier_selection")
 
+# Tham số CHÍNH SÁCH GIÁ của `quote` — của công ty, không phải của câu hỏi. BR-05
+# chạy lại 28/10: model điền `fuel_sensitivity: 0.05` ở cả hai câu đủ dữ kiện
+# (mặc định đã hiệu chỉnh 0,35 — phần điều chỉnh giá dầu nhỏ đi 7 lần) và bịa
+# `min_margin_amount: 1000000`. Chủ dự án chốt: câu không nói tới thì MÃ XOÁ để
+# tool dùng mặc định, vẫn tính ngay — không hỏi lại.
+_CHINH_SACH_TIEN = ("min_margin_amount", "fuel_baseline_price")
+_NOI_DO_NHAY_DAU = re.compile(
+    r"(?:độ\s+nhạy|do\s+nhay|hệ\s+số|he\s+so)[^.;\n]{0,25}(?:dầu|dau|nhiên\s+liệu|nhien\s+lieu)",
+    re.IGNORECASE,
+)
+_PHAN_TRAM = re.compile(r"(\d+(?:[.,]\d+)?)\s*%")
+
+
+def bo_chinh_sach_khong_noi_toi(cau: str, args: dict) -> tuple[dict, list[str]]:
+    """
+    Xoá tham số chính sách giá trong `pricing_rule` mà câu không nói tới.
+    Trả (args mới, tên các trường đã xoá).
+    """
+    luat = args.get("pricing_rule")
+    if not isinstance(luat, dict):
+        return args, []
+    luat = dict(luat)
+    bo: list[str] = []
+    if "fuel_sensitivity" in luat and not _NOI_DO_NHAY_DAU.search(cau):
+        luat.pop("fuel_sensitivity")
+        bo.append("fuel_sensitivity")
+    tien = set(doc_so_tien(cau))
+    for k in _CHINH_SACH_TIEN:
+        v = luat.get(k)
+        if isinstance(v, (int, float)) and not isinstance(v, bool) and round(v) not in tien:
+            luat.pop(k)
+            bo.append(k)
+    return ({**args, "pricing_rule": luat}, bo) if bo else (args, [])
+
+
+def bien_khong_co_trong_cau(cau: str, args: dict) -> float | None:
+    """`base_margin_pct` model điền mà câu không có "N%" nào bằng nó -> trả số
+    đó (bịa). Trường bắt buộc, không có mặc định nên không xoá được — hỏi lại."""
+    luat = args.get("pricing_rule")
+    bien = luat.get("base_margin_pct") if isinstance(luat, dict) else None
+    if not isinstance(bien, (int, float)) or isinstance(bien, bool):
+        return None
+    co = {float(m.group(1).replace(",", ".")) for m in _PHAN_TRAM.finditer(cau)}
+    return None if float(bien) in co else float(bien)
+
 
 def chot_dau_vao(ten: str, args: dict, cau: str) -> tuple[dict, str | None, str]:
     """
@@ -425,6 +473,16 @@ def chot_dau_vao(ten: str, args: dict, cau: str) -> tuple[dict, str | None, str]
         dong = tach_hoa_don(cau)
         if dong:
             args, ma_dien = {**args, "items": dong}, ("items",)
+    if ten == "quote":
+        args, bo = bo_chinh_sach_khong_noi_toi(cau, args)
+        if bo:
+            logger.info("quote: xoá tham số chính sách câu không nói tới: %s", ", ".join(bo))
+        bien = bien_khong_co_trong_cau(cau, args)
+        if bien is not None:
+            return args, (
+                f"Tôi không thấy biên lợi nhuận {bien:g}% trong tin nhắn của bạn. "
+                "Bạn cho tôi biết biên lợi nhuận muốn áp cho chuyến này nhé."
+            ), "bia"
 
     bo_sot = so_tien_bi_bo_sot(cau, args)
     if bo_sot:
@@ -628,6 +686,8 @@ __all__ = [
     "CAU_HOI_THUE",
     "MOC_HOI_THUE",
     "TOOL_DOC_TU_CAU",
+    "bien_khong_co_trong_cau",
+    "bo_chinh_sach_khong_noi_toi",
     "chot_dau_vao",
     "co_so_thue",
     "dinh_dang_vnd",

@@ -183,7 +183,8 @@ không nói rõ thì **hỏi lại** (chủ dự án chốt), lượt trả lờ
 đơn lượt trước. Logic gom thành `chot_dau_vao` — benchmark gọi cùng hàm.
 
 Còn hở: A có thể hỏi lại thừa khi câu nhắc số tiền không phải đầu vào; bảng
-benchmark "qua chốt đầu vào" **chưa chạy trên Colab**.
+benchmark "qua chốt đầu vào" đo 28/10: an toàn 100%, lọt 0 (BAO_CAO_BR05 §6c);
+bản xoá tham số chính sách giá bịa (`fuel_sensitivity`…) cài sau lần đo đó, chưa đo lại.
 
 ---
 

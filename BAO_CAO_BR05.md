@@ -157,11 +157,40 @@ Chủ dự án chốt giữ cả hai đường, tách theo ý định bằng lu�
 - **Tham số `quote` đúng kiểu ở cả 6 câu** khi được đưa đúng tool. Hai ca bịa `pricing_rule.discount_rate` ở §3.1 phần lớn là hệ quả của việc bị đưa sai tool.
 - **"Biết hỏi lại" 25% không phải lỗi model ở đường production.** AG0010, AG0018 (có biên, chưa có giá nhà xe) cố ý không có kế hoạch — và production chỉ vào vòng agentic khi CÓ kế hoạch, nên hai câu này không tới đó. Bộ đo vẫn cho model tự chọn giữa 8 tool; nó chọn `quote`, tức sẽ phải bịa giá nhà xe — đáng ghi nhận, nhưng đó là đường không tồn tại. AG0009 gọi `report` khi "chưa có số liệu": ở production `report` lấy số liệu hệ thống và tự báo thiếu, nên hành vi chấp nhận được; nhãn "phải hỏi lại" có thể tranh cãi.
 - **Khung đo còn lệch thêm một chỗ:** câu không có kế hoạch được chấm qua vòng agentic với lược đồ tự do, trong khi production đưa chúng sang nhánh router. Sửa: bộ đo bỏ qua (hoặc chấm riêng) các câu không có kế hoạch.
-- **Khoảng trống `carrier_selection` — đã đóng 28/10 (`7da7a9f`).** Trước đó tool định tuyến đúng nhưng lấy nhà xe/lời chào từ hệ thống (chưa có nguồn), nên người dùng liệt kê lời chào vẫn nhận câu hỏi lại. Nay mã bóc ≥ 2 lời chào từ câu (tên, giá, chiết khấu, công nợ) thành `carriers`/`offers`; model chỉ điền tuyến. Giới hạn: chỉ đọc dạng "tên + số tiền"; tiêu chí không có trong câu tool tự bỏ. Cùng commit, `vat`/`quote` có chốt neo đầu vào (BAO_CAO_BR04 §5.2); bộ benchmark agentic **chưa đo lại** sau thay đổi này (benchmark gọi model trực tiếp, không qua `_provide_tool_data`).
+- **Khoảng trống `carrier_selection` — đã đóng 28/10 (`7da7a9f`).** Trước đó tool định tuyến đúng nhưng lấy nhà xe/lời chào từ hệ thống (chưa có nguồn), nên người dùng liệt kê lời chào vẫn nhận câu hỏi lại. Nay mã bóc ≥ 2 lời chào từ câu (tên, giá, chiết khấu, công nợ) thành `carriers`/`offers`; model chỉ điền tuyến. Giới hạn: chỉ đọc dạng "tên + số tiền"; tiêu chí không có trong câu tool tự bỏ. Cùng commit, `vat`/`quote` có chốt neo đầu vào (BAO_CAO_BR04 §5.2); đo qua chốt ở §6c.
 
 **pytest trên đúng mã đã đo (`4911302`, Colab, 28/10):** `1067 passed, 4 skipped`; riêng hai file luật định tuyến `59 passed`. Sau `7da7a9f`: `1110 passed, 4 skipped`.
 
 Dữ liệu thô: Drive `ANSER_AI_Logistics/br05b_*`.
+
+---
+
+## 6c. Đo qua chốt đầu vào, như production (28/10/2026, `d3de025`)
+
+Từ `4c05171`, tham số model điền cho `vat`/`quote`/`carrier_selection` đi qua `doc_dau_vao.chot_dau_vao` trước khi tool chạy — benchmark gọi đúng hàm đó (bảng "qua chốt đầu vào"). Cùng bộ đề 19 câu, vLLM 0.11.2 trên L4, ctx 32768.
+
+| Chỉ số | Kết quả |
+|---|---|
+| Bảng luật chọn đúng tool | 100% (15/15) — không đổi |
+| Model: chịu gọi tool / điền tham số đúng kiểu | 100% / 100% (n=9) — không đổi |
+| Model: biết hỏi lại | 25% (n=4) — không đổi; AG0009 `report`, AG0010, AG0018 `quote` |
+| **Qua chốt: an toàn** (không ca nào tính trên đầu vào sai) | **100%** (11 dòng chấm, **lọt 0**) |
+| **Qua chốt: trả lời ngay** (đủ dữ kiện thì tính luôn) | 77,8% (7/9) |
+| Hỏi VAT theo thiết kế | 3 câu hoá đơn không nói giá gồm VAT chưa |
+
+**Đọc tham số thô của bốn ca bị chặn:**
+
+| Ca | Model điền | Chốt |
+|---|---|---|
+| AG0010, AG0018 (chưa có giá nhà xe) | `carrier_cost: 0`; `pricing_rule` sai kiểu (`"default"`, khoá tự đặt) | chặn — đúng: model lỡ gọi tool, khách nhận câu hỏi lại thay vì số |
+| AG0001 | `min_margin_amount: 1000000`, `fuel_sensitivity: 0.05` — câu không nói tới cả hai | chặn khoản 1.000.000 — **model bịa thật**, không phải báo nhầm |
+| AG0015 (lần chạy 2) | bỏ `fuel_baseline_price` dù câu có 26.500; `fuel_sensitivity: 0.05` | hỏi lại 26.500 — đúng |
+
+**Phát hiện mới: `fuel_sensitivity` bị bịa ở cả hai câu đủ dữ kiện.** Mặc định đã hiệu chỉnh là 0,35; model điền 0,05 — phần điều chỉnh theo giá dầu nhỏ đi 7 lần mà vẫn "có nguồn từ tool". Chốt lúc đó chỉ soi số tiền nên **lọt**. Chủ dự án chốt: tham số chính sách giá câu không nói tới thì **mã xoá, tool dùng mặc định, vẫn tính ngay** (`fuel_sensitivity` trừ khi câu nói "độ nhạy / hệ số giá dầu"; `min_margin_amount`, `fuel_baseline_price` khi số không có trong câu). Cùng lớp lỗi, `base_margin_pct` phải có dạng "N%" trong câu, không có thì hỏi lại (trường bắt buộc, không có mặc định để rơi về). Đã cài sau lần đo này; với tham số thô ở trên, AG0001 nay chạy ngay — **chưa đo lại** trên Colab.
+
+**Lưu ý đo:** hai lần chạy cùng `temperature=0` cho AG0015 hai đầu ra khác nhau (lần 1 bịa 1.000.000, lần 2 bỏ 26.500). Batching của vLLM không bảo đảm tất định theo từng câu — số ở bảng trên dao động ±1 ca.
+
+Kết quả: `/content/br05c.json`, đầu ra thô `/content/br05c_tho.jsonl` (phiên Colab, chưa chép lên Drive).
 
 ---
 

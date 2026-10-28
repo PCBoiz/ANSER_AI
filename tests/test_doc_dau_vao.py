@@ -269,13 +269,48 @@ def test_vat_da_gom_vat_ma_ghi_de_co_cua_model():
     assert args["prices_include_vat"] is True
 
 
-def test_quote_model_bia_gia_dau_luc_chot_thi_hoi_lai():
+def test_quote_chinh_sach_gia_model_bia_thi_ma_xoa_va_van_tinh():
+    """
+    Nguyên văn AG0001 (BR-05 chạy lại 28/10): model điền fuel_sensitivity 0.05
+    (mặc định hiệu chỉnh 0,35) và min_margin_amount 1.000.000 — câu không nói
+    tới cả hai. Chủ dự án chốt: mã xoá, tool dùng mặc định, vẫn tính ngay.
+    """
+    cau = ("Nhà xe vừa chào 12.500.000 đồng cho chuyến cảng Đình Vũ đi Bắc Giang, "
+           "biên lợi nhuận họ tính 8% nhưng giá dầu giờ lên 28.500 đồng/lít trong khi "
+           "lúc chốt bảng giá chỉ 26.500 đồng/lít.")
+    args, thieu = _cung_cap("quote", {
+        "carrier_cost": 12500000,
+        "pricing_rule": {"base_margin_pct": 8, "fuel_sensitivity": 0.05,
+                         "fuel_baseline_price": 26500, "min_margin_amount": 1000000},
+        "current_fuel_price": 28500, "extra_surcharges": [],
+    }, cau)
+    assert thieu is None
+    assert args["pricing_rule"] == {"base_margin_pct": 8, "fuel_baseline_price": 26500}
+
+
+def test_quote_gia_dau_luc_chot_khong_co_trong_cau_thi_xoa_khong_hoi():
     cau = "Nhà xe chào 12.500.000 đồng, biên lợi nhuận 8%, giá dầu 28.500 đồng/lít"
-    _args, thieu = _cung_cap("quote", {
+    args, thieu = _cung_cap("quote", {
         "carrier_cost": 12_500_000, "current_fuel_price": 28_500,
         "pricing_rule": {"base_margin_pct": 8, "fuel_baseline_price": 26_500},
     }, cau)
-    assert thieu and "26.500" in thieu and "không thấy" in thieu
+    assert thieu is None and "fuel_baseline_price" not in args["pricing_rule"]
+
+
+def test_quote_giu_do_nhay_khi_cau_noi_ro():
+    from src.core.doc_dau_vao import bo_chinh_sach_khong_noi_toi
+
+    cau = "Nhà xe chào 9tr, biên 10%, hệ số giá dầu 0,5"
+    args = {"pricing_rule": {"base_margin_pct": 10, "fuel_sensitivity": 0.5}}
+    assert bo_chinh_sach_khong_noi_toi(cau, args) == (args, [])
+
+
+def test_quote_bien_bia_thi_hoi_lai():
+    cau = "Nhà xe chào 12.500.000 đồng, tính giá bán giúp tôi"
+    _args, thieu = _cung_cap("quote", {
+        "carrier_cost": 12_500_000, "pricing_rule": {"base_margin_pct": 15},
+    }, cau)
+    assert thieu and "15%" in thieu
 
 
 def test_vat_so_viet_bang_chu_bat_duoc_dong_bi_bo():
