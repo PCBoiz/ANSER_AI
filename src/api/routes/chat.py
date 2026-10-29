@@ -37,7 +37,7 @@ from src.core import metrics
 from src.core.config import Config
 from src.core.doc_dau_vao import noi_tra_loi_hoi_thue
 from src.core.engine import TASK_REGISTRY
-from src.core.grounding import guard_answer
+from src.core.grounding import LOI_SUY_BIEN, guard_answer, kiem_suy_bien
 from src.core.retrieval_policy import KHONG_CO_TAI_LIEU, decide_web_fallback
 from src.core.schemas import RetailChatResponse
 from src.core.tool_planner import (
@@ -816,7 +816,20 @@ async def chat_endpoint(
         # CHỈ chặn khi CÓ dữ liệu gốc để đối chiếu. Nhánh GENERAL và LOGISTICS
         # không có `grounding_ctx`; chặn ở đó là chặn oan mọi con số >= 4 chữ số,
         # kể cả số người dùng vừa tự nhắc trong câu hỏi.
-        if grounding_ctx:
+        #
+        # Chốt SUY BIẾN đứng trước (29/10/2026): rác tiếng Trung/lặp đuôi không
+        # chứa số nên chốt số liệu cho qua, và nó xảy ra ở cả nhánh không có
+        # `grounding_ctx`. TECHNICAL đứng ngoài — đầu ra là JSON workflow, đã có
+        # validate riêng.
+        ly_do_suy_bien = None if cat == "TECHNICAL" else kiem_suy_bien(cleaned)
+        if ly_do_suy_bien:
+            logger.warning(
+                "Chặn câu trả lời suy biến (%s, %d ký tự)", ly_do_suy_bien, len(cleaned),
+                extra={"request_id": request_id},
+            )
+            metric.blocked_reason = f"suy biến: {ly_do_suy_bien}"
+            cleaned = LOI_SUY_BIEN
+        elif grounding_ctx:
             verdict = guard_answer(cleaned, grounding_ctx)
             if verdict.blocked:
                 logger.warning(

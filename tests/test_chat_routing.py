@@ -600,3 +600,19 @@ def test_tra_loi_cau_hoi_vat_o_luot_sau_thi_tinh_tren_hoa_don_luot_truoc(
     assert da_chay[0]["args"]["prices_include_vat"] is False
     assert da_chay[0]["kq"]["calculated_total"] == 6_050_000
     assert "6.050.000" in tra_loi
+
+
+def test_chat_chan_cau_suy_bien_truoc_khi_ra_ngoai(moi_truong, monkeypatch):
+    """
+    BR-05 yêu cầu 9 (29/10/2026): bản fine-tune hết ý thì trôi sang chữ Hán và
+    lặp tới trần token. Nhánh GENERAL không có `grounding_ctx`, nên trước chốt
+    suy biến đoạn rác đó đi thẳng ra màn hình khách.
+    """
+    from src.api import dependencies as deps
+    from src.core.grounding import LOI_SUY_BIEN
+
+    monkeypatch.setattr(deps.runtime, "kb", None, raising=False)
+    moi_truong.category = "GENERAL"
+    moi_truong.answer = "Doanh thu quý này ổn định. " + "无所不能" * 200
+
+    assert _hoi("Tình hình kinh doanh quý này thế nào?") == LOI_SUY_BIEN

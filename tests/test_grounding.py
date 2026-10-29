@@ -150,3 +150,37 @@ def test_benchmark_cham_diem_bang_dung_ham_do():
     from offline_training import benchmark_v3
 
     assert benchmark_v3.narration_numbers_ok is narration_numbers_ok
+
+
+# ---------------------------------------------------------------------------
+# Chốt suy biến (29/10/2026) — mẫu lấy NGUYÊN VĂN đuôi đầu ra BR-05 yêu cầu 9
+# ---------------------------------------------------------------------------
+
+_DAU_VIET = "Doanh thu quý 3 đạt 45.000.000 đồng, chi phí nhà xe 33.825.862 đồng. "
+
+
+def test_suy_bien_chu_han():
+    from src.core.grounding import kiem_suy_bien
+
+    assert kiem_suy_bien(_DAU_VIET + "发展历程壮丽画卷美丽风景") == "chữ Hán"
+
+
+def test_suy_bien_lap_duoi_tieng_anh():
+    """NA0019: kê từ tiếng Anh không dứt, rồi cả chuỗi lặp lại."""
+    from src.core.grounding import kiem_suy_bien
+
+    vong = ("pull drag haul yank jerk toss throw shoot fire launch propel push shove "
+            "poke prod jab stick lodge embed implant transplant move relocate transfer ")
+    assert kiem_suy_bien(_DAU_VIET + vong * 3) == "lặp đuôi"
+
+
+def test_cau_tieng_viet_binh_thuong_khong_bi_chan():
+    from src.core.grounding import kiem_suy_bien
+
+    cau = (_DAU_VIET * 1 + "Lợi nhuận gộp 11.174.138 đồng, biên 24,8%. "
+           "Tuyến KCN Quế Võ đi Hà Nội lãi tốt nhất; nên giữ nhà xe Trường Thịnh. "
+           "Tháng 6 chi phí tăng do giá dầu, cần theo dõi thêm.")
+    assert kiem_suy_bien(cau) is None
+    assert kiem_suy_bien("") is None
+    assert kiem_suy_bien("ok") is None
+

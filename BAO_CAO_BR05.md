@@ -227,11 +227,22 @@ Qua chốt đầu vào (không ghép cặp được ở lần này — sửa sau
 
 - **extraction, n8n: fine-tune là lý do tồn tại của nó.** Bản gốc không ra nổi một yêu cầu báo giá đủ ba trường bắt buộc (0/98), và hỏng `connections.main` (không phải mảng của mảng) ở phần lớn workflow. Câu duy nhất fine-tune làm hỏng ở n8n — `n8n_eval_thue_soat_co_thue_danh_muc` — trỏ tới node `noOp` không tồn tại; cùng mẫu lỗi xuất hiện ở 2 trong 4 ca trượt của fine-tune → **dữ liệu huấn luyện** (workflow mẫu có nhánh "không làm gì" mà không khai node).
 - **narration: 7 câu fine-tune làm hỏng thì 6 là CẮT CỤT** (NA0002, NA0008, NA0009, NA0011, NA0016, NA0019 chạm trần 2048 token), 1 là bịa số (NA0022 `[report]` 360947). Bản gốc không cắt cụt câu nào; nó trượt vì **bịa số ở 6 câu** (NA0000, NA0001, NA0003, NA0017, NA0021, NA0023). Trên phần đo được, fine-tune đạt 94%.
-  - Trần benchmark **bằng đúng trần production** (`manager.MAX_REPORT_TOKENS = 2048`, yêu cầu 4) — nên cắt cụt ở đây cũng là cắt cụt khách nhận. Nhưng 2048 token là quá dài cho một đoạn diễn giải; bản gốc nói xong trong trần. Nguyên nhân nghiêng về **dữ liệu huấn luyện** (fine-tune học viết dài hoặc lặp), không phải trần thấp — cần đọc đuôi đầu ra thô (`br05_ft_tho.jsonl`) để phân biệt "dài" với "lặp" trước khi chọn cách sửa.
+  - Trần benchmark **bằng đúng trần production** (`manager.MAX_REPORT_TOKENS = 2048`, yêu cầu 4) — nên cắt cụt ở đây cũng là cắt cụt khách nhận.
+  - **Đọc đầu ra thô: không phải "viết dài" mà là SUY BIẾN.** NA0002, NA0009, NA0019 (5.252–13.628 ký tự) hết ý thì trôi sang chữ Hán hoặc kê từ tiếng Anh không dứt (*"pull drag haul yank jerk toss…"*), rồi lặp một cụm tới trần (*"无所不能无所不能…"*). Nới trần chỉ sinh thêm rác.
+  - **Đo `repetition_penalty`** (biến `TEXT_REPETITION_PENALTY`, `b896443`; chỉ nhánh narration, bản fine-tune):
+
+    | Mức phạt | Đạt | Cắt cụt | Đạt trên phần đo được |
+    |---|---|---|---|
+    | 1,25 (mặc định) | 37% | 13/27 | 71% |
+    | 1,1 | 44% | 5/27 | 55% |
+    | 1,0 | 52% | 6/27 | 67% |
+
+    Hạ phạt giảm suy biến nhưng không hết, và bịa số tăng — nhiều số bịa lệch **×10** (127.090.000 thay 12.709.000, đúng ca NA0006 ở §3). Cùng mức 1,25 hai lần chạy ra 9 và 13 ca cắt cụt: dao động lớn, n=27 một lần chạy không đủ để chọn mức. **Gốc ở dữ liệu huấn luyện** (không biết dừng; chép sai dấu ngăn nghìn), không ở tham số sinh.
+  - **Chủ dự án chốt (29/10):** giữ 1,25; thêm **chốt suy biến** ở production (`grounding.kiem_suy_bien`): câu trả lời có chữ Hán, hoặc 100 ký tự cuối đã xuất hiện nguyên văn ở phía trước, thì thay bằng câu an toàn và ghi `blocked_reason`. Chốt số liệu không bắt được loại này vì rác không chứa số, và nó xảy ra cả ở nhánh không có `grounding_ctx`. TECHNICAL đứng ngoài (đầu ra JSON). Kê từ tiếng Anh mà **chưa** kịp lặp thì chốt chưa bắt — còn hở.
   - Về R1: gốc bịa số 6/27, fine-tune bịa 1/27 trên phần đo được (+9 ca cắt cụt không chấm được số). Fine-tune **ít bịa hơn**, nhưng nói dài tới mức hỏng.
 - **agentic: model gần như không đóng góp khác biệt** — bảng luật chọn tool, chốt đầu vào giữ an toàn với cả hai bản. Khác biệt thật nằm ở **trả lời ngay**: bản gốc bỏ sót/bịa đầu vào ở 5/9 câu đủ dữ kiện (chốt bắt hết, khách phải trả lời lại), fine-tune 0/9.
 
-**Trả lời câu của yêu cầu 9 — "fine-tune làm hỏng câu nào mà bản gốc vốn đúng":** 8 câu — 1 workflow n8n (node `noOp`), 6 diễn giải cắt cụt, 1 diễn giải bịa số. Đổi lại fine-tune sửa 88 câu. **Giữ bản fine-tune**; hai việc cho vòng cải tiến sau: (1) độ dài narration — đọc đầu ra thô rồi quyết sửa dữ liệu hay trần; (2) mẫu `noOp` trong dữ liệu n8n.
+**Trả lời câu của yêu cầu 9 — "fine-tune làm hỏng câu nào mà bản gốc vốn đúng":** 8 câu — 1 workflow n8n (node `noOp`), 6 diễn giải cắt cụt, 1 diễn giải bịa số. Đổi lại fine-tune sửa 88 câu. **Giữ bản fine-tune**; ba việc cho vòng huấn luyện sau: (1) narration không biết dừng → suy biến; (2) chép sai dấu ngăn nghìn (lệch ×10); (3) mẫu `noOp` trong dữ liệu n8n.
 
 **Khung đo:** `agentic_he_thong` chưa ghi kết quả từng câu nên `compare_runs` báo "không có câu chung" — đã thêm `per_row`/`row_ids` sau lần đo này (chỉ dòng được chấm, ghép theo `_id`).
 

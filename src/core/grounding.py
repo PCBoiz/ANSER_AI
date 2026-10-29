@@ -102,6 +102,39 @@ _LOI_TU_CHOI_LO = (
 )
 
 
+# ---------------------------------------------------------------------------
+# Chốt SUY BIẾN (29/10/2026, BR-05 yêu cầu 9)
+# ---------------------------------------------------------------------------
+# Bản fine-tune ở 6–13/27 câu diễn giải hết ý thì không dừng: trôi sang tiếng
+# Trung/Anh, kê từ không dứt, rồi lặp một cụm tới trần 2048 token ("无所不能
+# 无所不能…", "pull drag haul yank…"). Hạ repetition_penalty không chữa được
+# (đo 1.25/1.1/1.0) — gốc ở dữ liệu huấn luyện. Chốt số liệu không bắt được loại
+# này vì rác không chứa số; khách sẽ nhận nguyên đoạn rác.
+#
+# Hai dấu hiệu tất định, cố ý hẹp để không chặn oan câu tiếng Việt bình thường:
+#   - có chữ Hán: Brain trả lời tiếng Việt, không có lý do nào để có chữ Hán
+#   - đuôi lặp: 100 ký tự cuối đã xuất hiện nguyên văn ở phía trước — văn bình
+#     thường không bao giờ lặp nguyên một đoạn dài như vậy
+_CHU_HAN = re.compile(r"[㐀-䶿一-鿿]")
+_DO_DAI_DUOI = 100
+
+LOI_SUY_BIEN = (
+    "Tôi chưa soạn được câu trả lời trọn vẹn cho câu này — bản nháp bị hỏng giữa "
+    "chừng nên tôi đã chặn lại. Bạn hỏi lại giúp tôi, hoặc hỏi ngắn và cụ thể hơn."
+)
+
+
+def kiem_suy_bien(answer: str) -> str | None:
+    """Lý do suy biến ("chữ Hán" / "lặp đuôi"), hoặc None khi câu trả lời sạch."""
+    q = answer or ""
+    if _CHU_HAN.search(q):
+        return "chữ Hán"
+    duoi = q.rstrip()[-_DO_DAI_DUOI:]
+    if len(duoi) == _DO_DAI_DUOI and q.count(duoi) >= 2:
+        return "lặp đuôi"
+    return None
+
+
 def guard_answer(answer: str, context: str, *, for_customer: bool = False) -> GuardVerdict:
     """
     Soát câu trả lời do model viết TRƯỚC KHI cho ra ngoài.
@@ -132,9 +165,11 @@ def guard_answer(answer: str, context: str, *, for_customer: bool = False) -> Gu
 
 
 __all__ = [
+    "LOI_SUY_BIEN",
     "GuardVerdict",
     "customer_leak",
     "guard_answer",
+    "kiem_suy_bien",
     "narration_numbers_ok",
     "numbers_in",
 ]
