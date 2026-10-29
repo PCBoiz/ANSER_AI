@@ -10,7 +10,15 @@ Nên mặc định gỡ hai biến đó cho MỌI test. Test nào cần đườn
 `monkeypatch.setenv` — và như vậy đọc test là thấy ngay nó cần server.
 """
 
+import os
+
 import pytest
+
+# Hằng số đọc env LÚC IMPORT (`serving.REPETITION_PENALTY_TU_DO`), nên phải gỡ
+# ngay khi conftest nạp — trước mọi module `src` — chứ fixture thì đã muộn.
+# Sự cố 29/10/2026: ô Colab đo repetition_penalty để lại `=1.0` trong phiên,
+# pytest sau đó trượt 4 ca kiểm mặc định 1,25.
+os.environ.pop("TEXT_REPETITION_PENALTY", None)
 
 
 @pytest.fixture(autouse=True)
