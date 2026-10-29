@@ -200,6 +200,43 @@ Ca còn lại, AG0015: model bỏ giá dầu lúc chốt 26.500 mà câu có —
 
 Kết quả: `br05c.json` / `br05d.json` và đầu ra thô `br05c_tho.jsonl` / `br05d_tho.jsonl`, chép lên Drive `ANSER_AI_Logistics/`.
 
+
+---
+
+## 6d. So theo cặp với model gốc — yêu cầu 9 (29/10/2026, `31aafa1`)
+
+Hai lần chạy trọn bốn nhánh, **cùng commit, cùng phiên, cùng cấu hình** (vLLM 0.11.2, L4, ctx 32768, `gpu_memory_utilization` 0.85, không nạp vision): bản gốc **`Qwen/Qwen3-8B-AWQ`** (AWQ chính thức của Qwen — so AWQ với AWQ để phần chênh là của fine-tune, không lẫn tác động lượng tử hoá) và bản fine-tune `anser-v3-awq`. So bằng `compare_runs.py` (McNemar trên các câu hai bên khác nhau).
+
+| Nhánh | Gốc | Fine-tune | Fine-tune sửa được | **Fine-tune LÀM HỎNG** | p | Kết luận |
+|---|---|---|---|---|---|---|
+| extraction (sẵn sàng báo giá, n=98) | 0,0% | **64,3%** | 63 | **0** | 0,0000 | fine-tune hơn rõ |
+| n8n hợp lệ (n=34) | 29,4% | **88,2%** | 21 | **1** | 0,0000 | fine-tune hơn rõ |
+| narration (n=27) | **77,8%** | 63,0% | 3 | **7** | 0,34 | chưa đủ bằng chứng |
+| bảng luật chọn tool (n=15) | 100% | 100% | 0 | 0 | 1,00 | giống hệt — mã tất định |
+| agentic (n=19) | 78,9% | 84,2% | 1 | 0 | 1,00 | ngang nhau |
+
+Qua chốt đầu vào (không ghép cặp được ở lần này — sửa sau đó, xem cuối mục):
+
+| | Gốc | Fine-tune |
+|---|---|---|
+| An toàn | 100% (lọt 0) | 100% (lọt 0) |
+| Trả lời ngay | 44,4% (4/9) — bỏ giá dầu lúc chốt ở 4 câu, bịa phụ phí 150.000 ở AG0011 | **100% (9/9)** |
+| Biết hỏi lại (model) | 0% (4/4 câu thiếu dữ kiện vẫn gọi tool) | 25% |
+
+**Đọc từng nhánh.**
+
+- **extraction, n8n: fine-tune là lý do tồn tại của nó.** Bản gốc không ra nổi một yêu cầu báo giá đủ ba trường bắt buộc (0/98), và hỏng `connections.main` (không phải mảng của mảng) ở phần lớn workflow. Câu duy nhất fine-tune làm hỏng ở n8n — `n8n_eval_thue_soat_co_thue_danh_muc` — trỏ tới node `noOp` không tồn tại; cùng mẫu lỗi xuất hiện ở 2 trong 4 ca trượt của fine-tune → **dữ liệu huấn luyện** (workflow mẫu có nhánh "không làm gì" mà không khai node).
+- **narration: 7 câu fine-tune làm hỏng thì 6 là CẮT CỤT** (NA0002, NA0008, NA0009, NA0011, NA0016, NA0019 chạm trần 2048 token), 1 là bịa số (NA0022 `[report]` 360947). Bản gốc không cắt cụt câu nào; nó trượt vì **bịa số ở 6 câu** (NA0000, NA0001, NA0003, NA0017, NA0021, NA0023). Trên phần đo được, fine-tune đạt 94%.
+  - Trần benchmark **bằng đúng trần production** (`manager.MAX_REPORT_TOKENS = 2048`, yêu cầu 4) — nên cắt cụt ở đây cũng là cắt cụt khách nhận. Nhưng 2048 token là quá dài cho một đoạn diễn giải; bản gốc nói xong trong trần. Nguyên nhân nghiêng về **dữ liệu huấn luyện** (fine-tune học viết dài hoặc lặp), không phải trần thấp — cần đọc đuôi đầu ra thô (`br05_ft_tho.jsonl`) để phân biệt "dài" với "lặp" trước khi chọn cách sửa.
+  - Về R1: gốc bịa số 6/27, fine-tune bịa 1/27 trên phần đo được (+9 ca cắt cụt không chấm được số). Fine-tune **ít bịa hơn**, nhưng nói dài tới mức hỏng.
+- **agentic: model gần như không đóng góp khác biệt** — bảng luật chọn tool, chốt đầu vào giữ an toàn với cả hai bản. Khác biệt thật nằm ở **trả lời ngay**: bản gốc bỏ sót/bịa đầu vào ở 5/9 câu đủ dữ kiện (chốt bắt hết, khách phải trả lời lại), fine-tune 0/9.
+
+**Trả lời câu của yêu cầu 9 — "fine-tune làm hỏng câu nào mà bản gốc vốn đúng":** 8 câu — 1 workflow n8n (node `noOp`), 6 diễn giải cắt cụt, 1 diễn giải bịa số. Đổi lại fine-tune sửa 88 câu. **Giữ bản fine-tune**; hai việc cho vòng cải tiến sau: (1) độ dài narration — đọc đầu ra thô rồi quyết sửa dữ liệu hay trần; (2) mẫu `noOp` trong dữ liệu n8n.
+
+**Khung đo:** `agentic_he_thong` chưa ghi kết quả từng câu nên `compare_runs` báo "không có câu chung" — đã thêm `per_row`/`row_ids` sau lần đo này (chỉ dòng được chấm, ghép theo `_id`).
+
+Dữ liệu: Drive `ANSER_AI_Logistics/br05_goc.json`, `br05_ft.json` và hai file `*_tho.jsonl`.
+
 ---
 
 ## 7. Đối chiếu yêu cầu BR-05
@@ -214,4 +251,4 @@ Kết quả: `br05c.json` / `br05d.json` và đầu ra thô `br05c_tho.jsonl` / 
 | 6 | Soi riêng bịa số | **Đạt** — mục 3.3.1 |
 | 7 | Quy mỗi loại về dữ liệu / lược đồ-prompt / mã khung đo | **Đạt** — mục 3 |
 | 8 | Cập nhật TIEN_TRINH: treo #1, #2 | **Đạt** — treo #2 đóng; treo #1 *chưa đóng được* (agentic bị lỗi bảng luật che) |
-| 9 | (NÊN) So cặp với model gốc | **Chưa làm** — tốn thêm ~30 phút GPU |
+| 9 | (NÊN) So cặp với model gốc | **Đạt** (29/10) — §6d: fine-tune làm hỏng 8 câu, sửa 88; giữ fine-tune |

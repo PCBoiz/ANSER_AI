@@ -473,11 +473,17 @@ def score_he_thong(rows: list[dict], outputs: list[str]) -> dict:
     o = {k: 0 for k in ("chay_dung", "chan_dau_vao", "hoi_lai_dung", "hoi_thue",
                         "lot", "tham_so_hong")}
     failures = []
+    # Theo từng dòng cho `compare_runs` (ghép cặp theo `_id`): đúng = chạy đúng
+    # hoặc chặn đúng ca thiếu dữ kiện. Dòng không chấm (không gọi tool đọc từ
+    # câu, hoặc hỏi VAT theo thiết kế) không có mặt — so cặp chỉ trên dòng chung.
+    per_row: list[bool] = []
+    row_ids: list[str] = []
     decisions, _ = parse_outputs(outputs, "he_thong")
     for row, decision in zip(rows, decisions):
         ten = decision.get("tool")
         if ten not in TOOL_DOC_TU_CAU:
             continue
+        truoc = dict(o)
         args, hoi_lai, ly_do = chot_dau_vao(ten, decision.get("arguments") or {},
                                             row.get("question", ""))
         if ly_do == "thue":
@@ -498,11 +504,16 @@ def score_he_thong(rows: list[dict], outputs: list[str]) -> dict:
             else:
                 o["tham_so_hong"] += 1
                 failures.append((row["_id"], f"tham số {ten} sau chốt không hợp lệ: {loi}"))
+        if o["hoi_thue"] == truoc["hoi_thue"]:
+            row_ids.append(str(row.get("_id")))
+            per_row.append(o["chay_dung"] + o["hoi_lai_dung"]
+                           > truoc["chay_dung"] + truoc["hoi_lai_dung"])
     n_cham = sum(o.values()) - o["hoi_thue"]
     n_du = o["chay_dung"] + o["chan_dau_vao"] + o["tham_so_hong"]
     return {**o, "n_cham": n_cham,
             "an_toan": (n_cham - o["lot"] - o["tham_so_hong"]) / n_cham if n_cham else None,
             "tra_loi_ngay": o["chay_dung"] / n_du if n_du else None,
+            "per_row": per_row, "row_ids": row_ids,
             "failures": failures}
 
 

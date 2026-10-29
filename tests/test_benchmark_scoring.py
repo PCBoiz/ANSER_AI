@@ -593,3 +593,6 @@ def test_he_thong_cham_qua_chot_dau_vao_nhu_production():
     assert kq["lot"] == 0
     assert kq["an_toan"] == 1.0
     assert kq["tra_loi_ngay"] == pytest.approx(2 / 3)
+    # compare_runs ghép cặp theo _id; dòng hỏi VAT theo thiết kế không chấm
+    assert kq["row_ids"] == ["q_du", "q_thieu", "vat_du", "bia"]
+    assert kq["per_row"] == [True, False, True, True]
