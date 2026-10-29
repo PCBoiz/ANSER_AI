@@ -1,0 +1,490 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="utf-8" />
+<title>ANSER - Bao cao BR-05</title>
+<style>
+/* docs/in-pdf.css — kiểu trình bày cho bản HTML và PDF của tài liệu ANSER Brain.
+   Dùng với: pandoc <file>.md -o <file>.html --standalone --embed-resources --css docs/in-pdf.css
+   Rồi in ra PDF bằng msedge --headless --print-to-pdf. */
+
+@page {
+  size: A4;
+  margin: 16mm 14mm 18mm 14mm;
+}
+
+:root {
+  --muc: #1a1a1a;
+  --nhat: #5a5a5a;
+  --vien: #d7dbe0;
+  --nen-phu: #f7f8fa;
+  --xanh: #2f5d8a;
+  --luc: #3f7a3f;
+}
+
+html { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+
+body {
+  font-family: "Segoe UI", Calibri, Helvetica, Arial, sans-serif;
+  font-size: 10.5pt;
+  line-height: 1.55;
+  color: var(--muc);
+  background: #ffffff;
+  max-width: 190mm;
+  margin: 0 auto;
+  padding: 10mm 4mm;
+}
+
+/* Tiêu đề */
+h1 {
+  font-size: 20pt;
+  line-height: 1.25;
+  margin: 0 0 4mm;
+  padding-bottom: 3mm;
+  border-bottom: 2.5px solid var(--xanh);
+  color: var(--xanh);
+}
+h2 {
+  font-size: 14.5pt;
+  margin: 9mm 0 3mm;
+  padding-bottom: 1.5mm;
+  border-bottom: 1px solid var(--vien);
+  break-after: avoid;
+  page-break-after: avoid;
+}
+h3 {
+  font-size: 12pt;
+  margin: 6mm 0 2mm;
+  color: #2b2b2b;
+  break-after: avoid;
+  page-break-after: avoid;
+}
+h4 { font-size: 11pt; margin: 4mm 0 1.5mm; }
+
+p { margin: 0 0 2.5mm; orphans: 3; widows: 3; }
+
+/* Bảng: phần lớn nội dung của bộ tài liệu này nằm trong bảng */
+table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 3mm 0 5mm;
+  font-size: 9pt;
+  break-inside: auto;
+}
+thead { display: table-header-group; }
+tr { break-inside: avoid; page-break-inside: avoid; }
+th, td {
+  border: 1px solid var(--vien);
+  padding: 1.6mm 2.2mm;
+  text-align: left;
+  vertical-align: top;
+}
+th { background: var(--nen-phu); font-weight: 600; }
+td code { white-space: normal; word-break: break-word; }
+
+/* Mã */
+code {
+  font-family: Consolas, "Courier New", monospace;
+  font-size: 9pt;
+  background: #f2f3f5;
+  padding: 0.3mm 1mm;
+  border-radius: 2px;
+}
+pre {
+  background: var(--nen-phu);
+  border: 1px solid var(--vien);
+  border-left: 3px solid var(--xanh);
+  border-radius: 3px;
+  padding: 2.5mm 3mm;
+  overflow-x: auto;
+  font-size: 8.8pt;
+  line-height: 1.45;
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
+pre code { background: none; padding: 0; font-size: inherit; }
+
+/* Trích dẫn: trong bộ tài liệu này là cảnh báo và ghi chú sự cố */
+blockquote {
+  margin: 3mm 0;
+  padding: 2mm 4mm;
+  border-left: 3px solid #c9913f;
+  background: #fdfaf4;
+  color: #3a3a3a;
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
+blockquote p:last-child { margin-bottom: 0; }
+
+/* Hình vẽ */
+img {
+  max-width: 100%;
+  height: auto;
+  display: block;
+  margin: 4mm auto;
+  border: 1px solid var(--vien);
+  border-radius: 3px;
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
+
+ul, ol { margin: 0 0 3mm; padding-left: 6mm; }
+li { margin-bottom: 1.2mm; }
+
+a { color: var(--xanh); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+hr { border: none; border-top: 1px solid var(--vien); margin: 6mm 0; }
+
+/* Mục lục do pandoc sinh */
+nav#TOC {
+  background: var(--nen-phu);
+  border: 1px solid var(--vien);
+  border-radius: 4px;
+  padding: 3mm 5mm;
+  margin: 0 0 6mm;
+  break-after: page;
+  page-break-after: always;
+}
+nav#TOC > ul { padding-left: 4mm; }
+nav#TOC ul { list-style: none; padding-left: 4mm; }
+nav#TOC li { margin-bottom: 0.8mm; font-size: 10pt; }
+
+/* Mỗi mục cấp 2 bắt đầu trang mới, trừ mục đầu */
+h2 { break-before: auto; }
+
+@media print {
+  body { padding: 0; max-width: none; }
+  a { color: var(--muc); }
+  a[href^="http"]::after {
+    content: " (" attr(href) ")";
+    font-size: 7.5pt;
+    color: var(--nhat);
+    word-break: break-all;
+  }
+  a[href^="#"]::after, a[href^="src/"]::after, a[href^="docs/"]::after,
+  a[href^="tests/"]::after, a[href^="offline_training/"]::after,
+  a[href$=".md"]::after { content: ""; }
+}
+
+</style>
+</head>
+<body>
+<nav id="TOC" role="doc-toc">
+<ul>
+<li><a href="#báo-cáo-br-05--phiên-đo-bản-fine-tune-qua-đường-server-bảng-phân-loại-lỗi">BÁO CÁO BR-05 — Phiên đo bản fine-tune qua đường server, bảng phân loại lỗi</a></li>
+<ul>
+<li><a href="#1-tóm-tắt">1. Tóm tắt</a></li>
+<li><a href="#2-điểm-số-để-đối-chiếu--không-phải-đầu-ra-chính">2. Điểm số, để đối chiếu — KHÔNG phải đầu ra chính</a></li>
+<li><a href="#3-bảng-phân-loại-lỗi-yêu-cầu-57">3. Bảng phân loại lỗi (yêu cầu 5–7)</a></li>
+<ul>
+<li><a href="#31-agentic-n19">3.1. agentic (n=19)</a></li>
+<li><a href="#32-extraction-n98">3.2. extraction (n=98)</a></li>
+<li><a href="#33-narration-n27">3.3. narration (n=27)</a></li>
+<li><a href="#34-n8n-n34">3.4. n8n (n=34)</a></li>
+<li><a href="#35-bảng-luật-chọn-tool-mã-n15-chấm-được">3.5. bảng luật chọn tool (mã, n=15 chấm được)</a></li>
+</ul>
+<li><a href="#4-lỗi-khung-đo-tìm-ra-và-đã-sửa-trong-phiên">4. Lỗi khung đo tìm ra và đã sửa trong phiên</a></li>
+<li><a href="#5-khung-đo-còn-lệch--chưa-sửa">5. Khung đo còn lệch — chưa sửa</a></li>
+<li><a href="#6-gợi-ý-cho-vòng-cải-tiến-sau--xếp-theo-rẻ-tới-đắt">6. Gợi ý cho vòng cải tiến sau — xếp theo rẻ tới đắt</a></li>
+<li><a href="#6b-đo-lại-sau-khi-tách-báo-giá-thành-ba-ý-định-28102026">6b. Đo lại sau khi tách "báo giá" thành ba ý định (28/10/2026)</a></li>
+<li><a href="#6c-đo-qua-chốt-đầu-vào-như-production-28102026-d3de025">6c. Đo qua chốt đầu vào, như production (28/10/2026, <code>d3de025</code>)</a></li>
+<li><a href="#6d-so-theo-cặp-với-model-gốc--yêu-cầu-9-29102026-31aafa1">6d. So theo cặp với model gốc — yêu cầu 9 (29/10/2026, <code>31aafa1</code>)</a></li>
+<li><a href="#7-đối-chiếu-yêu-cầu-br-05">7. Đối chiếu yêu cầu BR-05</a></li>
+</ul>
+</ul>
+</nav>
+<h1 id="báo-cáo-br-05--phiên-đo-bản-fine-tune-qua-đường-server-bảng-phân-loại-lỗi">BÁO CÁO BR-05 — Phiên đo bản fine-tune qua đường server, bảng phân loại lỗi</h1>
+<p><strong>Ngày đo:</strong> Thứ Ba 27/10/2026 · <strong>Phân tích:</strong> 28/10/2026 · <strong>Người làm:</strong> Thành · <strong>Đặc tả:</strong> <a href="SRS_CHU_KY_01.md">SRS_CHU_KY_01.md §BR-05</a>
+<strong>Mục đích (chủ dự án chốt 24/10):</strong> <em>chẩn đoán</em> — xem bản fine-tune hổng chỗ nào để biết vòng cải tiến sau sửa gì. Không phải chấm điểm.</p>
+<table>
+<thead>
+<tr><th></th><th></th></tr>
+</thead>
+<tbody>
+<tr><td>Model</td><td><code>anser-v3-awq</code>, phục vụ bằng <code>vllm serve</code> 0.11.2 trên Colab L4 (cấu hình đề xuất ở BR-04: <code>max_model_len</code> 32768, <code>gpu_memory_utilization</code> 0.55)</td></tr>
+<tr><td>Đường đo</td><td><code>--model &#x27;openai:http://127.0.0.1:8001/v1#anser-v3&#x27;</code> — payload dựng bằng <strong>chính <code>ChatRequest</code> của production</strong> (<code>8042584</code>)</td></tr>
+<tr><td>Bộ đề</td><td><code>ANSER_AI_Logistics/generated</code> của phiên 15/08: extraction 98, n8n 34, narration 27, agentic 19</td></tr>
+<tr><td>Mã bộ đo</td><td><code>c57e97b</code> (bốn nhánh đầu) và <code>5501779</code> (agentic, sau khi sửa khung đo — mục 4)</td></tr>
+<tr><td>Dữ liệu thô</td><td><code>br05_tuned.json</code>, <code>br05_tho.jsonl</code>, <code>br05_agentic.json</code>, <code>br05_agentic_tho.jsonl</code> — Drive <code>ANSER_AI_Logistics/br05_2710_0435/</code></td></tr>
+</tbody>
+</table>
+<hr />
+<h2 id="1-tóm-tắt">1. Tóm tắt</h2>
+<ol>
+<li><strong>Ba dòng chốt chặn đều đạt</strong> — <code>[chốt chặn] ràng buộc JSON: ✓ CHẠY</code>, lược đồ agentic dựng được 8/8 tool, trường bị cấm không sinh ra được. Treo #2 của TIEN_TRINH <strong>đóng</strong>.</li>
+<li><strong>Lỗi lớn nhất của nhánh agentic không nằm ở model.</strong> Bảng luật chọn tool (<code>tool_planner.py</code>) đẩy <strong>6/6</strong> câu cần <code>quote</code> sang <code>report</code>; grammar chỉ cho một tên tool, nên model — dù <code>thought</code> ghi đúng <em>"cần gọi công cụ 'quote'"</em> — bị ép gọi <code>report</code>. Nguyên nhân: luật <code>report</code> bắt chữ trần <code>lợi nhuận</code>, và thiết kế <strong>thiếu đường</strong> cho ý định "tính giá bán từ giá nhà xe đã có" (<strong>mã</strong>). Không sửa bằng train lại. <strong>Đã sửa 28/10</strong> bằng cách tách "báo giá" thành ba ý định — bảng luật 40% → 100%, điền tham số 60% → 100% (§6b).</li>
+<li><strong>Extraction hổng ở kỷ luật null.</strong> 63 trường bị điền khi đáng lẽ để trống; <strong>~53 là lỗi model</strong> (xưng hô thành tên, mặc định <code>dau_keo</code>/<code>Hà Nội</code>, chép điểm đến sang điểm đi), <strong>~10 là nhãn bộ đề sai</strong>. Thêm ~21 ca <strong>tính sai ngày tương đối</strong> — LLM đang làm phép tính ngày, trái R1.</li>
+<li><strong>Narration có một ca bịa số nghiêm trọng:</strong> <code>12.709.000</code> thành <strong><code>127.090.000 đồng</code></strong> (gấp 10) trong email báo giá cho khách. Và 12/27 câu cắt cụt vì viết quá dài, 2 trong đó lặp vòng.</li>
+<li><strong>Bộ đo có bốn chỗ sai đã sửa trong phiên</strong> (mục 4) và ba chỗ còn lệch (mục 5) — con số tổng ở mục 2 phải đọc kèm hai mục đó.</li>
+</ol>
+<hr />
+<h2 id="2-điểm-số-để-đối-chiếu--không-phải-đầu-ra-chính">2. Điểm số, để đối chiếu — KHÔNG phải đầu ra chính</h2>
+<table>
+<thead>
+<tr><th>Nhánh</th><th>BR-05 (27/10)</th><th>Phiên 15/08</th><th>Ghi chú đọc số</th></tr>
+</thead>
+<tbody>
+<tr><td>extraction — sẵn sàng báo giá</td><td><strong>65,3%</strong> [55,5–74,0]</td><td>65,3%</td><td>~10 ca trượt do nhãn sai (mục 3.2) → con số thật cao hơn</td></tr>
+<tr><td>extraction — TB các trường</td><td>84,8%</td><td>—</td><td></td></tr>
+<tr><td>n8n — hợp lệ</td><td><strong>85,3%</strong> (29/34) [69,9–93,6]</td><td>67,6%</td><td>khoảng tin cậy vắt qua ngưỡng 90% — chưa kết luận được</td></tr>
+<tr><td>narration — đạt</td><td><strong>48%</strong>; trên phần đo được <strong>87%</strong></td><td>44,4%</td><td>12/27 cắt cụt; một ca "bịa số" là bộ chấm báo nhầm</td></tr>
+<tr><td>bảng luật chọn tool (mã)</td><td><strong>40%</strong> (6/15)</td><td>—</td><td>mã tất định, không có model</td></tr>
+<tr><td>agentic — chịu gọi tool</td><td><strong>93,3%</strong></td><td>—</td><td>đo sau khi sửa khung đo (mục 4.3)</td></tr>
+<tr><td>agentic — biết hỏi lại</td><td>25% (n=4)</td><td>—</td><td>mẫu quá nhỏ</td></tr>
+<tr><td>agentic — điền tham số</td><td>60% (n=5)</td><td>15,8% (chỉ số khác)</td><td>mẫu quá nhỏ; không so trực tiếp với 15/08</td></tr>
+</tbody>
+</table>
+<p>So 15/08 chỉ để định hướng: bộ đo đã đổi nhiều chỗ (payload, grammar, cách chấm agentic). So theo cặp với model gốc (yêu cầu 9): <strong>đã làm 29/10</strong>, xem §6d.</p>
+<hr />
+<h2 id="3-bảng-phân-loại-lỗi-yêu-cầu-57">3. Bảng phân loại lỗi (yêu cầu 5–7)</h2>
+<p>Nguyên nhân quy về một trong ba: <strong>dữ liệu</strong> (huấn luyện hoặc bộ đề), <strong>lược đồ/prompt</strong>, <strong>mã</strong> (mã production hoặc mã khung đo). Số ca đếm trên nguyên văn đầu ra (<code>br05_tho.jsonl</code>) đối chiếu nhãn bộ đề; số đếm của script phân tích khớp đúng từng con số với log bộ đo.</p>
+<h3 id="31-agentic-n19">3.1. agentic (n=19)</h3>
+<table>
+<thead>
+<tr><th>Loại lỗi</th><th>Số ca</th><th>Ví dụ nguyên văn</th><th>Nguyên nhân</th></tr>
+</thead>
+<tbody>
+<tr><td><strong>Bảng luật chọn sai tool</strong>, model bị ép gọi <code>report</code></td><td><strong>6</strong> (mọi câu cần <code>quote</code>)</td><td>AG0014 — <code>&quot;thought&quot;: &quot;…Tôi sẽ gọi công cụ &#x27;quote&#x27;…&quot;</code>, <code>&quot;tool&quot;: &quot;report&quot;</code></td><td><strong>mã</strong> — luật <code>report</code> bắt chữ trần <code>lợi nhuận</code>, và thiết kế thiếu đường cho ý định "tính giá bán từ giá nhà xe". <strong>Đã sửa 28/10, xem §6b</strong></td></tr>
+<tr><td>Luật <code>carrier_selection</code> không khớp câu chào giá; model tự chọn sai tool hoặc hỏi lại</td><td>3</td><td>AG0003 — đáp án <code>carrier_selection</code>, model gọi <code>quote</code></td><td><strong>mã</strong> (luật chỉ bắt "nhà xe nào", "so sánh nhà xe"…) + model</td></tr>
+<tr><td>Bịa tên trường trong <code>pricing_rule</code></td><td>2</td><td>AG0003 — <code>&quot;pricing_rule&quot;: {&quot;discount_rate&quot;: 8, &quot;credit_days&quot;: 30}</code> → 3 lỗi <code>QuoteRequest</code></td><td><strong>lược đồ</strong> — <code>arguments_schema</code> chỉ đóng tầng ngoài, <code>$defs</code> để mở</td></tr>
+<tr><td>Điền <code>0</code> cho giá dầu chưa biết</td><td>2</td><td>AG0003, AG0013 — <code>&quot;current_fuel_price&quot;: 0</code></td><td><strong>lược đồ/prompt</strong> — giá dầu phải do hệ thống cấp (AGENTS §3.1c); "chưa biết" ≠ 0</td></tr>
+<tr><td>Thiếu dữ kiện mà vẫn gọi tool thay vì hỏi lại</td><td>3</td><td>AG0010 — hỏi về biên lợi nhuận và giá dầu, luật bắt <code>report</code> vì chữ "lợi nhuận", model gọi <code>report</code> thay vì <code>hoi_lai</code></td><td>AG0010, AG0018: <strong>mã</strong> (kế hoạch sai) + model; AG0009: <strong>model</strong> (kế hoạch <code>report</code> đúng, lẽ ra phải hỏi lại)</td></tr>
+</tbody>
+</table>
+<p><code>thought</code> <strong>không đáng tin</strong>: nhiều ca ghi <em>"không cần gọi công cụ"</em> rồi vẫn gọi. Không dùng làm bằng chứng.</p>
+<h3 id="32-extraction-n98">3.2. extraction (n=98)</h3>
+<table>
+<thead>
+<tr><th>Loại lỗi</th><th>Số ca</th><th>Ví dụ nguyên văn</th><th>Nguyên nhân</th></tr>
+</thead>
+<tbody>
+<tr><td><strong>Xưng hô thành tên khách</strong></td><td>16</td><td>EX0063 <em>"Chú ơi báo giá giúp tôi…"</em> → <code>customer_name: &quot;chú&quot;</code>; EX0501 <em>"Admin oi…"</em> → <code>&quot;admin&quot;</code>; FU0040 <em>"A Huy oi"</em> (người nhận tin) → <code>&quot;anh Huy&quot;</code></td><td><strong>dữ liệu huấn luyện</strong> — nhãn gộp xưng hô với tên (<em>"anh Tuấn"</em>, <em>"chị Mai"</em> đứng đầu tập train)</td></tr>
+<tr><td><strong>Mặc định loại xe</strong> khi câu không nhắc</td><td>13</td><td>EX0228 <em>"…từ Đông Anh lên Việt Trì, hàng linh kiện điện tử…"</em> → <code>vehicle_type: &quot;dau_keo&quot;</code> (11/13 là <code>dau_keo</code>)</td><td><strong>dữ liệu huấn luyện</strong> — kỷ luật null yếu. Tập train có 174/600 mẫu để trống loại xe và 97/600 mẫu <code>dau_keo</code>, nên model đã thấy cả hai; vì sao nó nghiêng hẳn về <code>dau_keo</code> khi câu không nhắc xe thì chưa rõ</td></tr>
+<tr><td><strong>Điểm đi bịa hoặc chép từ điểm đến</strong></td><td>14</td><td>EX0098 <em>"giao tại Đà Nẵng"</em> → <code>origin: &quot;Đà Nẵng&quot;</code>; EX0664 → <code>&quot;Hải An&quot;</code> (từ tên miền email <code>haianexpress</code>); 8 ca mặc định <code>&quot;Hà Nội&quot;</code></td><td><strong>dữ liệu huấn luyện</strong></td></tr>
+<tr><td>Động từ hoặc xe thành loại hàng</td><td>7</td><td>EX0054 → <code>cargo_type: &quot;lấy hàng&quot;</code>; EX0551 → <code>&quot;xe cont&quot;</code></td><td><strong>dữ liệu huấn luyện</strong></td></tr>
+<tr><td><strong>Tính sai ngày tương đối</strong></td><td>21</td><td>EX0577 <em>"ngày kia"</em>, hôm nay 25/02 → <code>2026-02-26</code> (đúng <code>02-27</code>); EX0248 <em>"thứ 7 tuần sau"</em>, hôm nay 01/10 → <code>10-17</code> (đúng <code>10-10</code>)</td><td><strong>lược đồ/prompt</strong> — bắt LLM tự cộng ngày là trái R1. Bóc cụm ngày bằng mã tất định, model chỉ trích cụm từ</td></tr>
+<tr><td>Câu nối tiếp lấy sai xe/điểm đến</td><td>~10</td><td>FU0063 nhãn <code>1.5T</code> → model <code>5T</code></td><td>dữ liệu huấn luyện (hội thoại nhiều lượt)</td></tr>
+<tr><td><strong>Nhãn bộ đề sai</strong> — câu có nhắc mà nhãn ghi <code>null</code></td><td><strong>10</strong></td><td>EX0034 <em>"…ship <strong>về HP</strong>"</em> nhãn <code>destination: null</code>; EX0063 <em>"giao ngày <strong>t3</strong>"</em> nhãn <code>pickup_date: null</code> (model trả <code>09-08</code>, đúng)</td><td><strong>dữ liệu bộ đề</strong> — DeepSeek sinh ngược để lộ trường phải giấu</td></tr>
+<tr><td>Chấm quá chặt: cùng nghĩa khác chữ</td><td>~6</td><td><code>&quot;Sân bay Nội Bài&quot;</code> vs <code>&quot;Nội Bài&quot;</code>; <code>&quot;gạo&quot;</code> vs <code>&quot;gạo đóng bao&quot;</code></td><td><strong>mã khung đo</strong> — so chuỗi tuyệt đối sau bỏ dấu</td></tr>
+</tbody>
+</table>
+<h3 id="33-narration-n27">3.3. narration (n=27)</h3>
+<table>
+<thead>
+<tr><th>Loại lỗi</th><th>Số ca</th><th>Ví dụ nguyên văn</th><th>Nguyên nhân</th></tr>
+</thead>
+<tbody>
+<tr><td>Viết quá dài, cắt cụt ở trần 2048 token</td><td>10</td><td>NA0026 — 13.877 ký tự; nhóm <code>report</code> 0% vì cắt hết</td><td><strong>dữ liệu huấn luyện / prompt</strong> (độ dài đầu ra)</td></tr>
+<tr><td>Lặp vòng tới trần</td><td>2</td><td>NA0010 — <em>"…mãi mãi mãi mãi…"</em> (một cụm lặp 297 lần), dù đã phạt lặp 1,25</td><td>dữ liệu huấn luyện</td></tr>
+<tr><td><strong>Bịa số</strong></td><td>1</td><td>NA0006 — xem 3.3.1</td><td>dữ liệu huấn luyện</td></tr>
+<tr><td>"Bịa số" do bộ chấm báo nhầm</td><td>1</td><td>NA0001 — ngữ cảnh <code>10250000</code>, model viết <em>"10.25 triệu đồng"</em></td><td><strong>mã khung đo</strong> — đổi cách viết số bị coi là bịa</td></tr>
+<tr><td><strong>Model tự tính</strong> mà bộ chấm bỏ sót</td><td>≥1</td><td>NA0001 — <em>"…một khoản tiền lớn <strong>gấp khoảng 1.2 lần</strong> so với…"</em></td><td><strong>mã khung đo</strong> (chỉ soi số ≥ 4 chữ số) — vi phạm R1 thật</td></tr>
+</tbody>
+</table>
+<h4 id="331-soi-riêng-bịa-số-yêu-cầu-6">3.3.1. Soi riêng bịa số (yêu cầu 6)</h4>
+<table>
+<thead>
+<tr><th>Ca</th><th>Model viết</th><th>Đúng lẽ ra</th><th>Ngữ cảnh</th><th>Mức nghiêm trọng</th></tr>
+</thead>
+<tbody>
+<tr><td>NA0006 <code>[customer]</code></td><td><strong>127.090.000 đồng</strong></td><td><strong>12.709.000 đồng</strong></td><td>email báo giá gửi khách</td><td><strong>Cao</strong> — sai gấp 10, gửi thẳng cho khách, giọng chắc chắn</td></tr>
+<tr><td>NA0001 <code>[carrier]</code></td><td><em>"gấp khoảng 1.2 lần"</em></td><td>không được có — tỷ lệ phải ra từ tool</td><td>so sánh hai nhà xe</td><td>Trung bình — số tự tính, gần đúng (10,25 / 8,6 ≈ 1,19)</td></tr>
+</tbody>
+</table>
+<p>Cả hai là lỗi R1. Ca NA0006 cho thấy: kể cả khi mọi con số có sẵn trong ngữ cảnh, model vẫn <strong>chép sai</strong> — chốt neo số liệu (<code>guard_answer</code>) phải chạy trên narration ở production, không chỉ ở bộ đo.</p>
+<h3 id="34-n8n-n34">3.4. n8n (n=34)</h3>
+<table>
+<thead>
+<tr><th>Loại lỗi</th><th>Số ca</th><th>Ví dụ nguyên văn</th><th>Nguyên nhân</th></tr>
+</thead>
+<tbody>
+<tr><td><code>connections</code> trỏ tới node không tồn tại</td><td>4</td><td><code>connections[&quot;Gửi chủ doanh nghiệp&quot;]</code> trỏ tới <code>&quot;noOp&quot;</code></td><td><strong>lược đồ</strong> — grammar không ép được tham chiếu chéo giữa tên node và <code>connections</code></td></tr>
+<tr><td>Trùng tên node</td><td>1</td><td>hai node cùng tên <code>&quot;Trả kết quả&quot;</code></td><td><strong>lược đồ</strong> (như trên)</td></tr>
+</tbody>
+</table>
+<p><code>validate_workflow()</code> bắt được cả 5 — production không gửi workflow hỏng cho khách, nhưng người dùng nhận lỗi thay vì workflow.</p>
+<h3 id="35-bảng-luật-chọn-tool-mã-n15-chấm-được">3.5. bảng luật chọn tool (mã, n=15 chấm được)</h3>
+<table>
+<thead>
+<tr><th>Loại lỗi</th><th>Số ca</th><th>Ví dụ</th><th>Nguyên nhân</th></tr>
+</thead>
+<tbody>
+<tr><td>Câu báo giá vận tải bị bắt thành <code>report</code></td><td>6</td><td>AG0001 <em>"Nhà xe vừa chào 12.500.000 đồng…, biên lợi nhuận họ tính 8%"</em> → <code>[&quot;report&quot;]</code></td><td><strong>mã</strong> — luật <code>report</code> có chữ trần <code>lợi nhuận</code> (<a href="src/core/tool_planner.py#L157"><code>tool_planner.py:157</code></a>). Bảng luật không có luật <code>quote</code>, vì thiết kế cũ dồn mọi câu "báo giá" về LOGISTICS → n8n — kể cả câu đã có sẵn giá nhà xe. <strong>Đã sửa 28/10 (§6b)</strong></td></tr>
+<tr><td>Luật <code>carrier_selection</code> không khớp</td><td>3</td><td>AG0002 <em>"…Đại An chào 9.400.000 đồng chiết khấu 5%…"</em></td><td><strong>mã</strong> — luật chỉ bắt "nhà xe nào", "chọn/so sánh nhà xe"; câu liệt kê nhiều lời chào giá không khớp</td></tr>
+</tbody>
+</table>
+<hr />
+<h2 id="4-lỗi-khung-đo-tìm-ra-và-đã-sửa-trong-phiên">4. Lỗi khung đo tìm ra và đã sửa trong phiên</h2>
+<table>
+<thead>
+<tr><th>#</th><th>Lỗi</th><th>Hậu quả nếu không sửa</th><th>Sửa</th></tr>
+</thead>
+<tbody>
+<tr><td>4.1</td><td><code>payload_openai</code> tự dựng payload, thiếu <code>enable_thinking=False</code> và <code>repetition_penalty</code></td><td>narration đo ở thinking BẬT, phạt lặp 1,0 — khác thứ khách nhận</td><td><code>8042584</code> — dùng chính <code>ChatRequest</code></td></tr>
+<tr><td>4.2</td><td>Một request quá giờ làm đổ cả phiên; JSON chỉ ghi ở cuối; không lưu nguyên văn</td><td>mất sạch kết quả bốn nhánh; không có ví dụ cho bảng này</td><td><code>c57e97b</code> — <code>timeout</code> thành lý do dừng riêng, ghi JSON sau mỗi nhánh, <code>--tho</code></td></tr>
+<tr><td>4.3</td><td>Nhánh agentic để ngỏ <code>answer</code>, trong khi production khoá (<code>bat_buoc_tool=True</code>)</td><td>"không gọi tool dù đủ dữ kiện" 6/19 ca — đo cái cửa khách không đi qua. Sau sửa: chịu gọi tool 60% → <strong>93,3%</strong></td><td><code>5501779</code></td></tr>
+<tr><td>4.4</td><td><code>ChatRequest</code> cảnh báo hạ <code>repetition_penalty</code> cho một con số không ai đặt</td><td>log ngập hơn trăm dòng, production in ở mọi bước agentic</td><td><code>c57e97b</code></td></tr>
+</tbody>
+</table>
+<h2 id="5-khung-đo-còn-lệch--chưa-sửa">5. Khung đo còn lệch — chưa sửa</h2>
+<ol>
+<li><strong>Bộ chấm agentic không đo việc chọn tool.</strong> AG0001 và AG0004 được chấm <em>đạt</em> dù gọi <code>report</code> cho câu cần <code>quote</code>. Điểm agentic <strong>đẹp hơn</strong> thực tế.</li>
+<li><strong>Bộ chấm narration chỉ soi số ≥ 4 chữ số</strong> — bỏ sót phép tính tỷ lệ của model (NA0001), và <strong>báo nhầm</strong> khi model đổi cách viết số (<code>10250000</code> → "10.25 triệu").</li>
+<li><strong>~10 nhãn sai trong <code>eval_extraction.jsonl</code></strong> và chấm chuỗi tuyệt đối — sẵn sàng báo giá 65,3% là cận dưới.</li>
+</ol>
+<hr />
+<h2 id="6-gợi-ý-cho-vòng-cải-tiến-sau--xếp-theo-rẻ-tới-đắt">6. Gợi ý cho vòng cải tiến sau — xếp theo rẻ tới đắt</h2>
+<p>Đây là <strong>đầu vào</strong> cho quyết định, không phải quyết định (SRS BR-05: "Không huấn luyện lại model trong chu kỳ này").</p>
+<table>
+<thead>
+<tr><th>Việc</th><th>Loại</th><th>Kéo lên chỗ nào</th><th>Công ước lượng</th></tr>
+</thead>
+<tbody>
+<tr><td>Chốt câu báo giá đi nhánh nào (LOGISTICS/n8n hay agentic <code>quote</code>), rồi sửa theo: bỏ chữ trần <code>lợi nhuận</code> khỏi luật <code>report</code>, mở rộng luật <code>carrier_selection</code>, và sửa <code>eval_agent.jsonl</code> cho khớp thiết kế</td><td>mã + bộ đề</td><td>agentic, bảng luật</td><td>~nửa ngày, sau khi chốt</td></tr>
+<tr><td>Bóc ngày tương đối bằng mã tất định; model chỉ trích cụm từ ("ngày kia")</td><td>lược đồ + mã</td><td>extraction <code>pickup_date</code> (~21 ca)</td><td>~1 ngày</td></tr>
+<tr><td>Đóng <code>$defs</code> của <code>pricing_rule</code>; <code>current_fuel_price</code> do hệ thống cấp</td><td>lược đồ</td><td>agentic điền tham số</td><td>~nửa ngày</td></tr>
+<tr><td>Chốt neo số liệu (<code>guard_answer</code>) trên narration ở production</td><td>mã</td><td>bịa số (NA0006)</td><td>kiểm xem đã chạy chưa</td></tr>
+<tr><td>Sửa bộ chấm (mục 5) + sửa 10 nhãn bộ đề</td><td>mã khung đo + dữ liệu bộ đề</td><td>độ tin của mọi phiên đo sau</td><td>~1 ngày</td></tr>
+<tr><td>Dữ liệu huấn luyện: tách xưng hô khỏi tên; thêm ca để trống trường; giới hạn độ dài narration</td><td>dữ liệu huấn luyện</td><td>extraction null (~53 ca), narration cắt cụt</td><td>thuộc quyết định huấn luyện lại</td></tr>
+</tbody>
+</table>
+<p><strong>Kết luận chẩn đoán:</strong> phần lớn lỗi <em>rẻ nhất để sửa</em> nằm ở <strong>mã và lược đồ</strong>, không ở model. Nên sửa các dòng "mã" và "lược đồ" trước rồi đo lại, <em>sau đó</em> mới quyết có huấn luyện lại không — đúng bài học ba lần trước của dự án: con số xấu đến từ mã trước khi đến từ model.</p>
+<hr />
+<h2 id="6b-đo-lại-sau-khi-tách-báo-giá-thành-ba-ý-định-28102026">6b. Đo lại sau khi tách "báo giá" thành ba ý định (28/10/2026)</h2>
+<p>Chủ dự án chốt giữ cả hai đường, tách theo ý định bằng luật từ khoá (<code>b4091f7</code>): khách xin báo giá → LOGISTICS/n8n; <strong>tính giá bán từ giá nhà xe + biên</strong> → agentic <code>quote</code>; <strong>so ≥ 2 lời chào giá</strong> → agentic <code>carrier_selection</code>. Luật <code>report</code> và luật REPORT của router thôi bắt "<strong>biên</strong> lợi nhuận". Đo lại riêng bảng luật và agentic (<code>4911302</code>; ba nhánh kia không đổi mã):</p>
+<table>
+<thead>
+<tr><th>Chỉ số</th><th>BR-05 (27/10)</th><th>Sau tách ý định</th></tr>
+</thead>
+<tbody>
+<tr><td>Bảng luật chọn đúng tool</td><td>40% (6/15)</td><td><strong>100% (15/15)</strong></td></tr>
+<tr><td>Agentic — chịu gọi tool khi đủ dữ kiện</td><td>93,3%</td><td><strong>100%</strong></td></tr>
+<tr><td>Agentic — điền tham số đúng kiểu</td><td>60% (n=5)</td><td><strong>100% (n=9)</strong></td></tr>
+<tr><td>Agentic — biết hỏi lại khi thiếu dữ kiện</td><td>25% (n=4)</td><td>25% (n=4)</td></tr>
+</tbody>
+</table>
+<p>Đọc số:</p>
+<ul>
+<li><strong>Luật được viết SAU khi thấy bộ đề</strong>, nên 15/15 là cận trên. Đối trọng: 13 câu viết mới không lấy từ bộ đề (gồm ca không được khớp, câu không dấu) đều đúng, và 249 chuỗi trong 4 file test chỉ đổi kế hoạch ở 1 câu chú thích — đúng hướng.</li>
+<li><strong>Tham số <code>quote</code> đúng kiểu ở cả 6 câu</strong> khi được đưa đúng tool. Hai ca bịa <code>pricing_rule.discount_rate</code> ở §3.1 phần lớn là hệ quả của việc bị đưa sai tool.</li>
+<li><strong>"Biết hỏi lại" 25% không phải lỗi model ở đường production.</strong> AG0010, AG0018 (có biên, chưa có giá nhà xe) cố ý không có kế hoạch — và production chỉ vào vòng agentic khi CÓ kế hoạch, nên hai câu này không tới đó. Bộ đo vẫn cho model tự chọn giữa 8 tool; nó chọn <code>quote</code>, tức sẽ phải bịa giá nhà xe — đáng ghi nhận, nhưng đó là đường không tồn tại. AG0009 gọi <code>report</code> khi "chưa có số liệu": ở production <code>report</code> lấy số liệu hệ thống và tự báo thiếu, nên hành vi chấp nhận được; nhãn "phải hỏi lại" có thể tranh cãi.</li>
+<li><strong>Khung đo còn lệch thêm một chỗ:</strong> câu không có kế hoạch được chấm qua vòng agentic với lược đồ tự do, trong khi production đưa chúng sang nhánh router. Sửa: bộ đo bỏ qua (hoặc chấm riêng) các câu không có kế hoạch.</li>
+<li><strong>Khoảng trống <code>carrier_selection</code> — đã đóng 28/10 (<code>7da7a9f</code>).</strong> Trước đó tool định tuyến đúng nhưng lấy nhà xe/lời chào từ hệ thống (chưa có nguồn), nên người dùng liệt kê lời chào vẫn nhận câu hỏi lại. Nay mã bóc ≥ 2 lời chào từ câu (tên, giá, chiết khấu, công nợ) thành <code>carriers</code>/<code>offers</code>; model chỉ điền tuyến. Giới hạn: chỉ đọc dạng "tên + số tiền"; tiêu chí không có trong câu tool tự bỏ. Cùng commit, <code>vat</code>/<code>quote</code> có chốt neo đầu vào (BAO_CAO_BR04 §5.2); đo qua chốt ở §6c.</li>
+</ul>
+<p><strong>pytest trên đúng mã đã đo (<code>4911302</code>, Colab, 28/10):</strong> <code>1067 passed, 4 skipped</code>; riêng hai file luật định tuyến <code>59 passed</code>. Sau <code>7da7a9f</code>: <code>1110 passed, 4 skipped</code>.</p>
+<p>Dữ liệu thô: Drive <code>ANSER_AI_Logistics/br05b_*</code>.</p>
+<hr />
+<h2 id="6c-đo-qua-chốt-đầu-vào-như-production-28102026-d3de025">6c. Đo qua chốt đầu vào, như production (28/10/2026, <code>d3de025</code>)</h2>
+<p>Từ <code>4c05171</code>, tham số model điền cho <code>vat</code>/<code>quote</code>/<code>carrier_selection</code> đi qua <code>doc_dau_vao.chot_dau_vao</code> trước khi tool chạy — benchmark gọi đúng hàm đó (bảng "qua chốt đầu vào"). Cùng bộ đề 19 câu, vLLM 0.11.2 trên L4, ctx 32768.</p>
+<table>
+<thead>
+<tr><th>Chỉ số</th><th>Kết quả</th></tr>
+</thead>
+<tbody>
+<tr><td>Bảng luật chọn đúng tool</td><td>100% (15/15) — không đổi</td></tr>
+<tr><td>Model: chịu gọi tool / điền tham số đúng kiểu</td><td>100% / 100% (n=9) — không đổi</td></tr>
+<tr><td>Model: biết hỏi lại</td><td>25% (n=4) — không đổi; AG0009 <code>report</code>, AG0010, AG0018 <code>quote</code></td></tr>
+<tr><td><strong>Qua chốt: an toàn</strong> (không ca nào tính trên đầu vào sai)</td><td><strong>100%</strong> (11 dòng chấm, <strong>lọt 0</strong>)</td></tr>
+<tr><td><strong>Qua chốt: trả lời ngay</strong> (đủ dữ kiện thì tính luôn)</td><td>77,8% (7/9)</td></tr>
+<tr><td>Hỏi VAT theo thiết kế</td><td>3 câu hoá đơn không nói giá gồm VAT chưa</td></tr>
+</tbody>
+</table>
+<p><strong>Đọc tham số thô của bốn ca bị chặn:</strong></p>
+<table>
+<thead>
+<tr><th>Ca</th><th>Model điền</th><th>Chốt</th></tr>
+</thead>
+<tbody>
+<tr><td>AG0010, AG0018 (chưa có giá nhà xe)</td><td><code>carrier_cost: 0</code>; <code>pricing_rule</code> sai kiểu (<code>&quot;default&quot;</code>, khoá tự đặt)</td><td>chặn — đúng: model lỡ gọi tool, khách nhận câu hỏi lại thay vì số</td></tr>
+<tr><td>AG0001</td><td><code>min_margin_amount: 1000000</code>, <code>fuel_sensitivity: 0.05</code> — câu không nói tới cả hai</td><td>chặn khoản 1.000.000 — <strong>model bịa thật</strong>, không phải báo nhầm</td></tr>
+<tr><td>AG0015 (lần chạy 2)</td><td>bỏ <code>fuel_baseline_price</code> dù câu có 26.500; <code>fuel_sensitivity: 0.05</code></td><td>hỏi lại 26.500 — đúng</td></tr>
+</tbody>
+</table>
+<p><strong>Phát hiện mới: <code>fuel_sensitivity</code> bị bịa ở cả hai câu đủ dữ kiện.</strong> Mặc định đã hiệu chỉnh là 0,35; model điền 0,05 — phần điều chỉnh theo giá dầu nhỏ đi 7 lần mà vẫn "có nguồn từ tool". Chốt lúc đó chỉ soi số tiền nên <strong>lọt</strong>. Chủ dự án chốt: tham số chính sách giá câu không nói tới thì <strong>mã xoá, tool dùng mặc định, vẫn tính ngay</strong> (<code>fuel_sensitivity</code> trừ khi câu nói "độ nhạy / hệ số giá dầu"; <code>min_margin_amount</code>, <code>fuel_baseline_price</code> khi số không có trong câu). Cùng lớp lỗi, <code>base_margin_pct</code> phải có dạng "N%" trong câu, không có thì hỏi lại (trường bắt buộc, không có mặc định để rơi về). Cài ở <code>86a2b2c</code>, đo lại cùng phiên:</p>
+<table>
+<thead>
+<tr><th>Qua chốt đầu vào</th><th><code>d3de025</code></th><th><code>86a2b2c</code></th></tr>
+</thead>
+<tbody>
+<tr><td>An toàn</td><td>100%</td><td><strong>100%</strong> (lọt 0, tham số hỏng 0)</td></tr>
+<tr><td>Trả lời ngay</td><td>77,8% (7/9)</td><td><strong>88,9% (8/9)</strong></td></tr>
+<tr><td>Chặn đầu vào lệch</td><td>2 (AG0001, AG0015)</td><td>1 (AG0015)</td></tr>
+</tbody>
+</table>
+<p>Ca còn lại, AG0015: model bỏ giá dầu lúc chốt 26.500 mà câu có — hỏi lại là đúng. Bỏ được lượt hỏi này cần bộ bóc riêng cho câu tính giá (phân biệt giá dầu hiện tại với giá lúc chốt), chưa làm. pytest <code>86a2b2c</code>: <code>1159 passed, 4 skipped</code>.</p>
+<p><strong>Lưu ý đo:</strong> hai lần chạy cùng <code>temperature=0</code> cho AG0015 hai đầu ra khác nhau (lần 1 bịa 1.000.000, lần 2 bỏ 26.500). Batching của vLLM không bảo đảm tất định theo từng câu — số ở bảng trên dao động ±1 ca.</p>
+<p>Kết quả: <code>br05c.json</code> / <code>br05d.json</code> và đầu ra thô <code>br05c_tho.jsonl</code> / <code>br05d_tho.jsonl</code>, chép lên Drive <code>ANSER_AI_Logistics/</code>.</p>
+<hr />
+<h2 id="6d-so-theo-cặp-với-model-gốc--yêu-cầu-9-29102026-31aafa1">6d. So theo cặp với model gốc — yêu cầu 9 (29/10/2026, <code>31aafa1</code>)</h2>
+<p>Hai lần chạy trọn bốn nhánh, <strong>cùng commit, cùng phiên, cùng cấu hình</strong> (vLLM 0.11.2, L4, ctx 32768, <code>gpu_memory_utilization</code> 0.85, không nạp vision): bản gốc <strong><code>Qwen/Qwen3-8B-AWQ</code></strong> (AWQ chính thức của Qwen — so AWQ với AWQ để phần chênh là của fine-tune, không lẫn tác động lượng tử hoá) và bản fine-tune <code>anser-v3-awq</code>. So bằng <code>compare_runs.py</code> (McNemar trên các câu hai bên khác nhau).</p>
+<table>
+<thead>
+<tr><th>Nhánh</th><th>Gốc</th><th>Fine-tune</th><th>Fine-tune sửa được</th><th><strong>Fine-tune LÀM HỎNG</strong></th><th>p</th><th>Kết luận</th></tr>
+</thead>
+<tbody>
+<tr><td>extraction (sẵn sàng báo giá, n=98)</td><td>0,0%</td><td><strong>64,3%</strong></td><td>63</td><td><strong>0</strong></td><td>0,0000</td><td>fine-tune hơn rõ</td></tr>
+<tr><td>n8n hợp lệ (n=34)</td><td>29,4%</td><td><strong>88,2%</strong></td><td>21</td><td><strong>1</strong></td><td>0,0000</td><td>fine-tune hơn rõ</td></tr>
+<tr><td>narration (n=27)</td><td><strong>77,8%</strong></td><td>63,0%</td><td>3</td><td><strong>7</strong></td><td>0,34</td><td>chưa đủ bằng chứng</td></tr>
+<tr><td>bảng luật chọn tool (n=15)</td><td>100%</td><td>100%</td><td>0</td><td>0</td><td>1,00</td><td>giống hệt — mã tất định</td></tr>
+<tr><td>agentic (n=19)</td><td>78,9%</td><td>84,2%</td><td>1</td><td>0</td><td>1,00</td><td>ngang nhau</td></tr>
+</tbody>
+</table>
+<p>Qua chốt đầu vào (không ghép cặp được ở lần này — sửa sau đó, xem cuối mục):</p>
+<table>
+<thead>
+<tr><th></th><th>Gốc</th><th>Fine-tune</th></tr>
+</thead>
+<tbody>
+<tr><td>An toàn</td><td>100% (lọt 0)</td><td>100% (lọt 0)</td></tr>
+<tr><td>Trả lời ngay</td><td>44,4% (4/9) — bỏ giá dầu lúc chốt ở 4 câu, bịa phụ phí 150.000 ở AG0011</td><td><strong>100% (9/9)</strong></td></tr>
+<tr><td>Biết hỏi lại (model)</td><td>0% (4/4 câu thiếu dữ kiện vẫn gọi tool)</td><td>25%</td></tr>
+</tbody>
+</table>
+<p><strong>Đọc từng nhánh.</strong></p>
+<ul>
+<li><strong>extraction, n8n: fine-tune là lý do tồn tại của nó.</strong> Bản gốc không ra nổi một yêu cầu báo giá đủ ba trường bắt buộc (0/98), và hỏng <code>connections.main</code> (không phải mảng của mảng) ở phần lớn workflow. Câu duy nhất fine-tune làm hỏng ở n8n — <code>n8n_eval_thue_soat_co_thue_danh_muc</code> — trỏ tới node <code>noOp</code> không tồn tại; cùng mẫu lỗi xuất hiện ở 2 trong 4 ca trượt của fine-tune → <strong>dữ liệu huấn luyện</strong> (workflow mẫu có nhánh "không làm gì" mà không khai node).</li>
+<li><p><strong>narration: 7 câu fine-tune làm hỏng thì 6 là CẮT CỤT</strong> (NA0002, NA0008, NA0009, NA0011, NA0016, NA0019 chạm trần 2048 token), 1 là bịa số (NA0022 <code>[report]</code> 360947). Bản gốc không cắt cụt câu nào; nó trượt vì <strong>bịa số ở 6 câu</strong> (NA0000, NA0001, NA0003, NA0017, NA0021, NA0023). Trên phần đo được, fine-tune đạt 94%.</p>
+<ul>
+<li>Trần benchmark <strong>bằng đúng trần production</strong> (<code>manager.MAX_REPORT_TOKENS = 2048</code>, yêu cầu 4) — nên cắt cụt ở đây cũng là cắt cụt khách nhận.</li>
+<li><strong>Đọc đầu ra thô: không phải "viết dài" mà là SUY BIẾN.</strong> NA0002, NA0009, NA0019 (5.252–13.628 ký tự) hết ý thì trôi sang chữ Hán hoặc kê từ tiếng Anh không dứt (<em>"pull drag haul yank jerk toss…"</em>), rồi lặp một cụm tới trần (<em>"无所不能无所不能…"</em>). Nới trần chỉ sinh thêm rác.</li>
+<li><p><strong>Đo <code>repetition_penalty</code></strong> (biến <code>TEXT_REPETITION_PENALTY</code>, <code>b896443</code>; chỉ nhánh narration, bản fine-tune):</p>
+<table>
+<thead>
+<tr><th>Mức phạt</th><th>Đạt</th><th>Cắt cụt</th><th>Đạt trên phần đo được</th></tr>
+</thead>
+<tbody>
+<tr><td>1,25 (mặc định)</td><td>37%</td><td>13/27</td><td>71%</td></tr>
+<tr><td>1,1</td><td>44%</td><td>5/27</td><td>55%</td></tr>
+<tr><td>1,0</td><td>52%</td><td>6/27</td><td>67%</td></tr>
+</tbody>
+</table>
+<p>Hạ phạt giảm suy biến nhưng không hết, và bịa số tăng — nhiều số bịa lệch <strong>×10</strong> (127.090.000 thay 12.709.000, đúng ca NA0006 ở §3). Cùng mức 1,25 hai lần chạy ra 9 và 13 ca cắt cụt: dao động lớn, n=27 một lần chạy không đủ để chọn mức. <strong>Gốc ở dữ liệu huấn luyện</strong> (không biết dừng; chép sai dấu ngăn nghìn), không ở tham số sinh.</p></li>
+<li><strong>Chủ dự án chốt (29/10):</strong> giữ 1,25; thêm <strong>chốt suy biến</strong> ở production (<code>grounding.kiem_suy_bien</code>): câu trả lời có chữ Hán, hoặc 100 ký tự cuối đã xuất hiện nguyên văn ở phía trước, thì thay bằng câu an toàn và ghi <code>blocked_reason</code>. Chốt số liệu không bắt được loại này vì rác không chứa số, và nó xảy ra cả ở nhánh không có <code>grounding_ctx</code>. TECHNICAL đứng ngoài (đầu ra JSON). Kê từ tiếng Anh mà <strong>chưa</strong> kịp lặp thì chốt chưa bắt — còn hở.</li>
+<li>Về R1: gốc bịa số 6/27, fine-tune bịa 1/27 trên phần đo được (+9 ca cắt cụt không chấm được số). Fine-tune <strong>ít bịa hơn</strong>, nhưng nói dài tới mức hỏng.</li>
+</ul></li>
+<li><strong>agentic: model gần như không đóng góp khác biệt</strong> — bảng luật chọn tool, chốt đầu vào giữ an toàn với cả hai bản. Khác biệt thật nằm ở <strong>trả lời ngay</strong>: bản gốc bỏ sót/bịa đầu vào ở 5/9 câu đủ dữ kiện (chốt bắt hết, khách phải trả lời lại), fine-tune 0/9.</li>
+</ul>
+<p><strong>Trả lời câu của yêu cầu 9 — "fine-tune làm hỏng câu nào mà bản gốc vốn đúng":</strong> 8 câu — 1 workflow n8n (node <code>noOp</code>), 6 diễn giải cắt cụt, 1 diễn giải bịa số. Đổi lại fine-tune sửa 88 câu. <strong>Giữ bản fine-tune</strong>; ba việc cho vòng huấn luyện sau: (1) narration không biết dừng → suy biến; (2) chép sai dấu ngăn nghìn (lệch ×10); (3) mẫu <code>noOp</code> trong dữ liệu n8n.</p>
+<p><strong>Khung đo:</strong> <code>agentic_he_thong</code> chưa ghi kết quả từng câu nên <code>compare_runs</code> báo "không có câu chung" — đã thêm <code>per_row</code>/<code>row_ids</code> sau lần đo này (chỉ dòng được chấm, ghép theo <code>_id</code>).</p>
+<p>Dữ liệu: Drive <code>ANSER_AI_Logistics/br05_goc.json</code>, <code>br05_ft.json</code> và hai file <code>*_tho.jsonl</code>.</p>
+<hr />
+<h2 id="7-đối-chiếu-yêu-cầu-br-05">7. Đối chiếu yêu cầu BR-05</h2>
+<table>
+<thead>
+<tr><th>#</th><th>Yêu cầu</th><th>Trạng thái</th></tr>
+</thead>
+<tbody>
+<tr><td>1</td><td>Chạy <code>benchmark_v3.py</code> trên <code>anser-v3-awq</code> qua đường server</td><td><strong>Đạt</strong></td></tr>
+<tr><td>2</td><td>Đọc ba dòng cảnh báo khung đo trước điểm số</td><td><strong>Đạt</strong> — mục 1, 4, 5</td></tr>
+<tr><td>3</td><td><code>smoke_test_guided()</code> báo ràng buộc đang thi hành</td><td><strong>Đạt</strong> — <code>[chốt chặn] ràng buộc JSON: ✓ CHẠY</code></td></tr>
+<tr><td>4</td><td>Dùng chung hằng số trần token</td><td><strong>Đạt</strong> — <code>tran_token()</code> import <code>MAX_*_TOKENS</code> của production</td></tr>
+<tr><td>5</td><td>Bảng phân loại lỗi theo nhánh, số ca, ví dụ nguyên văn</td><td><strong>Đạt</strong> — mục 3</td></tr>
+<tr><td>6</td><td>Soi riêng bịa số</td><td><strong>Đạt</strong> — mục 3.3.1</td></tr>
+<tr><td>7</td><td>Quy mỗi loại về dữ liệu / lược đồ-prompt / mã khung đo</td><td><strong>Đạt</strong> — mục 3</td></tr>
+<tr><td>8</td><td>Cập nhật TIEN_TRINH: treo #1, #2</td><td><strong>Đạt</strong> — treo #2 đóng; treo #1 <em>chưa đóng được</em> (agentic bị lỗi bảng luật che)</td></tr>
+<tr><td>9</td><td>(NÊN) So cặp với model gốc</td><td><strong>Đạt</strong> (29/10) — §6d: fine-tune làm hỏng 8 câu, sửa 88; giữ fine-tune</td></tr>
+</tbody>
+</table>
+</body>
+</html>

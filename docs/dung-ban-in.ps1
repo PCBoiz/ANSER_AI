@@ -26,6 +26,8 @@ $TaiLieu = @{
     "SRS_CHU_KY_01"    = "ANSER - SRS chu ky 01"
     "PHAN_VIEC_CHU_KY_01" = "ANSER - Phan viec chu ky 01"
     "BAO_CAO_BR04" = "ANSER - Bao cao BR-04"
+    "BAO_CAO_BR05" = "ANSER - Bao cao BR-05"
+    "BIEN_BAN_CHU_KY_01" = "ANSER - Bien ban chu ky 01"
 }
 
 function Tim-Lenh([string[]]$duongDan, [string]$ten) {

@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="utf-8" />
+<title>ANSER - Bien ban chu ky 01</title>
+<style>
+/* docs/in-pdf.css — kiểu trình bày cho bản HTML và PDF của tài liệu ANSER Brain.
+   Dùng với: pandoc <file>.md -o <file>.html --standalone --embed-resources --css docs/in-pdf.css
+   Rồi in ra PDF bằng msedge --headless --print-to-pdf. */
+
+@page {
+  size: A4;
+  margin: 16mm 14mm 18mm 14mm;
+}
+
+:root {
+  --muc: #1a1a1a;
+  --nhat: #5a5a5a;
+  --vien: #d7dbe0;
+  --nen-phu: #f7f8fa;
+  --xanh: #2f5d8a;
+  --luc: #3f7a3f;
+}
+
+html { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+
+body {
+  font-family: "Segoe UI", Calibri, Helvetica, Arial, sans-serif;
+  font-size: 10.5pt;
+  line-height: 1.55;
+  color: var(--muc);
+  background: #ffffff;
+  max-width: 190mm;
+  margin: 0 auto;
+  padding: 10mm 4mm;
+}
+
+/* Tiêu đề */
+h1 {
+  font-size: 20pt;
+  line-height: 1.25;
+  margin: 0 0 4mm;
+  padding-bottom: 3mm;
+  border-bottom: 2.5px solid var(--xanh);
+  color: var(--xanh);
+}
+h2 {
+  font-size: 14.5pt;
+  margin: 9mm 0 3mm;
+  padding-bottom: 1.5mm;
+  border-bottom: 1px solid var(--vien);
+  break-after: avoid;
+  page-break-after: avoid;
+}
+h3 {
+  font-size: 12pt;
+  margin: 6mm 0 2mm;
+  color: #2b2b2b;
+  break-after: avoid;
+  page-break-after: avoid;
+}
+h4 { font-size: 11pt; margin: 4mm 0 1.5mm; }
+
+p { margin: 0 0 2.5mm; orphans: 3; widows: 3; }
+
+/* Bảng: phần lớn nội dung của bộ tài liệu này nằm trong bảng */
+table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 3mm 0 5mm;
+  font-size: 9pt;
+  break-inside: auto;
+}
+thead { display: table-header-group; }
+tr { break-inside: avoid; page-break-inside: avoid; }
+th, td {
+  border: 1px solid var(--vien);
+  padding: 1.6mm 2.2mm;
+  text-align: left;
+  vertical-align: top;
+}
+th { background: var(--nen-phu); font-weight: 600; }
+td code { white-space: normal; word-break: break-word; }
+
+/* Mã */
+code {
+  font-family: Consolas, "Courier New", monospace;
+  font-size: 9pt;
+  background: #f2f3f5;
+  padding: 0.3mm 1mm;
+  border-radius: 2px;
+}
+pre {
+  background: var(--nen-phu);
+  border: 1px solid var(--vien);
+  border-left: 3px solid var(--xanh);
+  border-radius: 3px;
+  padding: 2.5mm 3mm;
+  overflow-x: auto;
+  font-size: 8.8pt;
+  line-height: 1.45;
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
+pre code { background: none; padding: 0; font-size: inherit; }
+
+/* Trích dẫn: trong bộ tài liệu này là cảnh báo và ghi chú sự cố */
+blockquote {
+  margin: 3mm 0;
+  padding: 2mm 4mm;
+  border-left: 3px solid #c9913f;
+  background: #fdfaf4;
+  color: #3a3a3a;
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
+blockquote p:last-child { margin-bottom: 0; }
+
+/* Hình vẽ */
+img {
+  max-width: 100%;
+  height: auto;
+  display: block;
+  margin: 4mm auto;
+  border: 1px solid var(--vien);
+  border-radius: 3px;
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
+
+ul, ol { margin: 0 0 3mm; padding-left: 6mm; }
+li { margin-bottom: 1.2mm; }
+
+a { color: var(--xanh); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+hr { border: none; border-top: 1px solid var(--vien); margin: 6mm 0; }
+
+/* Mục lục do pandoc sinh */
+nav#TOC {
+  background: var(--nen-phu);
+  border: 1px solid var(--vien);
+  border-radius: 4px;
+  padding: 3mm 5mm;
+  margin: 0 0 6mm;
+  break-after: page;
+  page-break-after: always;
+}
+nav#TOC > ul { padding-left: 4mm; }
+nav#TOC ul { list-style: none; padding-left: 4mm; }
+nav#TOC li { margin-bottom: 0.8mm; font-size: 10pt; }
+
+/* Mỗi mục cấp 2 bắt đầu trang mới, trừ mục đầu */
+h2 { break-before: auto; }
+
+@media print {
+  body { padding: 0; max-width: none; }
+  a { color: var(--muc); }
+  a[href^="http"]::after {
+    content: " (" attr(href) ")";
+    font-size: 7.5pt;
+    color: var(--nhat);
+    word-break: break-all;
+  }
+  a[href^="#"]::after, a[href^="src/"]::after, a[href^="docs/"]::after,
+  a[href^="tests/"]::after, a[href^="offline_training/"]::after,
+  a[href$=".md"]::after { content: ""; }
+}
+
+</style>
+</head>
+<body>
+<nav id="TOC" role="doc-toc">
+<ul>
+<li><a href="#biên-bản-chu-kỳ-01--2610-đến-06112026">BIÊN BẢN CHU KỲ 01 — 26/10 đến 06/11/2026</a></li>
+<ul>
+<li><a href="#1-tóm-tắt">1. Tóm tắt</a></li>
+<li><a href="#2-việc-brain--trạng-thái">2. Việc Brain — trạng thái</a></li>
+<li><a href="#3-cổng-ra-chu-kỳ-srs-7">3. Cổng ra chu kỳ (SRS §7)</a></li>
+<li><a href="#4-việc-treo-của-tien_trinh">4. Việc treo của TIEN_TRINH</a></li>
+<li><a href="#5-phát-hiện-ngoài-kế-hoạch-đã-xử-lý">5. Phát hiện ngoài kế hoạch, đã xử lý</a></li>
+<ul>
+<li><a href="#51-model-chép-sai-đầu-vào-tool--chốt-đầu-vào-srccoredoc_dau_vaopy">5.1. Model chép sai đầu vào tool — chốt đầu vào (<code>src/core/doc_dau_vao.py</code>)</a></li>
+<li><a href="#52-model-suy-biến--chốt-suy-biến-groundingkiem_suy_bien">5.2. Model suy biến — chốt suy biến (<code>grounding.kiem_suy_bien</code>)</a></li>
+<li><a href="#53-các-quyết-định-chủ-dự-án-đã-chốt-trong-chu-kỳ">5.3. Các quyết định chủ dự án đã chốt trong chu kỳ</a></li>
+</ul>
+<li><a href="#6-rủi-ro-lớn-nhất-ci-của-repo-chưa-từng-chạy">6. Rủi ro lớn nhất: CI của repo chưa từng chạy</a></li>
+<li><a href="#7-đẩy-sang-chu-kỳ-02">7. Đẩy sang chu kỳ 02</a></li>
+<ul>
+<li><a href="#71-theo-kế-hoạch">7.1. Theo kế hoạch</a></li>
+<li><a href="#72-đầu-vào-cho-vòng-huấn-luyện-lại-lỗi-do-dữ-liệu-bao_cao_br05">7.2. Đầu vào cho vòng huấn luyện lại (lỗi do <strong>dữ liệu</strong>, BAO_CAO_BR05)</a></li>
+<li><a href="#73-hở-đã-biết-của-các-chốt-mới">7.3. Hở đã biết của các chốt mới</a></li>
+<li><a href="#74-khung-đo">7.4. Khung đo</a></li>
+</ul>
+<li><a href="#8-chi-phí-thật-nfr-02">8. Chi phí thật (NFR-02)</a></li>
+<li><a href="#9-việc-còn-mở-cần-quyết-trước-khi-khép-chu-kỳ">9. Việc còn mở, cần quyết trước khi khép chu kỳ</a></li>
+<li><a href="#10-phần-body-đội-body-điền">10. Phần Body (đội Body điền)</a></li>
+</ul>
+</ul>
+</nav>
+<h1 id="biên-bản-chu-kỳ-01--2610-đến-06112026">BIÊN BẢN CHU KỲ 01 — 26/10 đến 06/11/2026</h1>
+<p><strong>Viết:</strong> 29/10/2026 · <strong>Phần Brain:</strong> Thành · <strong>Phần Body:</strong> Sĩ, Sơn, Nam (mục 10, chờ điền)
+<strong>Đặc tả:</strong> <a href="SRS_CHU_KY_01.md">SRS_CHU_KY_01.md</a> · <strong>Phân việc:</strong> <a href="PHAN_VIEC_CHU_KY_01.md">PHAN_VIEC_CHU_KY_01.md</a>
+<strong>Nhánh:</strong> <code>feat/workflow-format-and-deterministic-core</code> @ <code>fffbabd</code> — chưa mở PR, chưa merge <code>main</code></p>
+<p>Khuôn theo PHAN_VIEC mốc M2: <strong>cái gì xong, cái gì trượt kèm lý do, cái gì đẩy sang chu kỳ 02.</strong> Số liệu chi tiết nằm ở <a href="BAO_CAO_BR04.md">BAO_CAO_BR04.md</a> và <a href="BAO_CAO_BR05.md">BAO_CAO_BR05.md</a>; biên bản này chỉ dẫn tới.</p>
+<hr />
+<h2 id="1-tóm-tắt">1. Tóm tắt</h2>
+<ol>
+<li><strong>Mục tiêu S2 đạt:</strong> <code>/chat</code> chạy qua vLLM server thật trên Colab L4, có log server ghi nhận request của Brain, cùng vision đang nạp.</li>
+<li><strong>Cả 6 việc Brain của chu kỳ xong phần mã</strong> (BR-01 đến BR-05, BR-07); BR-06 đã chuyển chu kỳ 02 theo SRS. <strong>Một nghiệm thu chưa làm được:</strong> BR-07 cần CI chạy thật, mà CI của repo <strong>chưa từng chạy</strong> (mục 6).</li>
+<li><strong>Đo bản fine-tune xong, kể cả so cặp với bản gốc:</strong> giữ fine-tune — làm hỏng 8 câu, sửa 88 câu. Lỗi còn lại phần lớn là <strong>dữ liệu huấn luyện</strong>, đầu vào cho quyết định huấn luyện lại ở chu kỳ 02.</li>
+<li><strong>Lộ ra và đã chặn hai lớp lỗi R1 mà chốt cũ không bắt:</strong> model <strong>chép sai đầu vào tool</strong> rồi tool tính đúng trên số sai (Brain báo 5.500.000 thay vì 6.050.000), và model <strong>suy biến</strong> ra rác chữ Hán/lặp tới trần token. Cả hai nay có chốt tất định ở production.</li>
+<li><strong>Không phát sinh chi phí mới</strong> — Colab Pro sẵn có (NFR-02).</li>
+</ol>
+<hr />
+<h2 id="2-việc-brain--trạng-thái">2. Việc Brain — trạng thái</h2>
+<table>
+<thead>
+<tr><th>Việc</th><th>Ưu tiên · hạn</th><th>Trạng thái</th><th>Bằng chứng</th></tr>
+</thead>
+<tbody>
+<tr><td><strong>BR-01</strong> <code>/tools/vat</code> từ chối trường lạ</td><td>P0 · 27/10</td><td><strong>Xong</strong></td><td><code>7214df1</code>, <code>553e396</code>; trả 422, không tính bằng 0</td></tr>
+<tr><td><strong>BR-02</strong> Đường chat cho <code>VLLMServerClient</code></td><td>P0 · 29/10</td><td><strong>Xong</strong></td><td><code>5f3e37b</code>; ba bất biến payload có test: chat template, <code>enable_thinking=False</code>, <code>repetition_penalty=1.0</code> khi bật grammar</td></tr>
+<tr><td><strong>BR-03</strong> <code>engine.py</code> rẽ theo backend</td><td>P0 · 02/11</td><td><strong>Xong</strong></td><td><code>8b69afb</code>; nghiệm thu trên Colab: log vLLM ghi <code>POST /v1/chat/completions 200</code> từ Brain</td></tr>
+<tr><td><strong>BR-04</strong> vLLM trên L4, ngân sách ctx</td><td>P0 · 04/11</td><td><strong>Xong</strong> (9/10 yêu cầu)</td><td>BAO_CAO_BR04; ctx <strong>chốt 32768</strong>, p95 <strong>chốt hai ngưỡng</strong>. Yêu cầu 8 chưa đo → chu kỳ 02</td></tr>
+<tr><td><strong>BR-05</strong> Đo fine-tune, bảng phân loại lỗi</td><td>P1 · 05/11</td><td><strong>Xong</strong> (9/9 yêu cầu)</td><td>BAO_CAO_BR05 §3 (bảng phân loại), §6d (so cặp với bản gốc)</td></tr>
+<tr><td><strong>BR-06</strong> Bộ đo RAG</td><td>—</td><td><strong>Chuyển chu kỳ 02</strong></td><td>Quyết định trong SRS, không phải trượt</td></tr>
+<tr><td><strong>BR-07</strong> Mở rộng cổng lint CI</td><td>P2 · 06/11</td><td><strong>Xong phần mã, nghiệm thu treo</strong></td><td><code>31aafa1</code>: <code>ruff check src tests offline_training</code>, sạch trên Colab. Nhánh <code>ci/br07-nghiem-thu</code> đã đẩy (đỏ rồi xanh) nhưng <strong>CI không chạy</strong> — mục 6</td></tr>
+</tbody>
+</table>
+<hr />
+<h2 id="3-cổng-ra-chu-kỳ-srs-7">3. Cổng ra chu kỳ (SRS §7)</h2>
+<table>
+<thead>
+<tr><th>Mục</th><th>Trạng thái</th></tr>
+</thead>
+<tbody>
+<tr><td><code>/chat</code> qua vLLM server, có phép thử chứng minh server <strong>nhận</strong> request (BR-03)</td><td><strong>Đạt</strong> — log vLLM ghi 2 request của Brain cho câu hoá đơn (BR-04 §5.2)</td></tr>
+<tr><td>Ba bẫy §3.3 có phép thử riêng và xanh (BR-02)</td><td><strong>Đạt</strong> — cộng <strong>bẫy thứ tư</strong> tìm ra trong BR-04: xgrammar bỏ qua khoá đứng cạnh <code>oneOf</code>, grammar agentic không thi hành trên server; sửa <code>82e9e9c</code>, test bằng xgrammar thật</td></tr>
+<tr><td>Ngân sách ctx đo trên L4, ≥ 3 mức, <strong>với vision đang nạp</strong>; quyết định vào ARCHITECTURE (BR-04)</td><td><strong>Đạt</strong> — 8192/16384/32768 đều dựng được, KV 36.176 token ở gmu 0,55, VRAM đỉnh 21,1 GB; chốt 32768 và <code>ANSER_TEXT_MAX_CONCURRENT=4</code></td></tr>
+<tr><td>Bảng ARCHITECTURE §5.1 sửa (vision bf16 7,5 GB) (BR-04)</td><td><strong>Đạt</strong> — đo 7.874 MiB</td></tr>
+<tr><td>Bảng phân loại lỗi fine-tune theo nhánh, số ca, ví dụ nguyên văn, quy về ba nguyên nhân (BR-05)</td><td><strong>Đạt</strong> — BAO_CAO_BR05 §3</td></tr>
+<tr><td><code>/tools/vat</code> trả 422 cho trường lạ (BR-01)</td><td><strong>Đạt</strong></td></tr>
+<tr><td><code>pytest -q</code> xanh và <code>ruff</code> sạch trên đúng mã đã đo</td><td><strong>Đạt, kèm ghi chú</strong> — <code>fffbabd</code> trên Colab: <strong>1163 passed, 4 skipped</strong>; ruff <strong>All checks passed</strong> trên cả <code>src tests offline_training</code>. Phiên so cặp chạy ở <code>31aafa1</code>; các commit sau đó thêm chốt suy biến, biến env và test, không đổi đường đo trừ <code>per_row</code> của bảng hệ thống. <strong>CI không xác nhận được</strong> (mục 6) — xanh là do chạy tay</td></tr>
+<tr><td>Biên bản ghi treo 1 và 2, chi phí thật, danh sách sang chu kỳ 02</td><td><strong>Đạt</strong> — mục 4, 5, 7 của biên bản này</td></tr>
+</tbody>
+</table>
+<hr />
+<h2 id="4-việc-treo-của-tien_trinh">4. Việc treo của TIEN_TRINH</h2>
+<table>
+<thead>
+<tr><th>Treo</th><th>Trạng thái</th></tr>
+</thead>
+<tbody>
+<tr><td><strong>#1</strong> <code>render_tools()</code> từng quảng cáo trường hệ thống tự bơm</td><td><strong>Đề xuất đóng, chờ chủ dự án</strong> — sau khi sửa bảng luật (BR-05 §6b), agentic: chịu gọi tool 100%, điền tham số đúng kiểu 100% (n=9), không ca agentic nào cắt cụt ở cả ba lần đo 28–29/10. Lý do chưa tự đóng: n=9 nhỏ, và lỗi gốc (mảng <code>lines</code> dài tràn trần) không còn câu nào trong bộ đề tái hiện</td></tr>
+<tr><td><strong>#2</strong> Đo lại sau khi có <code>providers.py</code></td><td><strong>Đóng 27/10</strong> — <code>[chốt chặn] ràng buộc JSON: ✓ CHẠY</code></td></tr>
+<tr><td><strong>#3</strong> Ba phần hạ tầng khai báo mà chưa nối</td><td>Không thuộc chu kỳ này</td></tr>
+<tr><td><strong>#4</strong> RAG chưa có thước đo</td><td>Đi cùng BR-06 → chu kỳ 02</td></tr>
+<tr><td><strong>#5</strong> Model chép thiếu đầu vào cho tool (mở 26/10)</td><td><strong>Đóng 28/10</strong> — xem mục 5.1</td></tr>
+</tbody>
+</table>
+<hr />
+<h2 id="5-phát-hiện-ngoài-kế-hoạch-đã-xử-lý">5. Phát hiện ngoài kế hoạch, đã xử lý</h2>
+<h3 id="51-model-chép-sai-đầu-vào-tool--chốt-đầu-vào-srccoredoc_dau_vaopy">5.1. Model chép sai đầu vào tool — chốt đầu vào (<code>src/core/doc_dau_vao.py</code>)</h3>
+<p>Câu hoá đơn 5.000.000 + 500.000, model gửi cho <code>vat</code> <strong>một</strong> dòng; Brain trả lời "tổng thực tế 5.500.000đ" kèm "kết quả từ công cụ VAT" — sai mà trông có nguồn. Chủ dự án chốt làm cả hai cách, theo trường hợp:</p>
+<table>
+<thead>
+<tr><th>Đã làm</th><th>Ghi chú</th></tr>
+</thead>
+<tbody>
+<tr><td><strong>B</strong> — hoá đơn dán có cấu trúc thì mã bóc dòng hàng, ghi đè model; câu liệt kê ≥ 2 lời chào giá thì mã dựng <code>carriers</code>/<code>offers</code></td><td><code>carrier_selection</code> trước đó luôn hỏi lại vì "chưa có nguồn"</td></tr>
+<tr><td><strong>A</strong> hai chiều — số tiền trong câu phải có trong tham số (thiếu), số tiền trong tham số phải có trong câu (bịa)</td><td>đọc cả số bằng chữ ("năm triệu rưỡi") và nói tắt ("12tr5")</td></tr>
+<tr><td>Giá đã gồm VAT hay chưa: câu không nói thì <strong>hỏi lại</strong>; lượt trả lời được ghép với hoá đơn lượt trước</td><td>chủ dự án chốt; tool <code>vat</code> có thêm chế độ giá đã gồm thuế</td></tr>
+<tr><td>Tham số chính sách giá câu không nói tới (<code>fuel_sensitivity</code>, <code>min_margin_amount</code>, <code>fuel_baseline_price</code>) thì <strong>mã xoá</strong>, tool dùng mặc định</td><td>model điền <code>fuel_sensitivity</code> 0,05 thay 0,35 ở 2/2 câu — chốt số tiền không bắt được</td></tr>
+<tr><td>Một hàm <code>chot_dau_vao</code> dùng chung cho production và benchmark</td><td>đo đúng thứ chạy thật (R4)</td></tr>
+</tbody>
+</table>
+<p><strong>Kết quả trên vLLM thật:</strong> câu hoá đơn ra <strong>6.050.000, chênh 450.000</strong> (đúng). Benchmark qua chốt: <strong>an toàn 100%, lọt 0</strong> với cả bản gốc lẫn fine-tune; trả lời ngay 44,4% (gốc) và 100% (fine-tune).</p>
+<h3 id="52-model-suy-biến--chốt-suy-biến-groundingkiem_suy_bien">5.2. Model suy biến — chốt suy biến (<code>grounding.kiem_suy_bien</code>)</h3>
+<p>6–13/27 câu diễn giải của bản fine-tune hết ý thì trôi sang chữ Hán hoặc kê từ tiếng Anh, rồi lặp tới trần 2048 token. Đo <code>repetition_penalty</code> 1,25 / 1,1 / 1,0: hạ phạt giảm suy biến nhưng không hết và bịa số tăng — <strong>gốc ở dữ liệu huấn luyện</strong>. Chủ dự án chốt giữ 1,25, thêm chốt: câu có chữ Hán hoặc 100 ký tự cuối lặp nguyên văn thì thay câu an toàn. Chốt số liệu không bắt được loại này vì rác không có số.</p>
+<h3 id="53-các-quyết-định-chủ-dự-án-đã-chốt-trong-chu-kỳ">5.3. Các quyết định chủ dự án đã chốt trong chu kỳ</h3>
+<table>
+<thead>
+<tr><th>Ngày</th><th>Quyết định</th></tr>
+</thead>
+<tbody>
+<tr><td>28/10</td><td><code>TEXT_MAX_MODEL_LEN</code> 32768</td></tr>
+<tr><td>28/10</td><td>"Báo giá" tách ba ý định: xin báo giá → n8n; tính giá bán → <code>quote</code>; so lời chào → <code>carrier_selection</code></td></tr>
+<tr><td>28/10</td><td>Chép sai đầu vào: làm cả A và B theo trường hợp; <code>carrier_selection</code> đọc lời chào từ câu</td></tr>
+<tr><td>28/10</td><td>Giá không nói gồm VAT chưa → hỏi lại</td></tr>
+<tr><td>28/10</td><td>p95 hai ngưỡng: ≤ 60 ms/token (<code>P95_MS_MOI_TOKEN</code>) và ≤ 5.000 ms tổng (<code>P95_NGUONG_MS</code>)</td></tr>
+<tr><td>28/10</td><td>Tham số chính sách giá model bịa → mã xoá, dùng mặc định</td></tr>
+<tr><td>29/10</td><td>Suy biến: giữ <code>repetition_penalty</code> 1,25, thêm chốt</td></tr>
+</tbody>
+</table>
+<hr />
+<h2 id="6-rủi-ro-lớn-nhất-ci-của-repo-chưa-từng-chạy">6. Rủi ro lớn nhất: CI của repo chưa từng chạy</h2>
+<p>GitHub Actions của <code>PCBoiz/ANSER_AI</code>: <strong>136 lượt, 0 lượt xanh</strong>. Mọi job kết thúc với <em>"The job was not started because your account is locked due to a billing issue"</em> — từ lượt cũ nhất đã soi (14/05/2026) tới nay. Khoá ở tài khoản <strong>chủ repo <code>PCBoiz</code></strong>, không phải tài khoản người đẩy mã.</p>
+<p>Hệ quả:</p>
+<ul>
+<li><strong>Không có cổng tự động nào đang hoạt động</strong> — pytest, ruff, mypy, dataset preflight chỉ chạy khi có người chạy tay trên Colab.</li>
+<li>Các chỗ trong tài liệu cũ nói "CI xanh" <strong>không có lượt chạy nào chứng minh</strong>.</li>
+<li>Nghiệm thu BR-07 ("lỗi mới PHẢI làm CI đỏ") <strong>không thực hiện được</strong>.</li>
+</ul>
+<p><strong>Cần chủ repo:</strong> gỡ khoá ở <em>Settings → Billing and plans</em>, rồi <em>Re-run jobs</em> hai lượt trên nhánh <code>ci/br07-nghiem-thu</code> (mong đợi: đỏ ở bước Ruff, rồi xanh).</p>
+<p><strong>Nếu không gỡ được</strong> — ba hướng, cần chọn: (a) chạy CI trên fork công khai của người làm (Actions miễn phí cho repo công khai, tài khoản không bị khoá); (b) nghiệm thu bằng ruff chạy tay, ghi là lệch so với SRS; (c) thêm cấu hình pre-commit chạy ruff ở máy dev — bổ trợ, không thay được CI.</p>
+<hr />
+<h2 id="7-đẩy-sang-chu-kỳ-02">7. Đẩy sang chu kỳ 02</h2>
+<h3 id="71-theo-kế-hoạch">7.1. Theo kế hoạch</h3>
+<table>
+<thead>
+<tr><th>Việc</th><th>Ghi chú</th></tr>
+</thead>
+<tbody>
+<tr><td><strong>BR-06</strong> bộ đo RAG</td><td>SRS chuyển từ đầu chu kỳ</td></tr>
+<tr><td><strong>BR-04 yêu cầu 8</strong> — ctx đủ cho kế hoạch 3 tool + RAG, đo bằng ca thật</td><td>cần RAG có thước đo trước; đi cùng BR-06</td></tr>
+<tr><td>Huấn luyện lại model</td><td>SRS: không làm chu kỳ này; bảng phân loại lỗi là đầu vào</td></tr>
+</tbody>
+</table>
+<h3 id="72-đầu-vào-cho-vòng-huấn-luyện-lại-lỗi-do-dữ-liệu-bao_cao_br05">7.2. Đầu vào cho vòng huấn luyện lại (lỗi do <strong>dữ liệu</strong>, BAO_CAO_BR05)</h3>
+<table>
+<thead>
+<tr><th>Lỗi</th><th>Quy mô</th><th>Nguồn</th></tr>
+</thead>
+<tbody>
+<tr><td>Narration không biết dừng → suy biến tới trần token</td><td>6–13/27 câu</td><td>§6d</td></tr>
+<tr><td>Chép sai dấu ngăn nghìn → số lệch ×10 (12.709.000 → 127.090.000)</td><td>lặp lại ở mọi mức phạt</td><td>§3, §6d</td></tr>
+<tr><td>Extraction điền bừa trường đáng để trống (xưng hô thành tên, mặc định <code>dau_keo</code>/<code>Hà Nội</code>)</td><td>~53 ca</td><td>§3</td></tr>
+<tr><td>Extraction tự tính ngày tương đối — LLM làm phép tính, trái R1</td><td>~21 ca</td><td>§3</td></tr>
+<tr><td>Workflow n8n trỏ tới node <code>noOp</code> không khai</td><td>2/4 ca n8n trượt</td><td>§6d</td></tr>
+<tr><td>Bộ đề: ~10 nhãn extraction sai; nhãn "phải hỏi lại" của AG0009 có thể tranh cãi</td><td>—</td><td>§3, §6b</td></tr>
+</tbody>
+</table>
+<h3 id="73-hở-đã-biết-của-các-chốt-mới">7.3. Hở đã biết của các chốt mới</h3>
+<table>
+<thead>
+<tr><th>Hở</th><th>Hệ quả</th></tr>
+</thead>
+<tbody>
+<tr><td>Kê từ tiếng Anh mà chưa kịp lặp thì chốt suy biến chưa bắt</td><td>rác có thể lọt</td></tr>
+<tr><td>Model bỏ giá dầu lúc chốt bảng giá → vẫn phải hỏi lại khách (AG0015)</td><td>khách mất một lượt; sửa bằng bộ bóc riêng cho câu tính giá</td></tr>
+<tr><td>Cách A có thể hỏi lại thừa khi câu nhắc số tiền không phải đầu vào</td><td>khách mất một lượt</td></tr>
+<tr><td><code>carrier_selection</code> chỉ xếp theo giá / chiết khấu / công nợ có trong câu</td><td>tiêu chí khác tool tự bỏ</td></tr>
+<tr><td>Hoá đơn không nói gồm VAT chưa luôn tốn thêm một lượt</td><td>theo quyết định 28/10</td></tr>
+</tbody>
+</table>
+<h3 id="74-khung-đo">7.4. Khung đo</h3>
+<table>
+<thead>
+<tr><th>Việc</th><th>Ghi chú</th></tr>
+</thead>
+<tbody>
+<tr><td>Câu không có kế hoạch tool vẫn bị chấm qua vòng agentic, trong khi production đưa sang nhánh router</td><td>là lý do "biết hỏi lại" kẹt 25% — BAO_CAO_BR05 §6b</td></tr>
+<tr><td>Kết quả dao động ±1 ca giữa các lần chạy dù <code>temperature=0</code></td><td>batching vLLM; cần đo nhiều lần hoặc tăng bộ đề</td></tr>
+</tbody>
+</table>
+<hr />
+<h2 id="8-chi-phí-thật-nfr-02">8. Chi phí thật (NFR-02)</h2>
+<table>
+<thead>
+<tr><th>Khoản</th><th>Số</th></tr>
+</thead>
+<tbody>
+<tr><td>Hạ tầng mới</td><td><strong>0đ</strong> — Colab Pro sẵn có, không thuê GPU</td></tr>
+<tr><td>GPU dùng</td><td>Colab L4, nhiều phiên 26–29/10 (BR-04, BR-05 ba lần đo, so cặp, đo phạt lặp). Không ghi số giờ chính xác</td></tr>
+<tr><td>Model tải thêm</td><td><code>Qwen/Qwen3-8B-AWQ</code> (HF, miễn phí) cho so cặp</td></tr>
+</tbody>
+</table>
+<hr />
+<h2 id="9-việc-còn-mở-cần-quyết-trước-khi-khép-chu-kỳ">9. Việc còn mở, cần quyết trước khi khép chu kỳ</h2>
+<table>
+<thead>
+<tr><th>#</th><th>Việc</th><th>Ai</th></tr>
+</thead>
+<tbody>
+<tr><td>1</td><td>Gỡ khoá thanh toán GitHub, hoặc chọn hướng (a)/(b)/(c) ở mục 6</td><td>chủ repo <code>PCBoiz</code> / chủ dự án</td></tr>
+<tr><td>2</td><td>Đóng treo #1 hay đo thêm (mục 4)</td><td>chủ dự án</td></tr>
+<tr><td>3</td><td>Thư mục <code>docs/ban-in/BR05</code> (dữ liệu đo, chưa vào git): chuyển lên Drive hay <code>.gitignore</code></td><td>chủ dự án</td></tr>
+<tr><td>4</td><td>Dựng lại bản PDF <code>docs/ban-in</code> cho BAO_CAO_BR04, BAO_CAO_BR05, biên bản này</td><td>chủ dự án quyết, Thành làm</td></tr>
+<tr><td>5</td><td>Mở PR cho nhánh làm việc để review (không merge <code>main</code>)</td><td>chủ dự án</td></tr>
+<tr><td>6</td><td>Sửa câu "không tự tạo notebook" trong SO_TAY và AGENTS — lỗi AI sinh, Colab được phép</td><td>Thành</td></tr>
+<tr><td>7</td><td>Xoá nhánh <code>ci/br07-nghiem-thu</code> sau khi nghiệm thu xong</td><td>Thành</td></tr>
+</tbody>
+</table>
+<hr />
+<h2 id="10-phần-body-đội-body-điền">10. Phần Body (đội Body điền)</h2>
+<table>
+<thead>
+<tr><th>Việc</th><th>Người</th><th>Trạng thái</th><th>Ghi chú</th></tr>
+</thead>
+<tbody>
+<tr><td>BD-01 Gộp <code>feat/brain-integration</code> về <code>Dgsonn/ANSER-v2</code></td><td>Sĩ, Sơn</td><td></td><td></td></tr>
+<tr><td>BD-02 Chốt một bản <code>schema.ts</code> duy nhất và báo Brain</td><td>Sơn</td><td></td><td></td></tr>
+<tr><td>BD-03 Giữ phép thử hợp đồng đường dẫn chạy được</td><td>Nam</td><td></td><td></td></tr>
+<tr><td>BD-04 Đưa Body lên chỗ khách truy cập được</td><td>Nam</td><td></td><td></td></tr>
+</tbody>
+</table>
+</body>
+</html>
