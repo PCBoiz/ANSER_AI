@@ -21,10 +21,12 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements-dev.txt
           pip install fastapi httpx pydantic numpy json_repair sqlalchemy requests ddgs python-multipart openpyxl
+      # BR-07 (chu kỳ 01): cả ba thư mục, không còn danh sách file chọn tay. Bản
+      # cũ chỉ soi chín file nên không thấy tám lỗi sửa ngày 22/10 — trong đó
+      # một F821 làm notebook Colab ném NameError giữa phiên đo, sau khi đã nạp
+      # xong model. Script offline chạy trên GPU đắt tiền: lỗi phải chết ở đây.
       - name: Ruff
-        run: |
-          ruff check src/core/memory.py src/core/context.py tests
-          ruff check src/core/reporting.py src/core/metrics.py src/agents/agentic.py offline_training/providers.py offline_training/chay_thu_live.py offline_training/bat_lai_brain.py
+        run: ruff check src tests offline_training
       - name: Mypy
         run: mypy src/core/memory.py src/core/context.py offline_training/providers.py offline_training/chay_thu_live.py offline_training/bat_lai_brain.py
       - name: Pytest

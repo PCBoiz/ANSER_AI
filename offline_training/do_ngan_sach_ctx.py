@@ -42,6 +42,7 @@ REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(REPO, "offline_training"))
 sys.path.insert(0, REPO)
 from chay_thu_live import HOA_DON  # noqa: E402  — cùng câu hoá đơn cố ý sai
+
 from src.core.nguong_p95 import danh_gia  # noqa: E402  — chỉ thư viện chuẩn
 
 AWQ_MAC_DINH = "/content/drive/MyDrive/ANSER_AI_Logistics/anser-v3-awq"
