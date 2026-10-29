@@ -1,6 +1,6 @@
 # TIẾN TRÌNH BRAIN — bản kiểm soát lộ trình
 
-**Cập nhật 25/08/2026**, bổ sung 26–28/10/2026 (BR-01 đến BR-05: P1 đính chính, việc treo #2, #3 và #5). File này trả lời bốn câu cho người tiếp quản:
+**Cập nhật 25/08/2026**, bổ sung 26–29/10/2026 (chu kỳ 01: P1 đính chính, việc treo #2, #3 và #5; tổng kết ở [BIEN_BAN_CHU_KY_01.md](BIEN_BAN_CHU_KY_01.md)). File này trả lời bốn câu cho người tiếp quản:
 *đang ở đâu, cái gì đã chắc, cái gì đang dở, và đụng vào đâu thì gãy.*
 
 Khác với [BAN_GIAO_VAN_TAI.md](BAN_GIAO_VAN_TAI.md) — bản đó chỉ nói phần **vận
@@ -111,6 +111,15 @@ lược đồ đã gạch tên**.
 mảng dài → tràn trần token → JSON cắt cụt → vòng lặp gãy.
 
 **Đã sửa trong mã, chưa có số chứng minh nó kéo agentic lên.** Cần một phiên đo.
+
+> **29/10/2026: đề xuất đóng, chờ chủ dự án.** Sau khi sửa bảng luật (BR-05
+> §6b), ba lần đo 28–29/10: agentic chịu gọi tool 100%, điền tham số đúng kiểu
+> 100% (n=9), không ca agentic nào cắt cụt. Chưa tự đóng vì n=9 nhỏ và bộ đề
+> không còn câu nào tái hiện lỗi gốc (mảng `lines` dài tràn trần).
+
+> **⚠ CI chưa từng chạy** (phát hiện 29/10): GitHub Actions của repo bị khoá
+> thanh toán ở tài khoản chủ repo — 136 lượt, 0 lượt xanh, ít nhất từ 14/05/2026.
+> Mọi "CI xanh" trước đây không có lượt chạy nào chứng minh. Xem biên bản §6.
 
 > **BR-05 (27/10/2026): VẪN MỞ.** Phiên đo chạy được, nhưng nhánh agentic bị một
 > lỗi khác che mất: bảng luật đẩy 6/6 câu báo giá sang `report` (chữ trần

@@ -57,10 +57,10 @@ Cách đọc từng cột:
 | 3 | Đo **với vision đang nạp** | **Đạt** — 7.874 MiB ở mọi mức; script cảnh báo nếu dưới 4.000 MiB |
 | 4 | Ba mức 8192 / 16384 / 32768: dựng được, VRAM đỉnh, KV cache | **Đạt** — mục 2 |
 | 5 | Quy KV ra số request 32k song song | **Đạt** — 1,1 |
-| 6 | p95 ở mức đồng thời của yêu cầu 5 | **Đã đo** ở 1× và 4× (NFR-03). **Vượt 5.000ms** — mục 4 |
+| 6 | p95 ở mức đồng thời của yêu cầu 5 | **Đã đo** ở 1× và 4× (NFR-03). Vượt 5.000 ms tổng, đạt ngưỡng ms/token chốt 28/10 — mục 4, 6 |
 | 7 | 32k không vừa thì hạ `gmu` trước rồi mới hạ ctx | **Không cần** — 32k vừa |
 | 8 | ctx đủ cho kế hoạch 3 tool + RAG, **đo bằng ca thật** | **Chưa đo.** Câu thật duy nhất của phiên này đi 1 tool, không RAG |
-| 9 | Quyết định vào ARCHITECTURE + sửa bảng §5.1 | **Đã ghi dạng đề xuất** — chờ chủ dự án chốt (mục 6). §5.1 đã sửa theo số đo |
+| 9 | Quyết định vào ARCHITECTURE + sửa bảng §5.1 | **Đạt** — chủ dự án chốt 28/10: ctx 32768, p95 hai ngưỡng (mục 6). §5.1 đã sửa theo số đo |
 | 10 | Runbook dựng lại được | **Đạt** — mục 7 |
 
 ---

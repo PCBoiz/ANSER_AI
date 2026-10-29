@@ -36,7 +36,7 @@
 | agentic — biết hỏi lại | 25% (n=4) | — | mẫu quá nhỏ |
 | agentic — điền tham số | 60% (n=5) | 15,8% (chỉ số khác) | mẫu quá nhỏ; không so trực tiếp với 15/08 |
 
-So 15/08 chỉ để định hướng: bộ đo đã đổi nhiều chỗ (payload, grammar, cách chấm agentic). So theo cặp với model gốc (yêu cầu 9, mức NÊN) **chưa làm**.
+So 15/08 chỉ để định hướng: bộ đo đã đổi nhiều chỗ (payload, grammar, cách chấm agentic). So theo cặp với model gốc (yêu cầu 9): **đã làm 29/10**, xem §6d.
 
 ---
 
