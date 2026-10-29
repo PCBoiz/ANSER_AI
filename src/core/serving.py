@@ -239,7 +239,13 @@ class CompletionRequest:
 
 # Phạt lặp mặc định khi sinh tự do. Trùng con số đường trong tiến trình đang
 # dùng ở engine.py ("Ngày 7: 1.15 chưa đủ, model vẫn lặp nguyên câu").
-REPETITION_PENALTY_TU_DO = 1.25
+#
+# Đổi được qua env từ 29/10/2026 để ĐO, mặc định giữ 1,25. BR-05 yêu cầu 9:
+# 6/27 câu diễn giải của bản fine-tune suy biến ở mức này — hết ý thì trôi
+# sang tiếng Trung/Anh, kê từ đồng nghĩa không lặp ("pull drag haul yank…")
+# tới trần 2048 token; bản gốc cùng mức thì không. Chưa biết hạ phạt có đỡ
+# không — đo trước, đổi mặc định sau.
+REPETITION_PENALTY_TU_DO = float(os.getenv("TEXT_REPETITION_PENALTY", "1.25"))
 HEALTH_TIMEOUT_S = 2.0
 # Khi bật grammar PHẢI là 1.0. JSON bắt buộc lặp token ("typeVersion",
 # "position", dấu ngoặc giữa các node); phạt lặp sẽ cấm đúng các token grammar
