@@ -57,3 +57,6 @@ def danh_gia(p95_ms: float | None, p95_ms_moi_token: float | None) -> dict:
 
 
 __all__ = ["MAC_DINH_MS_MOI_TOKEN", "MAC_DINH_NGUONG_MS", "danh_gia", "doc_nguong"]
+
+# BR-07 nghiem thu: bien ten mo ho, ruff E741 PHAI lam CI do. Commit sau go ra.
+l = 1
